@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: postgres
+    ports:
+      - '5432:5432'
+
+  redis:
+    image: redis:7
+    ports:
+      - '6379:6379'
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    env_file:
+      - .env
+    environment:
+      AUTH_DB: postgresql+asyncpg://admin:admin@postgres:5432/auth_db
+      JWT_SECRET: supersecret
+      JWT_ALGORITHM: HS256
+    depends_on:
+      - postgres
+    ports:
+      - '8001:8000'
+
+  user-service:
+    build: ./services/user-service
+    container_name: user-service
+    env_file:
+      - .env
+    environment:
+      USER_DB: postgresql+asyncpg://admin:admin@postgres:5432/user_db
+    depends_on:
+      - postgres
+    ports:
+      - '8002:8000'
+
+  handyman-service:
+    build: ./services/handyman-service
+    container_name: handyman-service
+    env_file:
+      - .env
+    environment:
+      HANDYMAN_DB: postgresql+asyncpg://admin:admin@postgres:5432/handyman_db
+    depends_on:
+      - postgres
+    ports:
+      - '8003:8000'
+
+  availability-service:
+    build: ./services/availability-service
+    env_file: .env
+    ports:
+      - '8004:8000'
+    depends_on:
+      - redis
+
+  api-gateway:
+    build: ./services/api-gateway
+    env_file: .env
+    ports:
+      - '8000:8000'
+    depends_on:
+      - auth-service
+      - user-service
+      - availability-service
+      - redis

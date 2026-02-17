@@ -1,0 +1,14 @@
+[project]
+name = "shared"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "sqlalchemy",
+    "asyncpg",
+    "redis",
+    "aio_pika",
+    "pydantic",
+    "python-dotenv",
+    "uvicorn",
+    "structlog"
+]
