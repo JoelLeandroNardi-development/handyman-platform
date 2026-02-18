@@ -69,3 +69,21 @@ async def get_handyman(email: str, db: AsyncSession = Depends(get_db)):
         "latitude": handyman.latitude,
         "longitude": handyman.longitude,
     }
+
+
+@router.get("/handymen")
+async def list_handymen(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Handyman))
+    handymen = result.scalars().all()
+
+    return [
+        {
+            "email": h.email,
+            "skills": h.skills,
+            "years_experience": h.years_experience,
+            "service_radius_km": h.service_radius_km,
+            "latitude": h.latitude,
+            "longitude": h.longitude,
+        }
+        for h in handymen
+    ]

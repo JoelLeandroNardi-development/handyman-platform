@@ -2,6 +2,7 @@ version: '3.9'
 
 services:
   postgres:
+    container_name: postgres
     image: postgis/postgis:15-3.3
     environment:
       POSTGRES_USER: admin
@@ -11,6 +12,7 @@ services:
       - '5432:5432'
 
   redis:
+    container_name: redis
     image: redis:7
     ports:
       - '6379:6379'
@@ -64,6 +66,19 @@ services:
       - redis
     ports:
       - '8004:8000'
+
+  match-service:
+    build: ./services/match-service
+    container_name: match-service
+    env_file:
+      - .env
+    environment:
+      MATCH_DB: postgresql+asyncpg://admin:admin@postgres:5432/match_db
+    depends_on:
+      - postgres
+      - handyman-service
+    ports:
+      - '8005:8000'
 
   api-gateway:
     build: ./services/api-gateway
