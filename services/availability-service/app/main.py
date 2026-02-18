@@ -1,16 +1,6 @@
 from fastapi import FastAPI
-from shared.redis import redis_client
+from .routes import router
 
-app = FastAPI()
+app = FastAPI(title="Availability Service")
 
-TTL = 15
-
-@app.post("/heartbeat/{handyman_id}")
-async def heartbeat(handyman_id: int):
-    await redis_client.set(f"availability:{handyman_id}", "1", ex=TTL)
-    return {"status": "online"}
-
-@app.get("/status/{handyman_id}")
-async def status(handyman_id: int):
-    online = await redis_client.exists(f"availability:{handyman_id}")
-    return {"online": bool(online)}
+app.include_router(router)
