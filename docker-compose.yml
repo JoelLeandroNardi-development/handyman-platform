@@ -76,7 +76,13 @@ services:
   gateway-service:
     build: ./services/gateway-service
     container_name: gateway-service
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
+      - redis
+      - auth-service
       - user-service
       - handyman-service
       - availability-service

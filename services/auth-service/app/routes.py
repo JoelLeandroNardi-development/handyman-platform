@@ -14,7 +14,10 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"])
 
 JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM") or "HS256"
+
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is not set")
 
 
 async def get_db():
@@ -32,11 +35,16 @@ async def register(data: Register, db: AsyncSession = Depends(get_db)):
 
     hashed = pwd_context.hash(data.password)
 
-    user = AuthUser(email=data.email, password=hashed)
+    user = AuthUser(
+        email=data.email,
+        password=hashed,
+        roles=data.roles,
+    )
+
     db.add(user)
     await db.commit()
 
-    return {"message": "User registered"}
+    return {"message": "User registered", "roles": user.roles}
 
 
 @router.post("/login")
@@ -51,7 +59,10 @@ async def login(data: Login, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = jwt.encode(
-        {"sub": user.email},
+        {
+            "sub": user.email,
+            "roles": user.roles,
+        },
         JWT_SECRET,
         algorithm=JWT_ALGORITHM,
     )

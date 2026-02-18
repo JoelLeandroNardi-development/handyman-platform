@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, JSON
 from .db import Base
 
 
@@ -8,3 +8,4 @@ class AuthUser(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
+    roles = Column(JSON, nullable=False)
