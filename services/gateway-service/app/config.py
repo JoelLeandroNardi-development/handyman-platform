@@ -1,0 +1,5 @@
+AUTH_SERVICE_URL = "http://auth-service:8000"
+USER_SERVICE_URL = "http://user-service:8000"
+HANDYMAN_SERVICE_URL = "http://handyman-service:8000"
+AVAILABILITY_SERVICE_URL = "http://availability-service:8000"
+MATCH_SERVICE_URL = "http://match-service:8000"

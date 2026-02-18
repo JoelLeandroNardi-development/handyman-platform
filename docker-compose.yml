@@ -28,8 +28,6 @@ services:
       JWT_ALGORITHM: HS256
     depends_on:
       - postgres
-    ports:
-      - '8001:8000'
 
   user-service:
     build: ./services/user-service
@@ -40,8 +38,6 @@ services:
       USER_DB: postgresql+asyncpg://admin:admin@postgres:5432/user_db
     depends_on:
       - postgres
-    ports:
-      - '8002:8000'
 
   handyman-service:
     build: ./services/handyman-service
@@ -52,8 +48,6 @@ services:
       HANDYMAN_DB: postgresql+asyncpg://admin:admin@postgres:5432/handyman_db
     depends_on:
       - postgres
-    ports:
-      - '8003:8000'
 
   availability-service:
     build: ./services/availability-service
@@ -64,8 +58,6 @@ services:
       REDIS_URL: redis://redis:6379/0
     depends_on:
       - redis
-    ports:
-      - '8004:8000'
 
   match-service:
     build: ./services/match-service
@@ -74,19 +66,20 @@ services:
       - .env
     environment:
       MATCH_DB: postgresql+asyncpg://admin:admin@postgres:5432/match_db
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - postgres
       - handyman-service
-    ports:
-      - '8005:8000'
-
-  api-gateway:
-    build: ./services/api-gateway
-    env_file: .env
-    ports:
-      - '8000:8000'
-    depends_on:
-      - auth-service
-      - user-service
       - availability-service
       - redis
+
+  gateway-service:
+    build: ./services/gateway-service
+    container_name: gateway-service
+    depends_on:
+      - user-service
+      - handyman-service
+      - availability-service
+      - match-service
+    ports:
+      - '8000:8000'
