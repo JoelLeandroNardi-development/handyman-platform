@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Depends
+import time
+import asyncio
+import httpx
+from fastapi import FastAPI, Depends, Request
 from typing import List
 
 from .schemas import *
@@ -6,135 +9,148 @@ from .clients import *
 from .security import get_current_user
 from .rbac import require_role
 from .middleware import RequestLoggingMiddleware, RateLimitMiddleware
+from .config import (
+    AUTH_SERVICE_URL,
+    USER_SERVICE_URL,
+    HANDYMAN_SERVICE_URL,
+    AVAILABILITY_SERVICE_URL,
+    MATCH_SERVICE_URL,
+)
 
 app = FastAPI(title="Smart API Gateway")
 
-# Middleware order: logging wraps everything; rate limit applies early
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_per_minute=120)
 
 
 @app.get("/health")
 async def health():
-    return {"status": "gateway running"}
+    return {"status": "ok", "service": "gateway-service"}
+
+
+@app.get("/system/health")
+async def system_health(
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+
+    services = {
+        "auth-service": f"{AUTH_SERVICE_URL}/health",
+        "user-service": f"{USER_SERVICE_URL}/health",
+        "handyman-service": f"{HANDYMAN_SERVICE_URL}/health",
+        "availability-service": f"{AVAILABILITY_SERVICE_URL}/health",
+        "match-service": f"{MATCH_SERVICE_URL}/health",
+    }
+
+    async def check(name: str, url: str):
+        start = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                r = await client.get(url, headers={"X-Request-Id": request.state.request_id})
+                latency_ms = (time.perf_counter() - start) * 1000
+                return {
+                    "service": name,
+                    "status": "up" if r.status_code == 200 else "down",
+                    "http_status": r.status_code,
+                    "latency_ms": round(latency_ms, 2),
+                }
+        except Exception as e:
+            latency_ms = (time.perf_counter() - start) * 1000
+            return {
+                "service": name,
+                "status": "down",
+                "error": str(e),
+                "latency_ms": round(latency_ms, 2),
+            }
+
+    results = await asyncio.gather(*[check(n, u) for n, u in services.items()])
+    overall = "up" if all(r.get("status") == "up" for r in results) else "degraded"
+
+    return {"status": overall, "services": results}
 
 
 # ================= AUTH (PUBLIC) =================
 
 @app.post("/register")
-async def register(data: Register):
-    return await register_user(data.model_dump())
+async def register(data: Register, request: Request):
+    return await register_user(data.model_dump(), request_id=request.state.request_id)
 
 
 @app.post("/login", response_model=TokenResponse)
-async def login(data: Login):
-    return await login_user(data.model_dump())
+async def login(data: Login, request: Request):
+    return await login_user(data.model_dump(), request_id=request.state.request_id)
 
 
 # ================= USER (PROTECTED) =================
 
 @app.post("/users")
-async def create_user_endpoint(
-    data: CreateUser,
-    user=Depends(get_current_user),
-):
+async def create_user_endpoint(data: CreateUser, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
-    return await create_user(data.model_dump())
+    return await create_user(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.put("/users/{email}/location")
-async def update_user_location_endpoint(
-    email: str,
-    data: UpdateUserLocation,
-    user=Depends(get_current_user),
-):
+async def update_user_location_endpoint(email: str, data: UpdateUserLocation, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
-    return await update_user_location(email, data.model_dump())
+    return await update_user_location(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/users/{email}")
-async def get_user_endpoint(
-    email: str,
-    user=Depends(get_current_user),
-):
+async def get_user_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
-    return await get_user(email)
+    return await get_user(email, request_id=request.state.request_id, user_payload=user)
 
 
 # ================= HANDYMAN (PROTECTED) =================
 
 @app.post("/handymen")
-async def create_handyman_endpoint(
-    data: CreateHandyman,
-    user=Depends(get_current_user),
-):
+async def create_handyman_endpoint(data: CreateHandyman, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await create_handyman(data.model_dump())
+    return await create_handyman(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.put("/handymen/{email}/location")
-async def update_handyman_location_endpoint(
-    email: str,
-    data: UpdateHandymanLocation,
-    user=Depends(get_current_user),
-):
+async def update_handyman_location_endpoint(email: str, data: UpdateHandymanLocation, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await update_handyman_location(email, data.model_dump())
+    return await update_handyman_location(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/handymen/{email}")
-async def get_handyman_endpoint(
-    email: str,
-    user=Depends(get_current_user),
-):
+async def get_handyman_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await get_handyman(email)
+    return await get_handyman(email, request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/handymen")
-async def list_handymen_endpoint(
-    user=Depends(get_current_user),
-):
-    require_role(user, ["user", "admin"])
-    return await list_handymen()
+async def list_handymen_endpoint(request: Request, user=Depends(get_current_user)):
+    require_role(user, ["user", "handyman", "admin"])
+    return await list_handymen(request_id=request.state.request_id, user_payload=user)
 
 
 # ================= AVAILABILITY (PROTECTED) =================
 
 @app.post("/availability/{email}")
-async def set_availability_endpoint(
-    email: str,
-    data: SetAvailability,
-    user=Depends(get_current_user),
-):
+async def set_availability_endpoint(email: str, data: SetAvailability, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await set_availability(email, data.model_dump())
+    return await set_availability(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/availability/{email}")
-async def get_availability_endpoint(
-    email: str,
-    user=Depends(get_current_user),
-):
+async def get_availability_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "handyman", "admin"])
-    return await get_availability(email)
+    return await get_availability(email, request_id=request.state.request_id, user_payload=user)
 
 
 @app.delete("/availability/{email}")
-async def clear_availability_endpoint(
-    email: str,
-    user=Depends(get_current_user),
-):
+async def clear_availability_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await clear_availability(email)
+    return await clear_availability(email, request_id=request.state.request_id, user_payload=user)
 
 
 # ================= MATCH (PROTECTED) =================
 
 @app.post("/match", response_model=List[MatchResult])
-async def match_endpoint(
-    data: MatchRequest,
-    user=Depends(get_current_user),
-):
+async def match_endpoint(data: MatchRequest, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
-    return await match_request(data.model_dump())
+    return await match_request(data.model_dump(), request_id=request.state.request_id, user_payload=user)
