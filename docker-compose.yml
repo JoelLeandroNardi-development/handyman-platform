@@ -17,6 +17,21 @@ services:
     ports:
       - '6379:6379'
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   auth-service:
     build: ./services/auth-service
     container_name: auth-service
@@ -56,8 +71,12 @@ services:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - redis
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   match-service:
     build: ./services/match-service
@@ -67,11 +86,13 @@ services:
     environment:
       MATCH_DB: postgresql+asyncpg://admin:admin@postgres:5432/match_db
       REDIS_URL: redis://redis:6379/0
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
     depends_on:
       - postgres
+      - redis
+      - rabbitmq
       - handyman-service
       - availability-service
-      - redis
 
   gateway-service:
     build: ./services/gateway-service
