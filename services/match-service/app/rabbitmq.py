@@ -1,12 +1,11 @@
 import os
 import aio_pika
 
-RABBIT_URL = os.getenv("RABBIT_URL")
-if not RABBIT_URL:
-    raise RuntimeError("RABBIT_URL environment variable is not set")
-
+RABBIT_URL = os.getenv("RABBIT_URL")  # required if you want events
 EXCHANGE_NAME = "domain_events"
 
 
 async def connect():
+    if not RABBIT_URL:
+        return None
     return await aio_pika.connect_robust(RABBIT_URL)

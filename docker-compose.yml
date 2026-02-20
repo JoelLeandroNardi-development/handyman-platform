@@ -10,12 +10,22 @@ services:
       POSTGRES_DB: postgres
     ports:
       - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   redis:
     container_name: redis
     image: redis:7
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -42,7 +52,8 @@ services:
       JWT_SECRET: supersecret
       JWT_ALGORITHM: HS256
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   user-service:
     build: ./services/user-service
@@ -52,7 +63,8 @@ services:
     environment:
       USER_DB: postgresql+asyncpg://admin:admin@postgres:5432/user_db
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   handyman-service:
     build: ./services/handyman-service
@@ -62,7 +74,8 @@ services:
     environment:
       HANDYMAN_DB: postgresql+asyncpg://admin:admin@postgres:5432/handyman_db
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   availability-service:
     build: ./services/availability-service
@@ -76,7 +89,7 @@ services:
       rabbitmq:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   match-service:
     build: ./services/match-service
@@ -88,11 +101,16 @@ services:
       REDIS_URL: redis://redis:6379/0
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - handyman-service
-      - availability-service
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      handyman-service:
+        condition: service_started
+      availability-service:
+        condition: service_started
 
   gateway-service:
     build: ./services/gateway-service
@@ -102,11 +120,17 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - redis
-      - auth-service
-      - user-service
-      - handyman-service
-      - availability-service
-      - match-service
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      handyman-service:
+        condition: service_started
+      availability-service:
+        condition: service_started
+      match-service:
+        condition: service_started
     ports:
       - '8000:8000'
