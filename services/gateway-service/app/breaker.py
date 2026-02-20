@@ -48,7 +48,6 @@ class CircuitBreaker:
         if state == "OPEN":
             opened_at = await redis_client.get(self._key_opened_at())
             if not opened_at:
-                # safety: if no timestamp, close it
                 await self.close()
                 return
 
@@ -56,29 +55,24 @@ class CircuitBreaker:
             now = time.time()
 
             if (now - opened_at) >= self.reset_timeout_seconds:
-                # move to half-open and allow one probe
                 await redis_client.set(self._key_state(), "HALF_OPEN")
                 return
 
             raise CircuitBreakerOpen(f"Circuit breaker OPEN for {self.name}")
 
-        # HALF_OPEN: allow one probe request
         if state == "HALF_OPEN":
             return
 
     async def record_success(self) -> None:
-        # success closes breaker and resets failures
         await self.close()
 
     async def record_failure(self) -> None:
         state = await self._get_state()
 
-        # If half-open fails, open immediately
         if state == "HALF_OPEN":
             await self.open()
             return
 
-        # Otherwise count failures
         failures = await redis_client.incr(self._key_failures())
         if failures == 1:
             await redis_client.expire(self._key_failures(), 60)
@@ -93,6 +87,7 @@ class CircuitBreaker:
         pipe.set(self._key_opened_at(), now)
         pipe.expire(self._key_state(), self.reset_timeout_seconds + 30)
         pipe.expire(self._key_opened_at(), self.reset_timeout_seconds + 30)
+        pipe.expire(self._key_failures(), self.reset_timeout_seconds + 30)
         await pipe.execute()
 
     async def close(self) -> None:
@@ -102,3 +97,32 @@ class CircuitBreaker:
         pipe.delete(self._key_opened_at())
         pipe.expire(self._key_state(), 3600)
         await pipe.execute()
+
+    async def status(self) -> dict:
+        """
+        Returns breaker status for visibility endpoints.
+        """
+        state, failures, opened_at = await redis_client.mget(
+            self._key_state(),
+            self._key_failures(),
+            self._key_opened_at(),
+        )
+
+        state = state or "CLOSED"
+        failures_int = int(failures) if failures and str(failures).isdigit() else 0
+        opened_at_f = float(opened_at) if opened_at else None
+
+        now = time.time()
+        open_for_s = None
+        if opened_at_f:
+            open_for_s = max(0.0, now - opened_at_f)
+
+        return {
+            "name": self.name,
+            "state": state,
+            "failure_threshold": self.failure_threshold,
+            "reset_timeout_seconds": self.reset_timeout_seconds,
+            "failures": failures_int,
+            "opened_at_epoch": opened_at_f,
+            "open_for_seconds": round(open_for_s, 2) if open_for_s is not None else None,
+        }

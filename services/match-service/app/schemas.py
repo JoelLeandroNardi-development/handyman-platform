@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import Optional
 
 
 class MatchRequest(BaseModel):
@@ -12,3 +12,4 @@ class MatchResult(BaseModel):
     email: str
     distance_km: float
     years_experience: int
+    availability_unknown: bool = False

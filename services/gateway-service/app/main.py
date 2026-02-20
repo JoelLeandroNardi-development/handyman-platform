@@ -1,7 +1,7 @@
 import time
 import asyncio
 import httpx
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, HTTPException
 from typing import List
 
 from .schemas import *
@@ -21,6 +21,17 @@ app = FastAPI(title="Smart API Gateway")
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_per_minute=120)
+
+
+def _breaker_registry():
+    # breakers live in clients.py; we expose them here
+    return {
+        "auth-service": cb_auth,
+        "user-service": cb_user,
+        "handyman-service": cb_handyman,
+        "availability-service": cb_availability,
+        "match-service": cb_match,
+    }
 
 
 @app.get("/health")
@@ -68,6 +79,48 @@ async def system_health(
     overall = "up" if all(r.get("status") == "up" for r in results) else "degraded"
 
     return {"status": overall, "services": results}
+
+
+# ================= BREAKER VISIBILITY (ADMIN) =================
+
+@app.get("/system/breakers")
+async def breakers_status(
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    registry = _breaker_registry()
+    statuses = await asyncio.gather(*[b.status() for b in registry.values()])
+    # Sort by name for stable output
+    statuses.sort(key=lambda x: x["name"])
+    return {"breakers": statuses}
+
+
+@app.post("/system/breakers/{name}/close")
+async def breaker_close(
+    name: str,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    registry = _breaker_registry()
+    b = registry.get(name)
+    if not b:
+        raise HTTPException(status_code=404, detail="Breaker not found")
+    await b.close()
+    return {"message": "closed", "breaker": await b.status()}
+
+
+@app.post("/system/breakers/{name}/open")
+async def breaker_open(
+    name: str,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    registry = _breaker_registry()
+    b = registry.get(name)
+    if not b:
+        raise HTTPException(status_code=404, detail="Breaker not found")
+    await b.open()
+    return {"message": "opened", "breaker": await b.status()}
 
 
 # ================= AUTH (PUBLIC) =================
