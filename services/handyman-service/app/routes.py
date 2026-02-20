@@ -6,6 +6,9 @@ from .db import SessionLocal
 from .models import Handyman
 from .schemas import CreateHandyman, UpdateLocation
 
+from .events import build_event, to_json
+from .rabbitmq import publisher
+
 router = APIRouter()
 
 
@@ -34,6 +37,19 @@ async def create_handyman(data: CreateHandyman, db: AsyncSession = Depends(get_d
     db.add(handyman)
     await db.commit()
 
+    event = build_event(
+        "handyman.created",
+        {
+            "email": handyman.email,
+            "skills": handyman.skills,
+            "years_experience": handyman.years_experience,
+            "service_radius_km": handyman.service_radius_km,
+            "latitude": handyman.latitude,
+            "longitude": handyman.longitude,
+        },
+    )
+    await publisher.publish("handyman.created", to_json(event))
+
     return {"message": "Handyman created"}
 
 
@@ -47,8 +63,17 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
 
     handyman.latitude = data.latitude
     handyman.longitude = data.longitude
-
     await db.commit()
+
+    event = build_event(
+        "handyman.location_updated",
+        {
+            "email": handyman.email,
+            "latitude": handyman.latitude,
+            "longitude": handyman.longitude,
+        },
+    )
+    await publisher.publish("handyman.location_updated", to_json(event))
 
     return {"message": "Location updated"}
 

@@ -73,8 +73,11 @@ services:
       - .env
     environment:
       HANDYMAN_DB: postgresql+asyncpg://admin:admin@postgres:5432/handyman_db
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   availability-service:

@@ -6,10 +6,16 @@ from aio_pika import ExchangeType
 from .rabbitmq import connect, EXCHANGE_NAME
 from .services import redis_client
 
-QUEUE_NAME = "match_service_availability_events"
-ROUTING_KEY = "availability.updated"
-IDEMPOTENCY_TTL_SECONDS = 60 * 60  # 1 hour
+QUEUE_NAME = "match_service_domain_events"
 
+# Listen to both availability + handyman topics
+ROUTING_KEYS = [
+    "availability.updated",
+    "handyman.created",
+    "handyman.location_updated",
+]
+
+IDEMPOTENCY_TTL_SECONDS = 60 * 60  # 1 hour
 RETRY_SECONDS = 5
 
 
@@ -48,7 +54,11 @@ async def handle_message(message: aio_pika.IncomingMessage):
         event_id = payload.get("event_id")
         event_type = payload.get("event_type")
 
-        if not event_id or event_type != "availability.updated":
+        if not event_id or not event_type:
+            return
+
+        # Only process event types we care about
+        if event_type not in set(ROUTING_KEYS):
             return
 
         if await _already_processed(event_id):
@@ -58,10 +68,6 @@ async def handle_message(message: aio_pika.IncomingMessage):
 
 
 async def _connect_and_consume():
-    """
-    Connect to RabbitMQ and start consuming.
-    Returns connection if successful, else raises.
-    """
     connection = await connect()
     if connection is None:
         raise RuntimeError("RABBIT_URL not set; cannot start consumer")
@@ -80,18 +86,16 @@ async def _connect_and_consume():
         durable=True,
     )
 
-    await queue.bind(exchange, routing_key=ROUTING_KEY)
+    for rk in ROUTING_KEYS:
+        await queue.bind(exchange, routing_key=rk)
+
     await queue.consume(handle_message)
 
-    print("[match-service] event consumer started")
+    print("[match-service] event consumer started (availability + handyman)")
     return connection
 
 
 async def start_consumer_with_retry(stop_event: asyncio.Event):
-    """
-    Keeps trying to start the consumer until successful or stop_event is set.
-    Returns an active connection or None if stopped.
-    """
     while not stop_event.is_set():
         try:
             conn = await _connect_and_consume()
