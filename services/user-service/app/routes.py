@@ -6,6 +6,9 @@ from .db import SessionLocal
 from .models import User
 from .schemas import CreateUser, UpdateLocation
 
+from .events import build_event, to_json
+from .rabbitmq import publisher
+
 router = APIRouter()
 
 
@@ -32,6 +35,17 @@ async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.commit()
 
+    event = build_event(
+        "user.created",
+        {
+            "email": user.email,
+            "full_name": user.full_name,
+            "latitude": user.latitude,
+            "longitude": user.longitude,
+        },
+    )
+    await publisher.publish("user.created", to_json(event))
+
     return {"message": "User created"}
 
 
@@ -47,6 +61,16 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
     user.longitude = data.longitude
 
     await db.commit()
+
+    event = build_event(
+        "user.location_updated",
+        {
+            "email": user.email,
+            "latitude": user.latitude,
+            "longitude": user.longitude,
+        },
+    )
+    await publisher.publish("user.location_updated", to_json(event))
 
     return {"message": "Location updated"}
 

@@ -8,11 +8,12 @@ from .services import redis_client
 
 QUEUE_NAME = "match_service_domain_events"
 
-# Listen to both availability + handyman topics
 ROUTING_KEYS = [
     "availability.updated",
     "handyman.created",
     "handyman.location_updated",
+    "user.created",
+    "user.location_updated",
 ]
 
 IDEMPOTENCY_TTL_SECONDS = 60 * 60  # 1 hour
@@ -29,6 +30,7 @@ async def _already_processed(event_id: str) -> bool:
 
 
 async def _invalidate_match_cache():
+    # Coarse invalidation: safe and correct for now
     pattern = "match:*"
     cursor = 0
     keys_to_delete = []
@@ -57,7 +59,6 @@ async def handle_message(message: aio_pika.IncomingMessage):
         if not event_id or not event_type:
             return
 
-        # Only process event types we care about
         if event_type not in set(ROUTING_KEYS):
             return
 
@@ -91,7 +92,7 @@ async def _connect_and_consume():
 
     await queue.consume(handle_message)
 
-    print("[match-service] event consumer started (availability + handyman)")
+    print("[match-service] event consumer started (availability + handyman + user)")
     return connection
 
 
