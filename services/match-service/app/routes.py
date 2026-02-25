@@ -12,8 +12,9 @@ from .services import (
     availability_service_up,
     cache_key,
     get_cached_result,
-    set_cache,
+    set_cache_with_index,
     norm,
+    bucket_id,
 )
 
 router = APIRouter()
@@ -28,11 +29,10 @@ async def get_db():
 async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     requested_skill = norm(data.skill)
 
-    # 1) health probe once
     availability_up = await availability_service_up()
+    degraded = not availability_up
 
-    # 2) cache key depends on mode
-    key = cache_key(data.latitude, data.longitude, requested_skill, degraded=(not availability_up))
+    key = cache_key(data.latitude, data.longitude, requested_skill, degraded=degraded)
 
     cached = await get_cached_result(key)
     if cached:
@@ -59,7 +59,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         if distance > h["service_radius_km"]:
             continue
 
-        # Strict mode: require available
+        # strict mode: require availability
         if availability_up:
             try:
                 available = await is_available(h["email"])
@@ -67,11 +67,10 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
                     continue
                 availability_unknown = False
             except Exception:
-                # If availability-service dies mid-request, degrade gracefully
+                # degrade mid-request if availability dies
                 availability_up = False
                 availability_unknown = True
         else:
-            # Degraded mode: do not filter by availability
             availability_unknown = True
 
         results.append(
@@ -85,11 +84,20 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
 
     results.sort(key=lambda x: x["distance_km"])
 
-    # Cache policy:
-    # - strict: 60s (normal)
-    # - degraded: 15s (short, so we recover quickly when availability comes back)
+    # bucket-indexed cache
+    mode = "strict" if availability_up else "degraded"
     ttl = 60 if availability_up else 15
-    await set_cache(key, json.dumps(results), ttl_seconds=ttl)
+
+    b_lat, b_lon = bucket_id(data.latitude, data.longitude)
+    await set_cache_with_index(
+        cache_key_str=key,
+        value=json.dumps(results),
+        ttl_seconds=ttl,
+        mode=mode,
+        skill=requested_skill,
+        b_lat=b_lat,
+        b_lon=b_lon,
+    )
 
     log = MatchLog(
         user_latitude=data.latitude,

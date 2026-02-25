@@ -4,7 +4,13 @@ import aio_pika
 from aio_pika import ExchangeType
 
 from .rabbitmq import connect, EXCHANGE_NAME
-from .services import redis_client
+from .services import (
+    redis_client,
+    invalidate_bucket,
+    buckets_in_radius,
+    fetch_handyman,
+    norm,
+)
 
 QUEUE_NAME = "match_service_domain_events"
 
@@ -29,21 +35,36 @@ async def _already_processed(event_id: str) -> bool:
     return False
 
 
-async def _invalidate_match_cache():
-    # Coarse invalidation: safe and correct for now
-    pattern = "match:*"
-    cursor = 0
-    keys_to_delete = []
+async def _invalidate_for_handyman_profile(profile: dict):
+    """
+    profile needs:
+      - skills: list[str]
+      - latitude/longitude
+      - service_radius_km
+    Invalidate both strict and degraded caches conservatively.
+    """
+    if not profile:
+        return
 
-    while True:
-        cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=500)
-        if keys:
-            keys_to_delete.extend(keys)
-        if cursor == 0:
-            break
+    lat = profile.get("latitude")
+    lon = profile.get("longitude")
+    radius = profile.get("service_radius_km")
+    skills = profile.get("skills") or []
 
-    if keys_to_delete:
-        await redis_client.delete(*keys_to_delete)
+    if lat is None or lon is None or radius is None:
+        return
+
+    skills = [norm(s) for s in skills if s]
+    if not skills:
+        return
+
+    buckets = buckets_in_radius(float(lat), float(lon), float(radius))
+
+    # delete both modes for each skill/bucket
+    for skill in skills:
+        for mode in ("strict", "degraded"):
+            for b_lat, b_lon in buckets:
+                await invalidate_bucket(mode, skill, b_lat, b_lon)
 
 
 async def handle_message(message: aio_pika.IncomingMessage):
@@ -55,6 +76,7 @@ async def handle_message(message: aio_pika.IncomingMessage):
 
         event_id = payload.get("event_id")
         event_type = payload.get("event_type")
+        data = payload.get("data") or {}
 
         if not event_id or not event_type:
             return
@@ -65,7 +87,31 @@ async def handle_message(message: aio_pika.IncomingMessage):
         if await _already_processed(event_id):
             return
 
-        await _invalidate_match_cache()
+        # ---- Availability: fetch handyman profile for precise invalidation ----
+        if event_type == "availability.updated":
+            email = data.get("email")
+            if not email:
+                return
+            profile = await fetch_handyman(email)
+            await _invalidate_for_handyman_profile(profile)
+            return
+
+        # ---- Handyman created: use event payload directly if complete ----
+        if event_type == "handyman.created":
+            await _invalidate_for_handyman_profile(data)
+            return
+
+        # ---- Handyman location updated: event may not include skills/radius; fetch profile ----
+        if event_type == "handyman.location_updated":
+            email = data.get("email")
+            if not email:
+                return
+            profile = await fetch_handyman(email)
+            await _invalidate_for_handyman_profile(profile)
+            return
+
+        # ---- User events: no invalidation needed (new location => different cache key) ----
+        return
 
 
 async def _connect_and_consume():
@@ -92,7 +138,7 @@ async def _connect_and_consume():
 
     await queue.consume(handle_message)
 
-    print("[match-service] event consumer started (availability + handyman + user)")
+    print("[match-service] event consumer started (surgical invalidation)")
     return connection
 
 

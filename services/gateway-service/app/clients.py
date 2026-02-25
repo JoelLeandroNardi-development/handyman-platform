@@ -64,7 +64,6 @@ async def _call_with_breaker(
         await breaker.record_failure()
         raise HTTPException(status_code=504, detail=f"Timeout calling upstream: {url}")
     except httpx.HTTPStatusError as e:
-        # upstream responded but with error code
         await breaker.record_failure()
         status = e.response.status_code
         detail = e.response.text
@@ -132,6 +131,18 @@ async def list_handymen(request_id: str | None = None, user_payload: dict | None
     return await _call_with_breaker(
         cb_handyman, "GET", f"{HANDYMAN_SERVICE_URL}/handymen", None, request_id, user_payload
     )
+
+
+async def update_handyman_location_and_fetch(
+    email: str,
+    data: dict,
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+):
+    # 1) update
+    await update_handyman_location(email, data, request_id=request_id, user_payload=user_payload)
+    # 2) fetch updated state
+    return await get_handyman(email, request_id=request_id, user_payload=user_payload)
 
 
 # -------- AVAILABILITY --------

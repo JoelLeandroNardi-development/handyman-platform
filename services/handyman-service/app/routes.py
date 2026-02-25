@@ -69,6 +69,8 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
         "handyman.location_updated",
         {
             "email": handyman.email,
+            "skills": handyman.skills,
+            "service_radius_km": handyman.service_radius_km,
             "latitude": handyman.latitude,
             "longitude": handyman.longitude,
         },
