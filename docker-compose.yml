@@ -118,6 +118,20 @@ services:
       availability-service:
         condition: service_started
 
+  booking-service:
+    build: ./services/booking-service
+    container_name: booking-service
+    env_file:
+      - .env
+    environment:
+      BOOKING_DB: postgresql+asyncpg://admin:admin@postgres:5432/booking_db
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   gateway-service:
     build: ./services/gateway-service
     container_name: gateway-service
@@ -137,6 +151,8 @@ services:
       availability-service:
         condition: service_started
       match-service:
+        condition: service_started
+      booking-service:
         condition: service_started
     ports:
       - '8000:8000'

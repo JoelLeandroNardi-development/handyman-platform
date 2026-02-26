@@ -8,8 +8,8 @@ from .schemas import MatchRequest
 from .services import (
     haversine,
     fetch_handymen,
-    is_available,
     availability_service_up,
+    has_overlapping_availability,
     cache_key,
     get_cached_result,
     set_cache_with_index,
@@ -19,21 +19,21 @@ from .services import (
 
 router = APIRouter()
 
-
 async def get_db():
     async with SessionLocal() as session:
         yield session
 
-
 @router.post("/match")
 async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
+    if data.desired_end <= data.desired_start:
+        return []
+
     requested_skill = norm(data.skill)
 
     availability_up = await availability_service_up()
     degraded = not availability_up
 
-    key = cache_key(data.latitude, data.longitude, requested_skill, degraded=degraded)
-
+    key = cache_key(data.latitude, data.longitude, requested_skill, degraded=degraded, desired_start=data.desired_start)
     cached = await get_cached_result(key)
     if cached:
         return json.loads(cached)
@@ -49,46 +49,35 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         if h.get("latitude") is None or h.get("longitude") is None:
             continue
 
-        distance = haversine(
-            data.latitude,
-            data.longitude,
-            h["latitude"],
-            h["longitude"],
-        )
-
+        distance = haversine(data.latitude, data.longitude, h["latitude"], h["longitude"])
         if distance > h["service_radius_km"]:
             continue
 
-        # strict mode: require availability
         if availability_up:
             try:
-                available = await is_available(h["email"])
-                if not available:
+                ok = await has_overlapping_availability(h["email"], data.desired_start, data.desired_end)
+                if not ok:
                     continue
                 availability_unknown = False
             except Exception:
-                # degrade mid-request if availability dies
                 availability_up = False
                 availability_unknown = True
         else:
             availability_unknown = True
 
-        results.append(
-            {
-                "email": h["email"],
-                "distance_km": round(distance, 2),
-                "years_experience": h["years_experience"],
-                "availability_unknown": availability_unknown,
-            }
-        )
+        results.append({
+            "email": h["email"],
+            "distance_km": round(distance, 2),
+            "years_experience": h["years_experience"],
+            "availability_unknown": availability_unknown,
+        })
 
     results.sort(key=lambda x: x["distance_km"])
 
-    # bucket-indexed cache
     mode = "strict" if availability_up else "degraded"
     ttl = 60 if availability_up else 15
-
     b_lat, b_lon = bucket_id(data.latitude, data.longitude)
+
     await set_cache_with_index(
         cache_key_str=key,
         value=json.dumps(results),
@@ -99,12 +88,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         b_lon=b_lon,
     )
 
-    log = MatchLog(
-        user_latitude=data.latitude,
-        user_longitude=data.longitude,
-        skill=requested_skill,
-    )
-    db.add(log)
+    db.add(MatchLog(user_latitude=data.latitude, user_longitude=data.longitude, skill=requested_skill))
     await db.commit()
 
     return results
