@@ -1,7 +1,8 @@
 import asyncio
 import json
 import aio_pika
-from aio_pika import ExchangeType
+from aio_pika import ExchangeType, Message
+from datetime import datetime
 
 from .rabbitmq import connect, EXCHANGE_NAME
 from .services import (
@@ -12,7 +13,9 @@ from .services import (
     norm,
 )
 
-QUEUE_NAME = "match_service_domain_events"
+QUEUE_NAME = "match_service_queue"
+RETRY_QUEUE = "match_service_retry"
+DLQ_QUEUE = "match_service_dlq"
 
 ROUTING_KEYS = [
     "availability.updated",
@@ -22,7 +25,9 @@ ROUTING_KEYS = [
     "user.location_updated",
 ]
 
-IDEMPOTENCY_TTL_SECONDS = 60 * 60  # 1 hour
+MAX_RETRIES = 3
+RETRY_DELAY_MS = 5000
+IDEMPOTENCY_TTL_SECONDS = 3600
 RETRY_SECONDS = 5
 
 
@@ -36,13 +41,6 @@ async def _already_processed(event_id: str) -> bool:
 
 
 async def _invalidate_for_handyman_profile(profile: dict):
-    """
-    profile needs:
-      - skills: list[str]
-      - latitude/longitude
-      - service_radius_km
-    Invalidate both strict and degraded caches conservatively.
-    """
     if not profile:
         return
 
@@ -60,65 +58,76 @@ async def _invalidate_for_handyman_profile(profile: dict):
 
     buckets = buckets_in_radius(float(lat), float(lon), float(radius))
 
-    # delete both modes for each skill/bucket
     for skill in skills:
         for mode in ("strict", "degraded"):
             for b_lat, b_lon in buckets:
                 await invalidate_bucket(mode, skill, b_lat, b_lon)
 
 
+async def process_event(payload: dict):
+    event_id = payload.get("event_id")
+    event_type = payload.get("event_type")
+    data = payload.get("data") or {}
+
+    if not event_id or not event_type:
+        return
+
+    if event_type not in ROUTING_KEYS:
+        return
+
+    if await _already_processed(event_id):
+        return
+
+    if event_type == "availability.updated":
+        email = data.get("email")
+        if email:
+            profile = await fetch_handyman(email)
+            await _invalidate_for_handyman_profile(profile)
+        return
+
+    if event_type == "handyman.created":
+        await _invalidate_for_handyman_profile(data)
+        return
+
+    if event_type == "handyman.location_updated":
+        email = data.get("email")
+        if email:
+            profile = await fetch_handyman(email)
+            await _invalidate_for_handyman_profile(profile)
+        return
+
+
 async def handle_message(message: aio_pika.IncomingMessage):
     async with message.process(requeue=False):
         try:
-            payload = json.loads(message.body.decode("utf-8"))
-        except Exception:
-            return
+            payload = json.loads(message.body.decode())
+            await process_event(payload)
+        except Exception as e:
+            retry_count = message.headers.get("x-retry-count", 0)
 
-        event_id = payload.get("event_id")
-        event_type = payload.get("event_type")
-        data = payload.get("data") or {}
-
-        if not event_id or not event_type:
-            return
-
-        if event_type not in set(ROUTING_KEYS):
-            return
-
-        if await _already_processed(event_id):
-            return
-
-        # ---- Availability: fetch handyman profile for precise invalidation ----
-        if event_type == "availability.updated":
-            email = data.get("email")
-            if not email:
+            if retry_count >= MAX_RETRIES:
+                print(f"[match-service] Poison message moved to DLQ: {e}")
                 return
-            profile = await fetch_handyman(email)
-            await _invalidate_for_handyman_profile(profile)
-            return
 
-        # ---- Handyman created: use event payload directly if complete ----
-        if event_type == "handyman.created":
-            await _invalidate_for_handyman_profile(data)
-            return
+            headers = dict(message.headers)
+            headers["x-retry-count"] = retry_count + 1
 
-        # ---- Handyman location updated: event may not include skills/radius; fetch profile ----
-        if event_type == "handyman.location_updated":
-            email = data.get("email")
-            if not email:
-                return
-            profile = await fetch_handyman(email)
-            await _invalidate_for_handyman_profile(profile)
-            return
+            retry_message = Message(
+                body=message.body,
+                headers=headers,
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            )
 
-        # ---- User events: no invalidation needed (new location => different cache key) ----
-        return
+            await message.channel.default_exchange.publish(
+                retry_message,
+                routing_key=RETRY_QUEUE,
+            )
+
+            print(f"[match-service] Message retry #{retry_count + 1}")
 
 
 async def _connect_and_consume():
     connection = await connect()
-    if connection is None:
-        raise RuntimeError("RABBIT_URL not set; cannot start consumer")
-
     channel = await connection.channel()
     await channel.set_qos(prefetch_count=50)
 
@@ -128,17 +137,36 @@ async def _connect_and_consume():
         durable=True,
     )
 
-    queue = await channel.declare_queue(
+    main_queue = await channel.declare_queue(
         QUEUE_NAME,
+        durable=True,
+        arguments={
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": DLQ_QUEUE,
+        },
+    )
+
+    retry_queue = await channel.declare_queue(
+        RETRY_QUEUE,
+        durable=True,
+        arguments={
+            "x-message-ttl": RETRY_DELAY_MS,
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": QUEUE_NAME,
+        },
+    )
+
+    dlq = await channel.declare_queue(
+        DLQ_QUEUE,
         durable=True,
     )
 
     for rk in ROUTING_KEYS:
-        await queue.bind(exchange, routing_key=rk)
+        await main_queue.bind(exchange, routing_key=rk)
 
-    await queue.consume(handle_message)
+    await main_queue.consume(handle_message)
 
-    print("[match-service] event consumer started (surgical invalidation)")
+    print("[match-service] Consumer started with DLQ + retry")
     return connection
 
 
@@ -148,10 +176,8 @@ async def start_consumer_with_retry(stop_event: asyncio.Event):
             conn = await _connect_and_consume()
             return conn
         except Exception as e:
-            print(f"[match-service] consumer connect failed, retrying in {RETRY_SECONDS}s: {e}")
+            print(f"[match-service] consumer failed, retrying: {e}")
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=RETRY_SECONDS)
             except asyncio.TimeoutError:
                 continue
-
-    return None

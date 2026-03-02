@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from .routes import router
 from .publisher import publisher
-from .consumer import start_consumer
+from .event_consumer import start_consumer
 
 app = FastAPI(title="Booking Service")
 app.include_router(router)
