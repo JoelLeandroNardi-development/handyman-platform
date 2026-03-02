@@ -3,11 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from .db import SessionLocal
-from .models import User
+from .models import User, OutboxEvent
 from .schemas import CreateUser, UpdateLocation
-
-from .events import build_event, to_json
-from .rabbitmq import publisher
+from .events import build_event
 
 router = APIRouter()
 
@@ -32,20 +30,28 @@ async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
         longitude=data.longitude,
     )
 
-    db.add(user)
-    await db.commit()
-
     event = build_event(
         "user.created",
         {
-            "email": user.email,
-            "full_name": user.full_name,
-            "latitude": user.latitude,
-            "longitude": user.longitude,
+            "email": data.email,
+            "full_name": data.full_name,
+            "latitude": data.latitude,
+            "longitude": data.longitude,
         },
     )
-    await publisher.publish("user.created", to_json(event))
 
+    db.add(user)
+    db.add(
+        OutboxEvent(
+            event_id=event["event_id"],
+            event_type=event["event_type"],
+            routing_key="user.created",
+            payload=event,
+            status="PENDING",
+        )
+    )
+
+    await db.commit()
     return {"message": "User created"}
 
 
@@ -60,8 +66,6 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
     user.latitude = data.latitude
     user.longitude = data.longitude
 
-    await db.commit()
-
     event = build_event(
         "user.location_updated",
         {
@@ -70,8 +74,18 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
             "longitude": user.longitude,
         },
     )
-    await publisher.publish("user.location_updated", to_json(event))
 
+    db.add(
+        OutboxEvent(
+            event_id=event["event_id"],
+            event_type=event["event_type"],
+            routing_key="user.location_updated",
+            payload=event,
+            status="PENDING",
+        )
+    )
+
+    await db.commit()
     return {"message": "Location updated"}
 
 

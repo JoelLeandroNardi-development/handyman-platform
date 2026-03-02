@@ -1,5 +1,11 @@
+import os
+import json
 import aio_pika
-from .rabbitmq import connect, EXCHANGE_NAME
+from aio_pika import ExchangeType
+
+RABBIT_URL = os.getenv("RABBIT_URL")
+EXCHANGE_NAME = "domain_events"
+
 
 class Publisher:
     def __init__(self):
@@ -8,25 +14,33 @@ class Publisher:
         self._exchange = None
 
     async def start(self):
-        if self._conn and not self._conn.is_closed:
-            return
-        self._conn = await connect()
+        if not RABBIT_URL:
+            raise RuntimeError("RABBIT_URL not set")
+
+        self._conn = await aio_pika.connect_robust(RABBIT_URL)
         self._channel = await self._conn.channel()
         self._exchange = await self._channel.declare_exchange(
-            EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC, durable=True
+            EXCHANGE_NAME, ExchangeType.TOPIC, durable=True
         )
 
-    async def publish(self, routing_key: str, body: str):
-        await self.start()
+    async def close(self):
+        try:
+            if self._conn and not self._conn.is_closed:
+                await self._conn.close()
+        except Exception:
+            pass
+
+    async def publish(self, routing_key: str, payload: dict):
+        if not self._exchange:
+            raise RuntimeError("publisher not started")
+
+        body = json.dumps(payload).encode("utf-8")
         msg = aio_pika.Message(
-            body=body.encode("utf-8"),
-            content_type="application/json",
+            body=body,
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            content_type="application/json",
         )
         await self._exchange.publish(msg, routing_key=routing_key)
 
-    async def close(self):
-        if self._conn and not self._conn.is_closed:
-            await self._conn.close()
 
 publisher = Publisher()
