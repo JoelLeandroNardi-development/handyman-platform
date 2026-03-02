@@ -22,6 +22,7 @@ cb_availability = CircuitBreaker("availability-service", 5, 10)
 cb_match = CircuitBreaker("match-service", 5, 10)
 cb_booking = CircuitBreaker("booking-service", 5, 10)
 
+
 def _base_headers(request_id: str | None, user_payload: dict | None):
     headers = {}
     if request_id:
@@ -35,7 +36,15 @@ def _base_headers(request_id: str | None, user_payload: dict | None):
             headers["X-User-Roles"] = json.dumps(roles)
     return headers
 
-async def _call_with_breaker(breaker: CircuitBreaker, method: str, url: str, payload: dict | None, request_id: str | None, user_payload: dict | None):
+
+async def _call_with_breaker(
+    breaker: CircuitBreaker,
+    method: str,
+    url: str,
+    payload: dict | None,
+    request_id: str | None,
+    user_payload: dict | None,
+):
     try:
         await breaker.allow_request()
     except CircuitBreakerOpen as e:
@@ -60,56 +69,77 @@ async def _call_with_breaker(breaker: CircuitBreaker, method: str, url: str, pay
         await breaker.record_failure()
         raise HTTPException(status_code=502, detail=f"Bad gateway calling upstream: {url}")
 
+
 async def register_user(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/register", data, request_id, None)
+
 
 async def login_user(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/login", data, request_id, None)
 
+
 async def create_user(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_user, "POST", f"{USER_SERVICE_URL}/users", data, request_id, user_payload)
+
 
 async def update_user_location(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_user, "PUT", f"{USER_SERVICE_URL}/users/{email}/location", data, request_id, user_payload)
 
+
 async def get_user(email: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_user, "GET", f"{USER_SERVICE_URL}/users/{email}", None, request_id, user_payload)
+
 
 async def create_handyman(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_handyman, "POST", f"{HANDYMAN_SERVICE_URL}/handymen", data, request_id, user_payload)
 
+
 async def update_handyman_location(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_handyman, "PUT", f"{HANDYMAN_SERVICE_URL}/handymen/{email}/location", data, request_id, user_payload)
+
 
 async def get_handyman(email: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_handyman, "GET", f"{HANDYMAN_SERVICE_URL}/handymen/{email}", None, request_id, user_payload)
 
+
 async def list_handymen(request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_handyman, "GET", f"{HANDYMAN_SERVICE_URL}/handymen", None, request_id, user_payload)
+
 
 async def update_handyman_location_and_fetch(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     await update_handyman_location(email, data, request_id, user_payload)
     return await get_handyman(email, request_id, user_payload)
 
+
 async def set_availability(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_availability, "POST", f"{AVAILABILITY_SERVICE_URL}/availability/{email}", data, request_id, user_payload)
+
 
 async def get_availability(email: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_availability, "GET", f"{AVAILABILITY_SERVICE_URL}/availability/{email}", None, request_id, user_payload)
 
+
 async def clear_availability(email: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_availability, "DELETE", f"{AVAILABILITY_SERVICE_URL}/availability/{email}", None, request_id, user_payload)
 
+
 async def match_request(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_match, "POST", f"{MATCH_SERVICE_URL}/match", data, request_id, user_payload)
+
 
 # ---- Booking ----
 
 async def create_booking(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings", data, request_id, user_payload)
 
+
 async def get_booking(booking_id: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_booking, "GET", f"{BOOKING_SERVICE_URL}/bookings/{booking_id}", None, request_id, user_payload)
 
+
 async def confirm_booking(booking_id: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings/{booking_id}/confirm", None, request_id, user_payload)
+
+
+async def cancel_booking(booking_id: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
+    return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings/{booking_id}/cancel", data, request_id, user_payload)

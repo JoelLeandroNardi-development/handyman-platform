@@ -14,12 +14,16 @@ QUEUE_NAME = "availability_service_booking_events"
 RETRY_QUEUE = "availability_service_booking_events_retry"
 DLQ_QUEUE = "availability_service_booking_events_dlq"
 
-ROUTING_KEYS = ["booking.requested", "booking.confirm_requested"]
+ROUTING_KEYS = [
+    "booking.requested",
+    "booking.confirm_requested",
+    "booking.cancel_requested",
+]
 
 IDEMPOTENCY_TTL = 3600
 
 MAX_RETRIES = 3
-RETRY_DELAY_MS = 5000  # 5 seconds
+RETRY_DELAY_MS = 5000
 
 
 def processed_key(event_id: str) -> str:
@@ -93,7 +97,6 @@ async def process_event(payload: dict):
     if event_type not in set(ROUTING_KEYS):
         return
 
-    # idempotent handling
     pk = processed_key(event_id)
     if await redis_client.get(pk):
         return
@@ -145,6 +148,18 @@ async def process_event(payload: dict):
         await publisher.publish("slot.confirmed", to_json(ev))
         return
 
+    if event_type == "booking.cancel_requested":
+        booking_id = data.get("booking_id")
+        if not booking_id:
+            return
+
+        # Release reservation (if it exists). If not exists, treat as idempotent success.
+        await delete_reservation(booking_id)
+
+        ev = build_event("slot.released", {"booking_id": booking_id})
+        await publisher.publish("slot.released", to_json(ev))
+        return
+
 
 async def handle_message(message: aio_pika.IncomingMessage):
     async with message.process(requeue=False):
@@ -173,7 +188,7 @@ async def handle_message(message: aio_pika.IncomingMessage):
                 routing_key=RETRY_QUEUE,
             )
 
-            print(f"[availability-service] Message retry #{retry_count + 1}")
+            print(f"[availability-service] retry #{retry_count + 1}")
 
 
 async def start_consumer(rabbit_url: str):

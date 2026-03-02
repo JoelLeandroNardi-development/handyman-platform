@@ -4,6 +4,7 @@ from datetime import datetime
 
 _ALLOWED_ROLES = {"user", "handyman", "admin"}
 
+
 class Register(BaseModel):
     email: str
     password: str
@@ -21,12 +22,15 @@ class Register(BaseModel):
             normalized = ["user"]
         object.__setattr__(self, "roles", normalized)
 
+
 class Login(BaseModel):
     email: str
     password: str
 
+
 class TokenResponse(BaseModel):
     access_token: str
+
 
 class CreateUser(BaseModel):
     email: str
@@ -34,9 +38,11 @@ class CreateUser(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+
 class UpdateUserLocation(BaseModel):
     latitude: float
     longitude: float
+
 
 class CreateHandyman(BaseModel):
     email: str
@@ -46,16 +52,20 @@ class CreateHandyman(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+
 class UpdateHandymanLocation(BaseModel):
     latitude: float
     longitude: float
+
 
 class AvailabilitySlot(BaseModel):
     start: str
     end: str
 
+
 class SetAvailability(BaseModel):
     slots: List[AvailabilitySlot]
+
 
 class MatchRequest(BaseModel):
     latitude: float
@@ -64,11 +74,13 @@ class MatchRequest(BaseModel):
     desired_start: datetime
     desired_end: datetime
 
+
 class MatchResult(BaseModel):
     email: str
     distance_km: float
     years_experience: int
     availability_unknown: bool = False
+
 
 # ---- Booking ----
 
@@ -78,6 +90,7 @@ class CreateBookingRequest(BaseModel):
     desired_start: datetime
     desired_end: datetime
 
+
 class BookingResponse(BaseModel):
     booking_id: str
     status: str
@@ -86,7 +99,19 @@ class BookingResponse(BaseModel):
     desired_start: datetime
     desired_end: datetime
     failure_reason: Optional[str] = None
+    cancellation_reason: Optional[str] = None
+
 
 class ConfirmBookingResponse(BaseModel):
     booking_id: str
     status: str
+
+
+class CancelBookingRequest(BaseModel):
+    reason: Optional[str] = "user_requested"
+
+
+class CancelBookingResponse(BaseModel):
+    booking_id: str
+    status: str
+    cancellation_reason: Optional[str] = None

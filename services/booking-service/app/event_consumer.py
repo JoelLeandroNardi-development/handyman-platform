@@ -7,17 +7,20 @@ from .rabbitmq import connect, EXCHANGE_NAME
 from .db import SessionLocal
 from .models import Booking
 
-# Main / retry / DLQ queues
 QUEUE_NAME = "booking_service_domain_events"
 RETRY_QUEUE = "booking_service_domain_events_retry"
 DLQ_QUEUE = "booking_service_domain_events_dlq"
 
-# Events booking-service consumes
-ROUTING_KEYS = ["slot.reserved", "slot.rejected", "slot.confirmed", "slot.expired"]
+ROUTING_KEYS = [
+    "slot.reserved",
+    "slot.rejected",
+    "slot.confirmed",
+    "slot.expired",
+    "slot.released",
+]
 
-# Retry policy
 MAX_RETRIES = 3
-RETRY_DELAY_MS = 5000  # 5 seconds
+RETRY_DELAY_MS = 5000
 
 
 async def process_event(payload: dict):
@@ -51,6 +54,13 @@ async def process_event(payload: dict):
             if booking.status in ("PENDING", "RESERVED"):
                 booking.status = "EXPIRED"
 
+        elif event_type == "slot.released":
+            # cancellation release acknowledgement (optional)
+            # booking already marked CANCELED in routes; just ensure state remains consistent
+            if booking.status != "CANCELED":
+                booking.status = "CANCELED"
+                booking.cancellation_reason = booking.cancellation_reason or "released"
+
         await db.commit()
 
 
@@ -63,8 +73,6 @@ async def handle_message(message: aio_pika.IncomingMessage):
             retry_count = int(message.headers.get("x-retry-count", 0) or 0)
 
             if retry_count >= MAX_RETRIES:
-                # Let RabbitMQ DLX route it to DLQ by raising no exception and just returning.
-                # We explicitly publish to DLQ for clarity.
                 print(f"[booking-service] Poison message (DLQ): {e}")
                 return
 
@@ -83,15 +91,7 @@ async def handle_message(message: aio_pika.IncomingMessage):
                 routing_key=RETRY_QUEUE,
             )
 
-            print(f"[booking-service] Message retry #{retry_count + 1} ({event_debug(payload=message.body)})")
-
-
-def event_debug(payload: bytes) -> str:
-    try:
-        obj = json.loads(payload.decode("utf-8"))
-        return f"{obj.get('event_type')}:{(obj.get('data') or {}).get('booking_id')}"
-    except Exception:
-        return "unparseable"
+            print(f"[booking-service] retry #{retry_count + 1}")
 
 
 async def start_consumer():
@@ -103,7 +103,6 @@ async def start_consumer():
         EXCHANGE_NAME, ExchangeType.TOPIC, durable=True
     )
 
-    # Main queue routes poison to DLQ
     main_queue = await channel.declare_queue(
         QUEUE_NAME,
         durable=True,
@@ -113,7 +112,6 @@ async def start_consumer():
         },
     )
 
-    # Retry queue delays and returns to main
     await channel.declare_queue(
         RETRY_QUEUE,
         durable=True,
@@ -124,7 +122,6 @@ async def start_consumer():
         },
     )
 
-    # DLQ
     await channel.declare_queue(DLQ_QUEUE, durable=True)
 
     for rk in ROUTING_KEYS:
