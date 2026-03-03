@@ -1,56 +1,94 @@
-import os
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .rabbitmq import publisher, RABBIT_URL
+from .messaging import publisher, RABBIT_URL
 from .event_consumer import start_consumer
 from .expiry_worker import expiry_loop
+from .outbox_worker import worker
 
-app = FastAPI(title="Availability Service")
-app.include_router(router)
 
-_consumer_conn = None
-_stop_event = asyncio.Event()
-_expiry_task = None
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop_event = asyncio.Event()
+    consumer_conn = None
+    expiry_task = None
+    consumer_task = None
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "service": "availability-service", "events_enabled": publisher.enabled}
+    async def consumer_with_retry():
+        nonlocal consumer_conn
+        if not RABBIT_URL:
+            print("[availability-service] RABBIT_URL not set, consumer disabled")
+            return
 
-@app.on_event("startup")
-async def startup():
-    global _consumer_conn, _expiry_task
+        while not stop_event.is_set():
+            try:
+                consumer_conn = await start_consumer()
+                return
+            except Exception as e:
+                print(f"[availability-service] consumer connect failed, retrying in 5s: {e}")
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    continue
+
+    # startup
+    print("[availability-service] starting up...")
     try:
-        await publisher.connect()
+        await publisher.start()
     except Exception as e:
-        print(f"[availability-service] RabbitMQ connect failed at startup; continuing: {e}")
+        # fine; outbox will keep retrying
+        print(f"[availability-service] publisher start failed (ok): {e}")
 
-    # start booking consumer (don’t crash service)
+    await worker.start()
+
+    expiry_task = asyncio.create_task(expiry_loop(stop_event))
+    consumer_task = asyncio.create_task(consumer_with_retry())
+
+    yield
+
+    # shutdown
+    print("[availability-service] shutting down...")
+    stop_event.set()
+
     try:
-        if RABBIT_URL:
-            _consumer_conn = await start_consumer(RABBIT_URL)
-    except Exception as e:
-        _consumer_conn = None
-        print(f"[availability-service] booking consumer failed to start: {e}")
-
-    _expiry_task = asyncio.create_task(expiry_loop(_stop_event))
-
-@app.on_event("shutdown")
-async def shutdown():
-    global _consumer_conn, _expiry_task
-    _stop_event.set()
-    if _expiry_task:
-        try:
-            await _expiry_task
-        except Exception:
-            pass
-    try:
-        if _consumer_conn and not _consumer_conn.is_closed:
-            await _consumer_conn.close()
+        await worker.stop()
     except Exception:
         pass
+
+    if expiry_task:
+        try:
+            await expiry_task
+        except Exception:
+            pass
+
+    if consumer_task:
+        try:
+            await consumer_task
+        except Exception:
+            pass
+
+    try:
+        if consumer_conn and not consumer_conn.is_closed:
+            await consumer_conn.close()
+    except Exception:
+        pass
+
     try:
         await publisher.close()
     except Exception:
         pass
+
+
+app = FastAPI(title="Availability Service", lifespan=lifespan)
+app.include_router(router)
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "availability-service",
+        "events_enabled": publisher.enabled,
+    }

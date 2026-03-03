@@ -8,17 +8,22 @@ from .redis_client import redis_client
 RES_TTL_SECONDS = 300  # 5 minutes
 EXPIRY_ZSET = "reservation_expiry"
 
+
 def _res_key(booking_id: str) -> str:
     return f"reservation:{booking_id}"
+
 
 def _res_handyman_set(email: str) -> str:
     return f"reservations_by_handyman:{email}"
 
+
 def _parse(dt_str: str) -> datetime:
     return parser.isoparse(dt_str)
 
+
 def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
     return a_start < b_end and a_end > b_start
+
 
 async def create_reservation(
     booking_id: str,
@@ -33,7 +38,6 @@ async def create_reservation(
     ds = _parse(desired_start)
     de = _parse(desired_end)
 
-    # check conflicts vs existing reservations for this handyman
     set_key = _res_handyman_set(handyman_email)
     existing = await redis_client.smembers(set_key)
     for bid in existing:
@@ -49,7 +53,6 @@ async def create_reservation(
         if overlaps(ods, ode, ds, de):
             return False
 
-    # store reservation
     payload = {
         "booking_id": booking_id,
         "handyman_email": handyman_email,
@@ -66,6 +69,7 @@ async def create_reservation(
     await pipe.execute()
     return True
 
+
 async def get_reservation(booking_id: str) -> dict | None:
     raw = await redis_client.get(_res_key(booking_id))
     if not raw:
@@ -74,6 +78,7 @@ async def get_reservation(booking_id: str) -> dict | None:
         return json.loads(raw)
     except Exception:
         return None
+
 
 async def delete_reservation(booking_id: str):
     res = await get_reservation(booking_id)

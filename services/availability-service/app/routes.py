@@ -7,19 +7,22 @@ from .reservations import overlaps
 
 router = APIRouter()
 
+
 def redis_key(email: str) -> str:
     return f"availability:{email}"
+
 
 @router.post("/availability/{email}")
 async def set_availability(email: str, data: SetAvailability):
     key = redis_key(email)
     await redis_client.delete(key)
 
-    for slot in data.slots:
-        # store as start|end
-        await redis_client.rpush(key, f"{slot.start}|{slot.end}")
+    # store as start|end
+    if data.slots:
+        await redis_client.rpush(key, *[f"{slot.start}|{slot.end}" for slot in data.slots])
 
     return {"message": "Availability updated"}
+
 
 @router.get("/availability/{email}")
 async def get_availability(email: str):
@@ -36,17 +39,19 @@ async def get_availability(email: str):
 
     return {"email": email, "slots": parsed}
 
+
 @router.delete("/availability/{email}")
 async def clear_availability(email: str):
     key = redis_key(email)
     await redis_client.delete(key)
     return {"message": "Availability cleared"}
 
+
 @router.post("/availability/{email}/overlap")
 async def check_overlap(email: str, req: OverlapRequest):
     """
     Checks whether ANY stored slot overlaps desired window.
-    (Reservation conflicts are handled at reservation time; match uses this for slot existence.)
+    Reservation conflicts are handled at reservation time.
     """
     try:
         ds = parser.isoparse(req.desired_start)

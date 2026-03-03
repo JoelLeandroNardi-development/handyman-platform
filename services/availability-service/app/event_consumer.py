@@ -3,12 +3,11 @@ import aio_pika
 from aio_pika import ExchangeType, Message
 from dateutil import parser
 
-from .rabbitmq import publisher
 from .redis_client import redis_client
 from .reservations import create_reservation, get_reservation, delete_reservation, overlaps
-from .events import build_event, to_json
-
-EXCHANGE_NAME = "domain_events"
+from .events import build_event
+from .outbox_worker import enqueue_domain_event
+from .messaging import RABBIT_URL, EXCHANGE_NAME
 
 QUEUE_NAME = "availability_service_booking_events"
 RETRY_QUEUE = "availability_service_booking_events_retry"
@@ -93,7 +92,6 @@ async def process_event(payload: dict):
 
     if not event_id or not event_type:
         return
-
     if event_type not in set(ROUTING_KEYS):
         return
 
@@ -114,16 +112,16 @@ async def process_event(payload: dict):
         ok_slot = await handyman_has_slot(handyman_email, desired_start, desired_end)
         if not ok_slot:
             ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "no_matching_slot"})
-            await publisher.publish("slot.rejected", to_json(ev))
+            await enqueue_domain_event("slot.rejected", ev)
             return
 
         ok = await create_reservation(booking_id, handyman_email, desired_start, desired_end)
         if ok:
             ev = build_event("slot.reserved", {"booking_id": booking_id})
-            await publisher.publish("slot.reserved", to_json(ev))
+            await enqueue_domain_event("slot.reserved", ev)
         else:
             ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "slot_conflict_reserved"})
-            await publisher.publish("slot.rejected", to_json(ev))
+            await enqueue_domain_event("slot.rejected", ev)
         return
 
     if event_type == "booking.confirm_requested":
@@ -138,14 +136,14 @@ async def process_event(payload: dict):
         res = await get_reservation(booking_id)
         if not res:
             ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "reservation_missing"})
-            await publisher.publish("slot.rejected", to_json(ev))
+            await enqueue_domain_event("slot.rejected", ev)
             return
 
         await apply_confirm_to_slots(handyman_email, desired_start, desired_end)
         await delete_reservation(booking_id)
 
         ev = build_event("slot.confirmed", {"booking_id": booking_id})
-        await publisher.publish("slot.confirmed", to_json(ev))
+        await enqueue_domain_event("slot.confirmed", ev)
         return
 
     if event_type == "booking.cancel_requested":
@@ -153,11 +151,10 @@ async def process_event(payload: dict):
         if not booking_id:
             return
 
-        # Release reservation (if it exists). If not exists, treat as idempotent success.
         await delete_reservation(booking_id)
 
         ev = build_event("slot.released", {"booking_id": booking_id})
-        await publisher.publish("slot.released", to_json(ev))
+        await enqueue_domain_event("slot.released", ev)
         return
 
 
@@ -191,8 +188,11 @@ async def handle_message(message: aio_pika.IncomingMessage):
             print(f"[availability-service] retry #{retry_count + 1}")
 
 
-async def start_consumer(rabbit_url: str):
-    conn = await aio_pika.connect_robust(rabbit_url)
+async def start_consumer():
+    if not RABBIT_URL:
+        raise RuntimeError("RABBIT_URL is not set")
+
+    conn = await aio_pika.connect_robust(RABBIT_URL)
     channel = await conn.channel()
     await channel.set_qos(prefetch_count=50)
 
