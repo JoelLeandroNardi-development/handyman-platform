@@ -13,8 +13,8 @@ class Booking(Base):
     user_email = Column(String, nullable=False)
     handyman_email = Column(String, nullable=False)
 
-    desired_start = Column(String, nullable=False)
-    desired_end = Column(String, nullable=False)
+    desired_start = Column(DateTime(timezone=True), nullable=False)
+    desired_end = Column(DateTime(timezone=True), nullable=False)
 
     status = Column(String, nullable=False, default="PENDING")
     failure_reason = Column(String, nullable=True)

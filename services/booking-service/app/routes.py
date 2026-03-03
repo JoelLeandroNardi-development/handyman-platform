@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import Booking, OutboxEvent
-from .schemas import CreateBooking, BookingResponse, CancelBooking
+from .schemas import CreateBooking, BookingResponse, CancelBooking, CancelBookingResponse, ConfirmBookingResponse
 from .events import build_event
 
 router = APIRouter()
@@ -14,6 +14,7 @@ router = APIRouter()
 @router.post("/bookings", response_model=BookingResponse)
 async def create_booking(data: CreateBooking):
     booking_id = str(uuid.uuid4())
+
     event = build_event(
         "booking.requested",
         {
@@ -47,6 +48,7 @@ async def create_booking(data: CreateBooking):
 
         await db.commit()
 
+    # IMPORTANT: return FULL response matching BookingResponse
     return BookingResponse(
         booking_id=booking_id,
         status="PENDING",
@@ -54,6 +56,8 @@ async def create_booking(data: CreateBooking):
         handyman_email=data.handyman_email,
         desired_start=data.desired_start,
         desired_end=data.desired_end,
+        failure_reason=None,
+        cancellation_reason=None,
     )
 
 
@@ -73,10 +77,11 @@ async def get_booking(booking_id: str):
             desired_start=booking.desired_start,
             desired_end=booking.desired_end,
             failure_reason=booking.failure_reason,
+            cancellation_reason=booking.cancellation_reason,
         )
 
 
-@router.post("/bookings/{booking_id}/confirm", response_model=BookingResponse)
+@router.post("/bookings/{booking_id}/confirm", response_model=ConfirmBookingResponse)
 async def confirm_booking(booking_id: str):
     async with SessionLocal() as db:
         res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
@@ -107,17 +112,10 @@ async def confirm_booking(booking_id: str):
         )
         await db.commit()
 
-        return BookingResponse(
-            booking_id=booking.booking_id,
-            status=booking.status,
-            user_email=booking.user_email,
-            handyman_email=booking.handyman_email,
-            desired_start=booking.desired_start,
-            desired_end=booking.desired_end,
-        )
+        return ConfirmBookingResponse(booking_id=booking.booking_id, status=booking.status)
 
 
-@router.post("/bookings/{booking_id}/cancel", response_model=BookingResponse)
+@router.post("/bookings/{booking_id}/cancel", response_model=CancelBookingResponse)
 async def cancel_booking(booking_id: str, data: CancelBooking):
     async with SessionLocal() as db:
         res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
@@ -125,24 +123,16 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
         if not booking:
             raise HTTPException(status_code=404, detail="Booking not found")
 
-        # idempotent cancel
         if booking.status in ("CANCELED", "FAILED", "EXPIRED"):
-            return BookingResponse(
+            return CancelBookingResponse(
                 booking_id=booking.booking_id,
                 status=booking.status,
-                user_email=booking.user_email,
-                handyman_email=booking.handyman_email,
-                desired_start=booking.desired_start,
-                desired_end=booking.desired_end,
-                failure_reason=booking.failure_reason,
+                cancellation_reason=booking.cancellation_reason,
             )
 
         booking.status = "CANCELED"
         booking.cancellation_reason = data.reason or "user_requested"
         booking.canceled_at = datetime.now(timezone.utc)
-
-        # if confirmed we still emit booking.canceled (no slot restore in this phase)
-        event_type = "booking.cancel_requested" if booking.status in ("PENDING", "RESERVED", "CANCELED") else "booking.canceled"
 
         event = build_event(
             "booking.cancel_requested",
@@ -165,11 +155,8 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
         )
         await db.commit()
 
-        return BookingResponse(
+        return CancelBookingResponse(
             booking_id=booking.booking_id,
             status=booking.status,
-            user_email=booking.user_email,
-            handyman_email=booking.handyman_email,
-            desired_start=booking.desired_start,
-            desired_end=booking.desired_end,
+            cancellation_reason=booking.cancellation_reason,
         )

@@ -24,7 +24,7 @@ cb_booking = CircuitBreaker("booking-service", 5, 10)
 
 
 def _base_headers(request_id: str | None, user_payload: dict | None):
-    headers = {}
+    headers: dict[str, str] = {}
     if request_id:
         headers["X-Request-Id"] = request_id
     if user_payload:
@@ -35,6 +35,17 @@ def _base_headers(request_id: str | None, user_payload: dict | None):
         if roles is not None:
             headers["X-User-Roles"] = json.dumps(roles)
     return headers
+
+
+def _safe_json(resp: httpx.Response) -> dict:
+    # If upstream didn't return JSON (or returned empty), avoid crashing the gateway.
+    if not resp.content:
+        return {}
+    try:
+        return resp.json()
+    except Exception:
+        # Return something useful for debugging
+        return {"raw": resp.text}
 
 
 async def _call_with_breaker(
@@ -56,18 +67,26 @@ async def _call_with_breaker(
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             resp = await client.request(method=method, url=url, json=safe_payload, headers=headers)
-            resp.raise_for_status()
+
+        if 200 <= resp.status_code < 300:
             await breaker.record_success()
-            return resp.json() if resp.content else {}
+            return _safe_json(resp)
+
+        # non-2xx
+        await breaker.record_failure()
+        # prefer JSON error payload if any
+        detail = _safe_json(resp)
+        raise HTTPException(status_code=resp.status_code, detail=detail)
+
     except httpx.TimeoutException:
         await breaker.record_failure()
         raise HTTPException(status_code=504, detail=f"Timeout calling upstream: {url}")
-    except httpx.HTTPStatusError as e:
+    except HTTPException:
+        # already shaped
+        raise
+    except Exception as e:
         await breaker.record_failure()
-        raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
-    except Exception:
-        await breaker.record_failure()
-        raise HTTPException(status_code=502, detail=f"Bad gateway calling upstream: {url}")
+        raise HTTPException(status_code=502, detail=f"Bad gateway calling upstream: {url}. err={type(e).__name__}: {e}")
 
 
 async def register_user(data: dict, request_id: str | None = None):

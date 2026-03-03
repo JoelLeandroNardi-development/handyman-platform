@@ -1,24 +1,36 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 
 class CreateBooking(BaseModel):
     user_email: str
     handyman_email: str
-    desired_start: str
-    desired_end: str
+    desired_start: datetime
+    desired_end: datetime
 
 
 class BookingResponse(BaseModel):
     booking_id: str
     status: str
+    user_email: str
+    handyman_email: str
+    desired_start: datetime
+    desired_end: datetime
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
 
 
-class ConfirmBooking(BaseModel):
-    pass
-
-
 class CancelBooking(BaseModel):
     reason: Optional[str] = "user_requested"
+
+
+class ConfirmBookingResponse(BaseModel):
+    booking_id: str
+    status: str
+
+
+class CancelBookingResponse(BaseModel):
+    booking_id: str
+    status: str
+    cancellation_reason: Optional[str] = None

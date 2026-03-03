@@ -3,11 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from .db import SessionLocal
-from .models import Handyman
+from .models import Handyman, OutboxEvent
 from .schemas import CreateHandyman, UpdateLocation
-
-from .events import build_event, to_json
-from .rabbitmq import publisher
+from .events import build_event
 
 router = APIRouter()
 
@@ -34,9 +32,6 @@ async def create_handyman(data: CreateHandyman, db: AsyncSession = Depends(get_d
         longitude=data.longitude,
     )
 
-    db.add(handyman)
-    await db.commit()
-
     event = build_event(
         "handyman.created",
         {
@@ -48,8 +43,19 @@ async def create_handyman(data: CreateHandyman, db: AsyncSession = Depends(get_d
             "longitude": handyman.longitude,
         },
     )
-    await publisher.publish("handyman.created", to_json(event))
 
+    db.add(handyman)
+    db.add(
+        OutboxEvent(
+            event_id=event["event_id"],
+            event_type=event["event_type"],
+            routing_key="handyman.created",
+            payload=event,
+            status="PENDING",
+        )
+    )
+
+    await db.commit()
     return {"message": "Handyman created"}
 
 
@@ -75,8 +81,18 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
             "longitude": handyman.longitude,
         },
     )
-    await publisher.publish("handyman.location_updated", to_json(event))
 
+    db.add(
+        OutboxEvent(
+            event_id=event["event_id"],
+            event_type=event["event_type"],
+            routing_key="handyman.location_updated",
+            payload=event,
+            status="PENDING",
+        )
+    )
+
+    await db.commit()
     return {"message": "Location updated"}
 
 
