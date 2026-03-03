@@ -1,53 +1,55 @@
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
 from .event_consumer import start_consumer_with_retry
+from .outbox_worker import worker
 
-app = FastAPI(title="Match Service")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop_event = asyncio.Event()
+    consumer_task: asyncio.Task | None = None
+    consumer_conn = None
+
+    async def run_consumer():
+        nonlocal consumer_conn
+        consumer_conn = await start_consumer_with_retry(stop_event)
+
+    # start worker (no-op in this service, but keeps architecture consistent)
+    await worker.start()
+
+    consumer_task = asyncio.create_task(run_consumer())
+
+    try:
+        yield
+    finally:
+        stop_event.set()
+
+        try:
+            if consumer_task:
+                await consumer_task
+        except Exception:
+            pass
+
+        try:
+            if consumer_conn and not consumer_conn.is_closed:
+                await consumer_conn.close()
+        except Exception:
+            pass
+
+        try:
+            await worker.stop()
+        except Exception:
+            pass
+
+
+app = FastAPI(title="Match Service", lifespan=lifespan)
 app.include_router(router)
-
-_consumer_connection = None
-_stop_event = asyncio.Event()
-_consumer_task: asyncio.Task | None = None
 
 
 @app.get("/health")
 async def health():
-    return {
-        "status": "ok",
-        "service": "match-service",
-        "events_enabled": _consumer_connection is not None,
-    }
-
-
-@app.on_event("startup")
-async def startup():
-    global _consumer_task, _consumer_connection
-
-    async def runner():
-        global _consumer_connection
-        _consumer_connection = await start_consumer_with_retry(_stop_event)
-
-    _consumer_task = asyncio.create_task(runner())
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    global _consumer_connection, _consumer_task
-    _stop_event.set()
-
-    try:
-        if _consumer_task:
-            await _consumer_task
-    except Exception:
-        pass
-
-    try:
-        if _consumer_connection and not _consumer_connection.is_closed:
-            await _consumer_connection.close()
-    except Exception:
-        pass
-
-    _consumer_connection = None
+    # We don't expose consumer state here since it's async; just say ok.
+    return {"status": "ok", "service": "match-service"}

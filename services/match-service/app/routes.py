@@ -19,9 +19,11 @@ from .services import (
 
 router = APIRouter()
 
+
 async def get_db():
     async with SessionLocal() as session:
         yield session
+
 
 @router.post("/match")
 async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
@@ -33,13 +35,19 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     availability_up = await availability_service_up()
     degraded = not availability_up
 
-    key = cache_key(data.latitude, data.longitude, requested_skill, degraded=degraded, desired_start=data.desired_start)
+    key = cache_key(
+        data.latitude,
+        data.longitude,
+        requested_skill,
+        degraded=degraded,
+        desired_start=data.desired_start,
+    )
     cached = await get_cached_result(key)
     if cached:
         return json.loads(cached)
 
     handymen = await fetch_handymen()
-    results = []
+    results: list[dict] = []
 
     for h in handymen:
         skills = [norm(x) for x in (h.get("skills") or [])]
@@ -65,12 +73,14 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         else:
             availability_unknown = True
 
-        results.append({
-            "email": h["email"],
-            "distance_km": round(distance, 2),
-            "years_experience": h["years_experience"],
-            "availability_unknown": availability_unknown,
-        })
+        results.append(
+            {
+                "email": h["email"],
+                "distance_km": round(distance, 2),
+                "years_experience": h["years_experience"],
+                "availability_unknown": availability_unknown,
+            }
+        )
 
     results.sort(key=lambda x: x["distance_km"])
 

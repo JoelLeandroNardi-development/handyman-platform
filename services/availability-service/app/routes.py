@@ -4,12 +4,19 @@ from dateutil import parser
 from .redis_client import redis_client
 from .schemas import SetAvailability, OverlapRequest
 from .reservations import overlaps
+from .events import build_event
+from .outbox_worker import enqueue_domain_event
 
 router = APIRouter()
 
 
 def redis_key(email: str) -> str:
     return f"availability:{email}"
+
+
+async def emit_availability_updated(email: str):
+    ev = build_event("availability.updated", {"email": email})
+    await enqueue_domain_event("availability.updated", ev)
 
 
 @router.post("/availability/{email}")
@@ -20,6 +27,9 @@ async def set_availability(email: str, data: SetAvailability):
     # store as start|end
     if data.slots:
         await redis_client.rpush(key, *[f"{slot.start}|{slot.end}" for slot in data.slots])
+
+    # emit domain event (buffered via Redis outbox)
+    await emit_availability_updated(email)
 
     return {"message": "Availability updated"}
 
@@ -44,6 +54,9 @@ async def get_availability(email: str):
 async def clear_availability(email: str):
     key = redis_key(email)
     await redis_client.delete(key)
+
+    await emit_availability_updated(email)
+
     return {"message": "Availability cleared"}
 
 

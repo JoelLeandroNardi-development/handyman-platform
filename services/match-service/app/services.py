@@ -52,9 +52,6 @@ async def fetch_handymen():
 
 
 async def fetch_handyman(email: str) -> dict | None:
-    """
-    Used by event_consumer for precise invalidation when events are incomplete.
-    """
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             r = await client.get(f"{HANDYMAN_SERVICE_URL}/handymen/{email}")
@@ -129,10 +126,6 @@ async def set_cache_with_index(
     await pipe.execute()
 
 
-# =========================
-# Cache invalidation helpers
-# =========================
-
 def km_to_deg_lat(km: float) -> float:
     return km / 111.0
 
@@ -145,10 +138,6 @@ def km_to_deg_lon(km: float, lat: float) -> float:
 
 
 def buckets_in_radius(lat: float, lon: float, radius_km: float) -> list[tuple[int, int]]:
-    """
-    Returns grid bucket coordinates covering a circle-ish bounding box around (lat, lon).
-    Used by event consumer to invalidate all impacted cache buckets.
-    """
     d_lat = km_to_deg_lat(radius_km)
     d_lon = km_to_deg_lon(radius_km, lat)
 
@@ -170,11 +159,6 @@ def buckets_in_radius(lat: float, lon: float, radius_km: float) -> list[tuple[in
 
 
 async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
-    """
-    Deletes all cached match results referenced in the bucket set key.
-    Returns number of deleted cache keys (best effort).
-    Signature matches event_consumer usage.
-    """
     mode = norm(mode)
     if mode not in ("strict", "degraded"):
         mode = "strict"
@@ -192,6 +176,5 @@ async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> in
     pipe.delete(set_key)
     res = await pipe.execute()
 
-    # res[0] is count deleted from delete(*keys)
     deleted = res[0] if res and isinstance(res[0], int) else 0
     return deleted

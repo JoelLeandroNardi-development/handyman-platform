@@ -2,9 +2,8 @@ import asyncio
 import json
 import aio_pika
 from aio_pika import ExchangeType, Message
-from datetime import datetime
 
-from .rabbitmq import connect, EXCHANGE_NAME
+from .messaging import connect, EXCHANGE_NAME, declare_exchange
 from .services import (
     redis_client,
     invalidate_bucket,
@@ -13,16 +12,15 @@ from .services import (
     norm,
 )
 
-QUEUE_NAME = "match_service_queue"
-RETRY_QUEUE = "match_service_retry"
-DLQ_QUEUE = "match_service_dlq"
+QUEUE_NAME = "match_service_domain_events"
+RETRY_QUEUE = "match_service_domain_events_retry"
+DLQ_QUEUE = "match_service_domain_events_dlq"
 
+# Only include events we actually use for cache invalidation
 ROUTING_KEYS = [
     "availability.updated",
     "handyman.created",
     "handyman.location_updated",
-    "user.created",
-    "user.location_updated",
 ]
 
 MAX_RETRIES = 3
@@ -33,14 +31,13 @@ RETRY_SECONDS = 5
 
 async def _already_processed(event_id: str) -> bool:
     key = f"processed_event:{event_id}"
-    exists = await redis_client.get(key)
-    if exists:
+    if await redis_client.get(key):
         return True
     await redis_client.set(key, "1", ex=IDEMPOTENCY_TTL_SECONDS)
     return False
 
 
-async def _invalidate_for_handyman_profile(profile: dict):
+async def _invalidate_for_handyman_profile(profile: dict | None):
     if not profile:
         return
 
@@ -100,42 +97,39 @@ async def process_event(payload: dict):
 async def handle_message(message: aio_pika.IncomingMessage):
     async with message.process(requeue=False):
         try:
-            payload = json.loads(message.body.decode())
+            payload = json.loads(message.body.decode("utf-8"))
             await process_event(payload)
         except Exception as e:
-            retry_count = message.headers.get("x-retry-count", 0)
+            headers_in = dict(message.headers or {})
+            retry_count = int(headers_in.get("x-retry-count", 0) or 0)
 
             if retry_count >= MAX_RETRIES:
-                print(f"[match-service] Poison message moved to DLQ: {e}")
+                print(f"[match-service] Poison message (DLQ): {e}")
                 return
 
-            headers = dict(message.headers)
-            headers["x-retry-count"] = retry_count + 1
+            headers_in["x-retry-count"] = retry_count + 1
 
-            retry_message = Message(
+            retry_msg = Message(
                 body=message.body,
-                headers=headers,
+                headers=headers_in,
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                content_type=message.content_type or "application/json",
             )
 
-            await message.channel.default_exchange.publish(
-                retry_message,
-                routing_key=RETRY_QUEUE,
-            )
-
-            print(f"[match-service] Message retry #{retry_count + 1}")
+            await message.channel.default_exchange.publish(retry_msg, routing_key=RETRY_QUEUE)
+            print(f"[match-service] retry #{retry_count + 1}")
 
 
 async def _connect_and_consume():
     connection = await connect()
+    if connection is None:
+        # events disabled
+        return None
+
     channel = await connection.channel()
     await channel.set_qos(prefetch_count=50)
 
-    exchange = await channel.declare_exchange(
-        EXCHANGE_NAME,
-        ExchangeType.TOPIC,
-        durable=True,
-    )
+    exchange = await declare_exchange(channel)
 
     main_queue = await channel.declare_queue(
         QUEUE_NAME,
@@ -146,7 +140,7 @@ async def _connect_and_consume():
         },
     )
 
-    retry_queue = await channel.declare_queue(
+    await channel.declare_queue(
         RETRY_QUEUE,
         durable=True,
         arguments={
@@ -156,17 +150,13 @@ async def _connect_and_consume():
         },
     )
 
-    dlq = await channel.declare_queue(
-        DLQ_QUEUE,
-        durable=True,
-    )
+    await channel.declare_queue(DLQ_QUEUE, durable=True)
 
     for rk in ROUTING_KEYS:
         await main_queue.bind(exchange, routing_key=rk)
 
     await main_queue.consume(handle_message)
-
-    print("[match-service] Consumer started with DLQ + retry")
+    print("[match-service] consumer started with DLQ + retry")
     return connection
 
 
@@ -174,9 +164,9 @@ async def start_consumer_with_retry(stop_event: asyncio.Event):
     while not stop_event.is_set():
         try:
             conn = await _connect_and_consume()
-            return conn
+            return conn  # can be None when events disabled
         except Exception as e:
-            print(f"[match-service] consumer failed, retrying: {e}")
+            print(f"[match-service] consumer failed, retrying in {RETRY_SECONDS}s: {e}")
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=RETRY_SECONDS)
             except asyncio.TimeoutError:
