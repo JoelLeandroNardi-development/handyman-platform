@@ -3,7 +3,7 @@ import aio_pika
 from aio_pika import ExchangeType, Message
 from sqlalchemy import select
 
-from .rabbitmq import connect, EXCHANGE_NAME
+from .messaging import mq, EXCHANGE_NAME
 from .db import SessionLocal
 from .models import Booking
 
@@ -55,8 +55,6 @@ async def process_event(payload: dict):
                 booking.status = "EXPIRED"
 
         elif event_type == "slot.released":
-            # cancellation release acknowledgement (optional)
-            # booking already marked CANCELED in routes; just ensure state remains consistent
             if booking.status != "CANCELED":
                 booking.status = "CANCELED"
                 booking.cancellation_reason = booking.cancellation_reason or "released"
@@ -86,18 +84,12 @@ async def handle_message(message: aio_pika.IncomingMessage):
                 content_type=message.content_type or "application/json",
             )
 
-            await message.channel.default_exchange.publish(
-                retry_msg,
-                routing_key=RETRY_QUEUE,
-            )
-
+            await message.channel.default_exchange.publish(retry_msg, routing_key=RETRY_QUEUE)
             print(f"[booking-service] retry #{retry_count + 1}")
 
 
 async def start_consumer():
-    conn = await connect()
-    channel = await conn.channel()
-    await channel.set_qos(prefetch_count=50)
+    channel = await mq.new_consumer_channel(prefetch=50)
 
     exchange = await channel.declare_exchange(
         EXCHANGE_NAME, ExchangeType.TOPIC, durable=True
@@ -129,4 +121,6 @@ async def start_consumer():
 
     await main_queue.consume(handle_message)
     print("[booking-service] consumer started with DLQ + retry")
-    return conn
+
+    # return the underlying connection so main.py can close it if desired
+    return await mq.connect()

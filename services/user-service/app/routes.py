@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import User, OutboxEvent
-from .schemas import CreateUser, UpdateLocation
+from .schemas import CreateUser, UpdateLocation, UserResponse
 from .events import build_event
 
 router = APIRouter()
@@ -15,13 +15,21 @@ async def get_db():
         yield session
 
 
-@router.post("/users")
-async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == data.email))
-    existing = result.scalar_one_or_none()
+def to_response(u: User) -> UserResponse:
+    return UserResponse(
+        email=u.email,
+        full_name=u.full_name,
+        latitude=u.latitude,
+        longitude=u.longitude,
+        created_at=u.created_at,
+    )
 
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+
+@router.post("/users", response_model=UserResponse)
+async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(User).where(User.email == data.email))
+    if res.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="User already exists")
 
     user = User(
         email=data.email,
@@ -29,18 +37,17 @@ async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
         latitude=data.latitude,
         longitude=data.longitude,
     )
+    db.add(user)
 
     event = build_event(
         "user.created",
         {
-            "email": data.email,
-            "full_name": data.full_name,
-            "latitude": data.latitude,
-            "longitude": data.longitude,
+            "email": user.email,
+            "full_name": user.full_name,
+            "latitude": user.latitude,
+            "longitude": user.longitude,
         },
     )
-
-    db.add(user)
     db.add(
         OutboxEvent(
             event_id=event["event_id"],
@@ -52,14 +59,14 @@ async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
     )
 
     await db.commit()
-    return {"message": "User created"}
+    await db.refresh(user)
+    return to_response(user)
 
 
-@router.put("/users/{email}/location")
+@router.put("/users/{email}/location", response_model=UserResponse)
 async def update_location(email: str, data: UpdateLocation, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-
+    res = await db.execute(select(User).where(User.email == email))
+    user = res.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -74,7 +81,6 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
             "longitude": user.longitude,
         },
     )
-
     db.add(
         OutboxEvent(
             event_id=event["event_id"],
@@ -86,20 +92,14 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
     )
 
     await db.commit()
-    return {"message": "Location updated"}
+    await db.refresh(user)
+    return to_response(user)
 
 
-@router.get("/users/{email}")
+@router.get("/users/{email}", response_model=UserResponse)
 async def get_user(email: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-
+    res = await db.execute(select(User).where(User.email == email))
+    user = res.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    return {
-        "email": user.email,
-        "full_name": user.full_name,
-        "latitude": user.latitude,
-        "longitude": user.longitude,
-    }
+    return to_response(user)

@@ -4,14 +4,14 @@ from sqlalchemy.sql import func
 
 from .db import SessionLocal
 from .models import OutboxEvent
-from .rabbitmq import publisher
+from .messaging import publisher
 
 POLL_INTERVAL_SECONDS = 1.0
 BATCH_SIZE = 50
 MAX_ATTEMPTS = 25
 
 
-class OutboxDispatcher:
+class OutboxWorker:
     def __init__(self):
         self._stop = asyncio.Event()
         self._task: asyncio.Task | None = None
@@ -69,4 +69,4 @@ class OutboxDispatcher:
             await db.commit()
 
 
-dispatcher = OutboxDispatcher()
+worker = OutboxWorker()

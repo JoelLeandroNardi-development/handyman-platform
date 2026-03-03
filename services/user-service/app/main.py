@@ -1,35 +1,38 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .rabbitmq import publisher
-from .outbox import dispatcher
-
-app = FastAPI(title="User Service")
-app.include_router(router)
+from .messaging import publisher
+from .outbox_worker import worker
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "service": "user-service"}
-
-
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("[user-service] starting up...")
     try:
         await publisher.start()
     except Exception as e:
         print(f"[user-service] publisher start failed: {e}")
 
-    await dispatcher.start()
+    await worker.start()
 
+    yield
 
-@app.on_event("shutdown")
-async def shutdown():
+    print("[user-service] shutting down...")
     try:
-        await dispatcher.stop()
+        await worker.stop()
     except Exception:
         pass
     try:
         await publisher.close()
     except Exception:
         pass
+
+
+app = FastAPI(title="User Service", lifespan=lifespan)
+app.include_router(router)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "user-service"}
