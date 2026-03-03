@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import datetime as dt
 import os
@@ -8,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import SessionLocal
 from .models import OutboxEvent
-from .messaging import mq
+from .messaging import publisher
 
 POLL_INTERVAL_SECONDS = float(os.getenv("OUTBOX_POLL_INTERVAL_SECONDS", "1.0"))
 BATCH_SIZE = int(os.getenv("OUTBOX_BATCH_SIZE", "50"))
@@ -53,8 +55,7 @@ async def _mark_failure(db: AsyncSession, row_id: int, attempts: int, err: str) 
 
 
 async def run_outbox_forever(stop_event: asyncio.Event) -> None:
-    # ensure connection established
-    await mq.connect()
+    await publisher.start()
 
     while not stop_event.is_set():
         try:
@@ -64,7 +65,7 @@ async def run_outbox_forever(stop_event: asyncio.Event) -> None:
 
                     for ev in batch:
                         try:
-                            await mq.publish_json(
+                            await publisher.publish(
                                 routing_key=ev.routing_key,
                                 payload=ev.payload,
                                 message_id=ev.event_id,

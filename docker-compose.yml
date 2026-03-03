@@ -43,7 +43,9 @@ services:
       retries: 12
 
   auth-service:
-    build: ./services/auth-service
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
     container_name: auth-service
     env_file:
       - .env
@@ -56,7 +58,9 @@ services:
         condition: service_healthy
 
   user-service:
-    build: ./services/user-service
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
     container_name: user-service
     env_file:
       - .env
@@ -70,7 +74,9 @@ services:
         condition: service_healthy
 
   handyman-service:
-    build: ./services/handyman-service
+    build:
+      context: .
+      dockerfile: services/handyman-service/Dockerfile
     container_name: handyman-service
     env_file:
       - .env
@@ -84,7 +90,9 @@ services:
         condition: service_healthy
 
   availability-service:
-    build: ./services/availability-service
+    build:
+      context: .
+      dockerfile: services/availability-service/Dockerfile
     container_name: availability-service
     env_file:
       - .env
@@ -98,7 +106,9 @@ services:
         condition: service_healthy
 
   match-service:
-    build: ./services/match-service
+    build:
+      context: .
+      dockerfile: services/match-service/Dockerfile
     container_name: match-service
     env_file:
       - .env
@@ -119,7 +129,9 @@ services:
         condition: service_started
 
   booking-service:
-    build: ./services/booking-service
+    build:
+      context: .
+      dockerfile: services/booking-service/Dockerfile
     container_name: booking-service
     env_file:
       - .env
@@ -133,7 +145,9 @@ services:
         condition: service_healthy
 
   gateway-service:
-    build: ./services/gateway-service
+    build:
+      context: .
+      dockerfile: services/gateway-service/Dockerfile
     container_name: gateway-service
     env_file:
       - .env

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
@@ -12,7 +14,8 @@ async def lifespan(app: FastAPI):
     try:
         await publisher.start()
     except Exception as e:
-        print(f"[user-service] publisher start failed: {e}")
+        # should not happen with best-effort shared publisher, but keep safe
+        print(f"[user-service] publisher start failed (ok): {type(e).__name__}: {e}")
 
     await worker.start()
 

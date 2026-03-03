@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .messaging import mq
 from .outbox_worker import run_outbox_forever
+from .messaging import publisher
 
 
 _stop = asyncio.Event()
@@ -16,7 +18,10 @@ async def lifespan(app: FastAPI):
     global _outbox_task
 
     print("[handyman-service] starting up...")
-    await mq.connect()
+    try:
+        await publisher.start()
+    except Exception as e:
+        print(f"[handyman-service] publisher start failed (ok): {type(e).__name__}: {e}")
 
     _outbox_task = asyncio.create_task(run_outbox_forever(_stop))
 
@@ -28,7 +33,10 @@ async def lifespan(app: FastAPI):
     if _outbox_task:
         _outbox_task.cancel()
 
-    await mq.close()
+    try:
+        await publisher.close()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="Handyman Service", lifespan=lifespan)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import time
 from datetime import datetime
@@ -80,7 +82,7 @@ async def get_reservation(booking_id: str) -> dict | None:
         return None
 
 
-async def delete_reservation(booking_id: str):
+async def delete_reservation(booking_id: str) -> None:
     res = await get_reservation(booking_id)
     pipe = redis_client.pipeline()
     pipe.delete(_res_key(booking_id))

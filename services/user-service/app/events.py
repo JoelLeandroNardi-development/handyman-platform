@@ -1,12 +1,9 @@
-import uuid
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from shared.shared.events import build_event as _build_event
+
+SERVICE_NAME = "user-service"
 
 
 def build_event(event_type: str, data: dict) -> dict:
-    # Keep occurred_at JSON-safe (ISO string)
-    return {
-        "event_id": str(uuid.uuid4()),
-        "event_type": event_type,
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
-        "data": data,
-    }
+    return _build_event(event_type, data, source=SERVICE_NAME)

@@ -1,11 +1,13 @@
-import json
-import aio_pika
-from aio_pika import ExchangeType, Message
-from sqlalchemy import select
+from __future__ import annotations
 
-from .messaging import mq, EXCHANGE_NAME
+from sqlalchemy import select
+import aio_pika
+
+from shared.shared.consumer import run_consumer_with_retry_dlq
+
 from .db import SessionLocal
 from .models import Booking
+from .messaging import EXCHANGE_NAME, RABBIT_URL, publisher
 
 QUEUE_NAME = "booking_service_domain_events"
 RETRY_QUEUE = "booking_service_domain_events_retry"
@@ -18,9 +20,6 @@ ROUTING_KEYS = [
     "slot.expired",
     "slot.released",
 ]
-
-MAX_RETRIES = 3
-RETRY_DELAY_MS = 5000
 
 
 async def process_event(payload: dict):
@@ -62,65 +61,29 @@ async def process_event(payload: dict):
         await db.commit()
 
 
-async def handle_message(message: aio_pika.IncomingMessage):
-    async with message.process(requeue=False):
-        try:
-            payload = json.loads(message.body.decode("utf-8"))
-            await process_event(payload)
-        except Exception as e:
-            retry_count = int(message.headers.get("x-retry-count", 0) or 0)
-
-            if retry_count >= MAX_RETRIES:
-                print(f"[booking-service] Poison message (DLQ): {e}")
-                return
-
-            headers = dict(message.headers or {})
-            headers["x-retry-count"] = retry_count + 1
-
-            retry_msg = Message(
-                body=message.body,
-                headers=headers,
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                content_type=message.content_type or "application/json",
-            )
-
-            await message.channel.default_exchange.publish(retry_msg, routing_key=RETRY_QUEUE)
-            print(f"[booking-service] retry #{retry_count + 1}")
-
-
 async def start_consumer():
-    channel = await mq.new_consumer_channel(prefetch=50)
+    if not RABBIT_URL:
+        raise RuntimeError("RABBIT_URL environment variable is not set")
 
-    exchange = await channel.declare_exchange(
-        EXCHANGE_NAME, ExchangeType.TOPIC, durable=True
+    # Make sure publisher is started (it owns the shared connection pattern in this service)
+    await publisher.start()
+
+    conn = await aio_pika.connect_robust(RABBIT_URL)
+    channel = await conn.channel()
+
+    await run_consumer_with_retry_dlq(
+        channel=channel,
+        exchange_name=EXCHANGE_NAME,
+        queue_name=QUEUE_NAME,
+        retry_queue=RETRY_QUEUE,
+        dlq_queue=DLQ_QUEUE,
+        routing_keys=ROUTING_KEYS,
+        handler=process_event,
+        retry_delay_ms=5000,
+        max_retries=3,
+        prefetch=50,
+        service_label="booking-service",
     )
 
-    main_queue = await channel.declare_queue(
-        QUEUE_NAME,
-        durable=True,
-        arguments={
-            "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": DLQ_QUEUE,
-        },
-    )
-
-    await channel.declare_queue(
-        RETRY_QUEUE,
-        durable=True,
-        arguments={
-            "x-message-ttl": RETRY_DELAY_MS,
-            "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": QUEUE_NAME,
-        },
-    )
-
-    await channel.declare_queue(DLQ_QUEUE, durable=True)
-
-    for rk in ROUTING_KEYS:
-        await main_queue.bind(exchange, routing_key=rk)
-
-    await main_queue.consume(handle_message)
     print("[booking-service] consumer started with DLQ + retry")
-
-    # return the underlying connection so main.py can close it if desired
-    return await mq.connect()
+    return conn

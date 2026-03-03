@@ -1,7 +1,11 @@
-import json
-import aio_pika
-from aio_pika import ExchangeType, Message
+from __future__ import annotations
+
 from dateutil import parser
+
+from shared.shared.consumer import run_consumer_with_retry_dlq
+from shared.shared.idempotency import already_processed
+
+import aio_pika
 
 from .redis_client import redis_client
 from .reservations import create_reservation, get_reservation, delete_reservation, overlaps
@@ -20,13 +24,6 @@ ROUTING_KEYS = [
 ]
 
 IDEMPOTENCY_TTL = 3600
-
-MAX_RETRIES = 3
-RETRY_DELAY_MS = 5000
-
-
-def processed_key(event_id: str) -> str:
-    return f"processed_event:{event_id}"
 
 
 def avail_key(email: str) -> str:
@@ -62,7 +59,7 @@ async def apply_confirm_to_slots(email: str, desired_start: str, desired_end: st
     key = avail_key(email)
     slots = await redis_client.lrange(key, 0, -1)
 
-    new_slots = []
+    new_slots: list[str] = []
     for slot in slots:
         try:
             s, e = slot.split("|")
@@ -95,10 +92,8 @@ async def process_event(payload: dict):
     if event_type not in set(ROUTING_KEYS):
         return
 
-    pk = processed_key(event_id)
-    if await redis_client.get(pk):
+    if await already_processed(redis_client=redis_client, event_id=event_id, ttl_seconds=IDEMPOTENCY_TTL):
         return
-    await redis_client.set(pk, "1", ex=IDEMPOTENCY_TTL)
 
     if event_type == "booking.requested":
         booking_id = data.get("booking_id")
@@ -158,70 +153,26 @@ async def process_event(payload: dict):
         return
 
 
-async def handle_message(message: aio_pika.IncomingMessage):
-    async with message.process(requeue=False):
-        try:
-            payload = json.loads(message.body.decode("utf-8"))
-            await process_event(payload)
-        except Exception as e:
-            retry_count = int(message.headers.get("x-retry-count", 0) or 0)
-
-            if retry_count >= MAX_RETRIES:
-                print(f"[availability-service] Poison message (DLQ): {e}")
-                return
-
-            headers = dict(message.headers or {})
-            headers["x-retry-count"] = retry_count + 1
-
-            retry_msg = Message(
-                body=message.body,
-                headers=headers,
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                content_type=message.content_type or "application/json",
-            )
-
-            await message.channel.default_exchange.publish(
-                retry_msg,
-                routing_key=RETRY_QUEUE,
-            )
-
-            print(f"[availability-service] retry #{retry_count + 1}")
-
-
 async def start_consumer():
     if not RABBIT_URL:
         raise RuntimeError("RABBIT_URL is not set")
 
     conn = await aio_pika.connect_robust(RABBIT_URL)
     channel = await conn.channel()
-    await channel.set_qos(prefetch_count=50)
 
-    exchange = await channel.declare_exchange(EXCHANGE_NAME, ExchangeType.TOPIC, durable=True)
-
-    main_queue = await channel.declare_queue(
-        QUEUE_NAME,
-        durable=True,
-        arguments={
-            "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": DLQ_QUEUE,
-        },
+    await run_consumer_with_retry_dlq(
+        channel=channel,
+        exchange_name=EXCHANGE_NAME,
+        queue_name=QUEUE_NAME,
+        retry_queue=RETRY_QUEUE,
+        dlq_queue=DLQ_QUEUE,
+        routing_keys=ROUTING_KEYS,
+        handler=process_event,
+        retry_delay_ms=5000,
+        max_retries=3,
+        prefetch=50,
+        service_label="availability-service",
     )
 
-    await channel.declare_queue(
-        RETRY_QUEUE,
-        durable=True,
-        arguments={
-            "x-message-ttl": RETRY_DELAY_MS,
-            "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": QUEUE_NAME,
-        },
-    )
-
-    await channel.declare_queue(DLQ_QUEUE, durable=True)
-
-    for rk in ROUTING_KEYS:
-        await main_queue.bind(exchange, routing_key=rk)
-
-    await main_queue.consume(handle_message)
     print("[availability-service] booking consumer started with DLQ + retry")
     return conn
