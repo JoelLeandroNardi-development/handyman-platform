@@ -48,7 +48,7 @@ async def create_booking(data: CreateBooking):
             OutboxEvent(
                 event_id=event["event_id"],
                 event_type=event["event_type"],
-                routing_key=event["event_type"],  # <-- standardized
+                routing_key=event["event_type"],
                 payload=event,
                 status="PENDING",
             )
@@ -113,7 +113,7 @@ async def confirm_booking(booking_id: str):
             OutboxEvent(
                 event_id=event["event_id"],
                 event_type=event["event_type"],
-                routing_key=event["event_type"],  # <-- standardized
+                routing_key=event["event_type"],
                 payload=event,
                 status="PENDING",
             )
@@ -157,7 +157,7 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
             OutboxEvent(
                 event_id=event["event_id"],
                 event_type=event["event_type"],
-                routing_key=event["event_type"],  # <-- standardized
+                routing_key=event["event_type"],
                 payload=event,
                 status="PENDING",
             )

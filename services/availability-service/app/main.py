@@ -33,12 +33,10 @@ async def lifespan(app: FastAPI):
                 except asyncio.TimeoutError:
                     continue
 
-    # startup
     print("[availability-service] starting up...")
     try:
         await publisher.start()
     except Exception as e:
-        # fine; outbox will keep retrying
         print(f"[availability-service] publisher start failed (ok): {e}")
 
     await worker.start()
@@ -48,7 +46,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # shutdown
     print("[availability-service] shutting down...")
     stop_event.set()
 

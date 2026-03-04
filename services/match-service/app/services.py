@@ -25,17 +25,15 @@ GRID_DEG = float(os.getenv("MATCH_GRID_DEG") or "0.05")
 TIME_BUCKET_SECONDS = int(os.getenv("MATCH_TIME_BUCKET_SECONDS") or "900")
 
 # ---- Projection keys ----
-PROJ_HANDYMAN_KEY = "proj:handyman:{email}"                 # string JSON
-PROJ_HANDYMEN_INDEX = "proj:handymen:index"                 # set of emails
-PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"   # set of emails
+PROJ_HANDYMAN_KEY = "proj:handyman:{email}"
+PROJ_HANDYMEN_INDEX = "proj:handymen:index" 
+PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"   
 
-PROJ_AVAIL_KEY = "proj:availability:{email}"                # string JSON {email, slots, updated_at}
-PROJ_AVAIL_INDEX = "proj:availability:index"                # set of emails
+PROJ_AVAIL_KEY = "proj:availability:{email}"
+PROJ_AVAIL_INDEX = "proj:availability:index"
 
 
-# -------------------------
 # Utilities
-# -------------------------
 def norm(s: str) -> str:
     return (s or "").strip().lower()
 
@@ -67,9 +65,7 @@ def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datet
     return a_start < b_end and a_end > b_start
 
 
-# -------------------------
 # Distance + bucketing
-# -------------------------
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
     d_lat = math.radians(lat2 - lat1)
@@ -136,9 +132,7 @@ def buckets_in_radius(lat: float, lon: float, radius_km: float) -> list[tuple[in
     return out
 
 
-# -------------------------
 # Match cache invalidation
-# -------------------------
 async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
     mode = norm(mode)
     if mode not in ("strict", "degraded"):
@@ -161,9 +155,7 @@ async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> in
     return deleted
 
 
-# -------------------------
 # Projections: Handyman
-# -------------------------
 def _normalize_handyman(doc: dict) -> dict:
     email = (doc or {}).get("email")
     if not email:
@@ -171,7 +163,6 @@ def _normalize_handyman(doc: dict) -> dict:
 
     skills = doc.get("skills") or []
     skills_norm = [norm(s) for s in skills if s]
-    # de-dup stable order
     seen = set()
     skills_norm = [s for s in skills_norm if not (s in seen or seen.add(s))]
 
@@ -205,22 +196,18 @@ async def upsert_handyman_projection(doc: dict) -> None:
     if not email:
         return
 
-    # Pull old skills for index maintenance
     old = await get_handyman_projection(email)
     old_skills = set((old or {}).get("skills") or [])
 
     new_skills = set(normalized.get("skills") or [])
 
-    # Write document + indexes
     pipe = redis_client.pipeline()
     pipe.set(PROJ_HANDYMAN_KEY.format(email=email), json.dumps(normalized))
     pipe.sadd(PROJ_HANDYMEN_INDEX, email)
 
-    # Remove old skill membership no longer present
     for s in (old_skills - new_skills):
         pipe.srem(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
 
-    # Add new memberships
     for s in new_skills:
         pipe.sadd(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
 
@@ -260,14 +247,11 @@ async def handyman_projection_count() -> int:
         return 0
 
 
-# -------------------------
 # Projections: Availability
-# -------------------------
 async def upsert_availability_projection(*, email: str, slots: list[dict]) -> None:
     if not email:
         return
 
-    # slots expected: [{"start": "...", "end": "..."}]
     clean_slots: list[dict] = []
     for s in (slots or []):
         if not isinstance(s, dict):
@@ -276,7 +260,6 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
         end = s.get("end")
         if not start or not end:
             continue
-        # validate parseable (but store original strings)
         try:
             parse_dt(start)
             parse_dt(end)
@@ -333,9 +316,7 @@ async def projections_have_any_availability() -> bool:
     return (await availability_projection_count()) > 0
 
 
-# -------------------------
 # Bootstrap seed (one-time)
-# -------------------------
 async def fetch_handymen_http() -> list[dict]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         r = await client.get(f"{HANDYMAN_SERVICE_URL}/handymen")

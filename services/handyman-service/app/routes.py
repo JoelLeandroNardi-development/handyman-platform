@@ -54,7 +54,7 @@ async def create_handyman(data: CreateHandyman):
             OutboxEvent(
                 event_id=evt["event_id"],
                 event_type=evt["event_type"],
-                routing_key=evt["event_type"],  # <-- standardized
+                routing_key=evt["event_type"],
                 payload=evt,
                 status="PENDING",
             )
@@ -104,7 +104,7 @@ async def update_location(email: str, data: UpdateLocation):
             OutboxEvent(
                 event_id=evt["event_id"],
                 event_type=evt["event_type"],
-                routing_key=evt["event_type"],  # <-- standardized
+                routing_key=evt["event_type"],
                 payload=evt,
                 status="PENDING",
             )

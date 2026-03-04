@@ -28,7 +28,7 @@ class OutboxEvent(Base):
 
     payload = Column(JSON, nullable=False)
 
-    status = Column(String, nullable=False, default="PENDING")  # PENDING|SENT|FAILED
+    status = Column(String, nullable=False, default="PENDING")
     attempts = Column(Integer, nullable=False, default=0)
     last_error = Column(String, nullable=True)
 

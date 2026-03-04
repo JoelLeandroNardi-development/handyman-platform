@@ -70,7 +70,6 @@ async def process_event(payload: dict):
     if await already_processed(redis_client=redis_client, event_id=event_id, ttl_seconds=IDEMPOTENCY_TTL_SECONDS):
         return
 
-    # ---- Approach A: availability.updated includes slots ----
     if event_type == "availability.updated":
         email = data.get("email")
         slots = data.get("slots") or []
@@ -80,14 +79,11 @@ async def process_event(payload: dict):
 
         await upsert_availability_projection(email=email, slots=slots)
 
-        # Invalidate based on handyman profile projection (if present)
         profile = await get_handyman_projection(email)
         await _invalidate_for_handyman_profile(profile)
         return
 
-    # ---- Handyman events -> projection + invalidate ----
     if event_type == "handyman.created":
-        # data includes full profile (per your contract)
         await upsert_handyman_projection(data)
         await _invalidate_for_handyman_profile(data)
         return

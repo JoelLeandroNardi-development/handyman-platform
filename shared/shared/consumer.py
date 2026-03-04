@@ -28,7 +28,6 @@ async def setup_consumer_topology(
         durable=True,
     )
 
-    # Main queue: dead-letter to DLQ on reject/nack (we will explicitly reject on poison)
     main_queue = await channel.declare_queue(
         queue_name,
         durable=True,
@@ -38,7 +37,6 @@ async def setup_consumer_topology(
         },
     )
 
-    # Retry queue: TTL then dead-letter back to main queue
     await channel.declare_queue(
         retry_queue,
         durable=True,
@@ -49,10 +47,8 @@ async def setup_consumer_topology(
         },
     )
 
-    # DLQ
     await channel.declare_queue(dlq_queue, durable=True)
 
-    # Bind main queue to routing keys
     rks = list(routing_keys)
     for rk in rks:
         await main_queue.bind(exchange, routing_key=rk)
@@ -83,7 +79,6 @@ async def run_consumer_with_retry_dlq(
     prefetch: int = 50,
     service_label: str = "service",
 ) -> None:
-    # declare exchange/queues/bindings
     await setup_consumer_topology(
         channel=channel,
         exchange_name=exchange_name,
@@ -103,8 +98,6 @@ async def run_consumer_with_retry_dlq(
     )
 
     async def _on_message(message: aio_pika.IncomingMessage):
-        # We will ACK manually on success; on failure we will publish to retry queue and ACK;
-        # on poison we REJECT so queue DLX sends to DLQ.
         try:
             payload = _safe_decode_json(message)
             await handler(payload)
@@ -115,7 +108,6 @@ async def run_consumer_with_retry_dlq(
 
             if retry_count >= max_retries:
                 print(f"[{service_label}] Poison -> DLQ: {type(e).__name__}: {e}")
-                # Reject (no requeue) so the queue's DLX routes to DLQ
                 await message.reject(requeue=False)
                 return
 
@@ -128,11 +120,9 @@ async def run_consumer_with_retry_dlq(
                 content_type=message.content_type or "application/json",
             )
 
-            # Publish to retry queue (default exchange routes by queue name)
             await message.channel.default_exchange.publish(retry_msg, routing_key=retry_queue)
             print(f"[{service_label}] retry #{retry_count + 1}")
 
-            # Ack original so it doesn't get redelivered immediately
             await message.ack()
 
     await main_queue.consume(_on_message)

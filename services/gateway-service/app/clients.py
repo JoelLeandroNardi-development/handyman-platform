@@ -38,13 +38,11 @@ def _base_headers(request_id: str | None, user_payload: dict | None):
 
 
 def _safe_json(resp: httpx.Response) -> dict:
-    # If upstream didn't return JSON (or returned empty), avoid crashing the gateway.
     if not resp.content:
         return {}
     try:
         return resp.json()
     except Exception:
-        # Return something useful for debugging
         return {"raw": resp.text}
 
 
@@ -72,9 +70,8 @@ async def _call_with_breaker(
             await breaker.record_success()
             return _safe_json(resp)
 
-        # non-2xx
         await breaker.record_failure()
-        # prefer JSON error payload if any
+
         detail = _safe_json(resp)
         raise HTTPException(status_code=resp.status_code, detail=detail)
 
@@ -82,7 +79,6 @@ async def _call_with_breaker(
         await breaker.record_failure()
         raise HTTPException(status_code=504, detail=f"Timeout calling upstream: {url}")
     except HTTPException:
-        # already shaped
         raise
     except Exception as e:
         await breaker.record_failure()

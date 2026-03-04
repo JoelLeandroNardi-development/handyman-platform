@@ -73,7 +73,6 @@ async def outbox_stats() -> dict:
 
 
 async def run_outbox_forever(stop_event: asyncio.Event) -> None:
-    # Best effort: won't crash if rabbit is briefly down
     await publisher.start()
 
     while not stop_event.is_set():

@@ -14,7 +14,6 @@ async def lifespan(app: FastAPI):
     try:
         await publisher.start()
     except Exception as e:
-        # should not happen with best-effort shared publisher, but keep safe
         print(f"[user-service] publisher start failed (ok): {type(e).__name__}: {e}")
 
     await worker.start()

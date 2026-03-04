@@ -5,10 +5,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 try:
-    # FastAPI encoder handles datetime/UUID/Decimal/etc recursively
-    from fastapi.encoders import jsonable_encoder as _jsonable_encoder  # type: ignore
-except Exception:  # pragma: no cover
-    _jsonable_encoder = None  # type: ignore
+    from fastapi.encoders import jsonable_encoder as _jsonable_encoder
+except Exception:
+    _jsonable_encoder = None
 
 
 def utc_now_iso() -> str:
@@ -67,9 +66,6 @@ def build_event_jsonable(
     )
 
     if _jsonable_encoder is None:
-        # Minimal fallback: build_event already produces JSON-safe top-level fields,
-        # but nested datetimes in data won't be converted without FastAPI.
-        # If this becomes an issue, add fastapi to shared deps (recommended).
         return evt
 
     return _jsonable_encoder(evt)

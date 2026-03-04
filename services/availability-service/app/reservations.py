@@ -7,7 +7,7 @@ from dateutil import parser
 
 from .redis_client import redis_client
 
-RES_TTL_SECONDS = 300  # 5 minutes
+RES_TTL_SECONDS = 300
 EXPIRY_ZSET = "reservation_expiry"
 
 

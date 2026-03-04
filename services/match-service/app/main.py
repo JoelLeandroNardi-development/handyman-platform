@@ -29,10 +29,8 @@ async def lifespan(app: FastAPI):
         nonlocal consumer_conn
         consumer_conn = await start_consumer_with_retry(stop_event)
 
-    # Start worker (no-op, kept for symmetry)
     await worker.start()
 
-    # Seed projections once (best-effort)
     _last_seed_status = await seed_handyman_projection_if_empty()
     print(f"[match-service] seed status: {_last_seed_status}")
 

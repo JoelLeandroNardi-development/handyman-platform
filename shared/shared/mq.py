@@ -61,7 +61,7 @@ class RabbitPublisher:
             return
 
         try:
-            self._conn = await aio_pika.connect_robust(self.cfg.url)  # type: ignore[arg-type]
+            self._conn = await aio_pika.connect_robust(self.cfg.url)
             self._channel = await self._conn.channel(publisher_confirms=True)
             self._exchange = await self._channel.declare_exchange(
                 self.cfg.exchange_name,
@@ -105,7 +105,7 @@ class RabbitPublisher:
         if self._exchange is not None and self._conn and not self._conn.is_closed:
             return
 
-        self._conn = await aio_pika.connect_robust(self.cfg.url)  # type: ignore[arg-type]
+        self._conn = await aio_pika.connect_robust(self.cfg.url)
         self._channel = await self._conn.channel(publisher_confirms=True)
         self._exchange = await self._channel.declare_exchange(
             self.cfg.exchange_name,
@@ -152,12 +152,10 @@ class RabbitPublisher:
 
         try:
             await self._exchange.publish(msg, routing_key=rk, mandatory=mandatory)
-            # Lightweight, very useful when debugging routing.
             print(
                 f"[shared.mq] published exchange={self.cfg.exchange_name} rk={rk} message_id={message_id}"
             )
         except Exception as e:
-            # Important: bubble up so outbox retries instead of marking SENT.
             print(
                 f"[shared.mq] publish failed exchange={self.cfg.exchange_name} rk={rk} "
                 f"message_id={message_id} err={type(e).__name__}: {e}"

@@ -6,12 +6,11 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# --- make imports work no matter how alembic is executed ---
-ROOT = Path(__file__).resolve().parents[1]  # /app
+ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.db import Base  # noqa: E402
-from app import models  # noqa: F401,E402
+from app.db import Base
+from app import models
 
 config = context.config
 
@@ -25,7 +24,6 @@ def get_url():
     url = os.getenv("BOOKING_DB")
     if not url:
         raise RuntimeError("BOOKING_DB env var not set")
-    # Alembic needs sync URL
     return url.replace("+asyncpg", "")
 
 

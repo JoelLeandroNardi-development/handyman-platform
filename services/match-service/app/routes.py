@@ -37,7 +37,6 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     if not requested_skill:
         return []
 
-    # degraded if we don't have any availability projections at all (bootstrap / events disabled)
     has_any_avail = await projections_have_any_availability()
     degraded = not has_any_avail
 
@@ -52,7 +51,6 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     if cached:
         return json.loads(cached)
 
-    # Projection-first candidate retrieval by skill (no Handyman-service call)
     handymen = await list_projected_handymen_by_skill(requested_skill)
 
     results: list[dict] = []
@@ -65,14 +63,10 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         if distance > (h.get("service_radius_km") or 0):
             continue
 
-        # ---- NO HTTP to availability-service anymore ----
         slots = await get_availability_slots(h["email"])
 
         if slots is None:
-            # no projection yet => degraded behavior for this handyman
             availability_unknown = True
-            # In strict mode, we typically filter unknowns out. But since strict/degraded is global here,
-            # we keep it consistent: in degraded mode we keep unknowns; in strict mode we drop.
             if not degraded:
                 continue
         else:

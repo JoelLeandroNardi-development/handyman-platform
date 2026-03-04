@@ -65,7 +65,6 @@ async def start_consumer():
     if not RABBIT_URL:
         raise RuntimeError("RABBIT_URL environment variable is not set")
 
-    # Make sure publisher is started (it owns the shared connection pattern in this service)
     await publisher.start()
 
     conn = await aio_pika.connect_robust(RABBIT_URL)

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from .redis_client import redis_client
 from .messaging import publisher
 
-# Redis-backed outbox for availability-service (because Availability state is Redis)
 OUTBOX_PENDING = "outbox:availability:pending"
 OUTBOX_PROCESSING = "outbox:availability:processing"
 OUTBOX_DLQ = "outbox:availability:dlq"
@@ -38,7 +37,6 @@ async def enqueue_domain_event(event: dict) -> None:
     """
     event_type = (event or {}).get("event_type")
     if not event_type or not isinstance(event_type, str):
-        # poison event -> DLQ (do not block caller)
         await redis_client.rpush(OUTBOX_DLQ, json.dumps({"bad_event": event, "reason": "missing_event_type"}))
         return
 

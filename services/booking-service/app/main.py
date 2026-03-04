@@ -22,7 +22,6 @@ async def lifespan(app: FastAPI):
 
     print("[booking-service] starting up...")
 
-    # best-effort
     try:
         await publisher.start()
     except Exception as e:

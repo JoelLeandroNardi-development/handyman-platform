@@ -31,7 +31,6 @@ def _slots_payload(slots: list[AvailabilitySlot]) -> list[dict]:
 
 
 async def emit_availability_updated(email: str, slots_payload: list[dict]) -> None:
-    # IMPORTANT (Approach A): include full slots so Match can project without HTTP calls.
     ev = build_event("availability.updated", {"email": email, "slots": slots_payload})
     await enqueue_domain_event(ev)
 
@@ -41,7 +40,6 @@ async def set_availability(email: str, data: SetAvailability):
     key = redis_key(email)
     await redis_client.delete(key)
 
-    # store as start|end
     if data.slots:
         await redis_client.rpush(key, *[f"{slot.start}|{slot.end}" for slot in data.slots])
 
@@ -69,8 +67,6 @@ async def get_availability(email: str):
 async def clear_availability(email: str):
     key = redis_key(email)
     await redis_client.delete(key)
-
-    # slots are now empty
     await emit_availability_updated(email, [])
     return {"message": "Availability cleared"}
 

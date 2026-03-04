@@ -53,7 +53,7 @@ async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
         OutboxEvent(
             event_id=event["event_id"],
             event_type=event["event_type"],
-            routing_key=event["event_type"],  # <-- standardized
+            routing_key=event["event_type"],
             payload=event,
             status="PENDING",
         )
@@ -87,7 +87,7 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
         OutboxEvent(
             event_id=event["event_id"],
             event_type=event["event_type"],
-            routing_key=event["event_type"],  # <-- standardized
+            routing_key=event["event_type"],
             payload=event,
             status="PENDING",
         )

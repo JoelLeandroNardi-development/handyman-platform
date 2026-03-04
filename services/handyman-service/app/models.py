@@ -10,7 +10,6 @@ class Handyman(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, index=True, nullable=False)
 
-    # store as JSON array in DB, but accept List[str] at API layer
     skills = Column(JSON, nullable=False)
 
     years_experience = Column(Integer, nullable=False)
@@ -27,7 +26,6 @@ class OutboxEvent(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # globally unique for idempotency downstream
     event_id = Column(String, unique=True, nullable=False, index=True)
 
     event_type = Column(String, nullable=False, index=True)
@@ -35,7 +33,7 @@ class OutboxEvent(Base):
 
     payload = Column(JSON, nullable=False)
 
-    status = Column(String, nullable=False, default="PENDING")  # PENDING|SENT|FAILED
+    status = Column(String, nullable=False, default="PENDING")
     attempts = Column(Integer, nullable=False, default=0)
     last_error = Column(String, nullable=True)
 

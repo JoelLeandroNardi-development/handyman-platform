@@ -30,7 +30,6 @@ class OutboxEvent(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # globally unique id for idempotency downstream
     event_id = Column(String, unique=True, nullable=False, index=True)
 
     event_type = Column(String, nullable=False, index=True)
@@ -38,7 +37,7 @@ class OutboxEvent(Base):
 
     payload = Column(JSON, nullable=False)
 
-    status = Column(String, nullable=False, default="PENDING")  # PENDING|SENT|FAILED
+    status = Column(String, nullable=False, default="PENDING")
     attempts = Column(Integer, nullable=False, default=0)
     last_error = Column(String, nullable=True)
 
