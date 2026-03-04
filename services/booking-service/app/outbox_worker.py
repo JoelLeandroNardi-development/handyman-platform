@@ -5,7 +5,8 @@ import datetime as dt
 import os
 from typing import Sequence
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import SessionLocal
@@ -54,6 +55,23 @@ async def _mark_failure(db: AsyncSession, row_id: int, attempts: int, err: str) 
     )
 
 
+async def outbox_stats() -> dict:
+    """
+    Lightweight stats for /health and debugging.
+    """
+    async with SessionLocal() as db:
+        res = await db.execute(select(OutboxEvent.status, func.count()).group_by(OutboxEvent.status))
+        rows = res.all()
+
+    counts = {status: int(n) for status, n in rows}
+    return {
+        "type": "sql",
+        "pending": counts.get("PENDING", 0),
+        "failed": counts.get("FAILED", 0),
+        "sent": counts.get("SENT", 0),
+    }
+
+
 async def run_outbox_forever(stop_event: asyncio.Event) -> None:
     # Best effort: won't crash if rabbit is briefly down
     await publisher.start()
@@ -70,7 +88,6 @@ async def run_outbox_forever(stop_event: asyncio.Event) -> None:
                                 routing_key=ev.routing_key,
                                 payload=ev.payload,
                                 message_id=ev.event_id,
-                                # mandatory=True by default in shared publisher
                             )
                             await _mark_sent(db, ev.id)
                         except Exception as e:

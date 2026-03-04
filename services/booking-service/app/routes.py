@@ -1,11 +1,18 @@
 import uuid
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import Booking, OutboxEvent
-from .schemas import CreateBooking, BookingResponse, CancelBooking, CancelBookingResponse, ConfirmBookingResponse
+from .schemas import (
+    CreateBooking,
+    BookingResponse,
+    CancelBooking,
+    CancelBookingResponse,
+    ConfirmBookingResponse,
+)
 from .events import build_event
 
 router = APIRouter()
@@ -37,18 +44,18 @@ async def create_booking(data: CreateBooking):
         )
         db.add(booking)
 
-        out = OutboxEvent(
-            event_id=event["event_id"],
-            event_type=event["event_type"],
-            routing_key="booking.requested",
-            payload=event,
-            status="PENDING",
+        db.add(
+            OutboxEvent(
+                event_id=event["event_id"],
+                event_type=event["event_type"],
+                routing_key=event["event_type"],  # <-- standardized
+                payload=event,
+                status="PENDING",
+            )
         )
-        db.add(out)
 
         await db.commit()
 
-    # IMPORTANT: return FULL response matching BookingResponse
     return BookingResponse(
         booking_id=booking_id,
         status="PENDING",
@@ -101,17 +108,18 @@ async def confirm_booking(booking_id: str):
                 "desired_end": booking.desired_end,
             },
         )
+
         db.add(
             OutboxEvent(
                 event_id=event["event_id"],
                 event_type=event["event_type"],
-                routing_key="booking.confirm_requested",
+                routing_key=event["event_type"],  # <-- standardized
                 payload=event,
                 status="PENDING",
             )
         )
-        await db.commit()
 
+        await db.commit()
         return ConfirmBookingResponse(booking_id=booking.booking_id, status=booking.status)
 
 
@@ -144,15 +152,17 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
                 "reason": booking.cancellation_reason,
             },
         )
+
         db.add(
             OutboxEvent(
                 event_id=event["event_id"],
                 event_type=event["event_type"],
-                routing_key="booking.cancel_requested",
+                routing_key=event["event_type"],  # <-- standardized
                 payload=event,
                 status="PENDING",
             )
         )
+
         await db.commit()
 
         return CancelBookingResponse(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import SessionLocal
@@ -50,6 +50,20 @@ async def _mark_failure(db: AsyncSession, row_id: int, attempts: int, err: str):
             last_error=(err or "")[:500],
         )
     )
+
+
+async def outbox_stats() -> dict:
+    async with SessionLocal() as db:
+        res = await db.execute(select(OutboxEvent.status, func.count()).group_by(OutboxEvent.status))
+        rows = res.all()
+
+    counts = {status: int(n) for status, n in rows}
+    return {
+        "type": "sql",
+        "pending": counts.get("PENDING", 0),
+        "failed": counts.get("FAILED", 0),
+        "sent": counts.get("SENT", 0),
+    }
 
 
 async def run_outbox_forever(stop_event: asyncio.Event):

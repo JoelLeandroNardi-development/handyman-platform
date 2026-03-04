@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .messaging import publisher
-from .outbox_worker import worker
+from .messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from .outbox_worker import worker, outbox_stats
 
 
 @asynccontextmanager
@@ -38,4 +38,21 @@ app.include_router(router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "user-service"}
+    return {
+        "status": "ok",
+        "service": "user-service",
+        "events_enabled": publisher.enabled,
+        "exchange_name": EXCHANGE_NAME,
+        "rabbit_url_set": bool(RABBIT_URL),
+        "outbox": await outbox_stats(),
+    }
+
+
+@app.get("/debug/rabbit")
+async def debug_rabbit():
+    return {
+        "service": "user-service",
+        "rabbit_url_set": bool(RABBIT_URL),
+        "exchange_name": EXCHANGE_NAME,
+        "publisher": {"enabled": publisher.enabled},
+    }

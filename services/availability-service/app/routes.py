@@ -16,7 +16,7 @@ def redis_key(email: str) -> str:
 
 async def emit_availability_updated(email: str):
     ev = build_event("availability.updated", {"email": email})
-    await enqueue_domain_event("availability.updated", ev)
+    await enqueue_domain_event(ev)
 
 
 @router.post("/availability/{email}")
@@ -24,13 +24,10 @@ async def set_availability(email: str, data: SetAvailability):
     key = redis_key(email)
     await redis_client.delete(key)
 
-    # store as start|end
     if data.slots:
         await redis_client.rpush(key, *[f"{slot.start}|{slot.end}" for slot in data.slots])
 
-    # emit domain event (buffered via Redis outbox)
     await emit_availability_updated(email)
-
     return {"message": "Availability updated"}
 
 
@@ -56,16 +53,11 @@ async def clear_availability(email: str):
     await redis_client.delete(key)
 
     await emit_availability_updated(email)
-
     return {"message": "Availability cleared"}
 
 
 @router.post("/availability/{email}/overlap")
 async def check_overlap(email: str, req: OverlapRequest):
-    """
-    Checks whether ANY stored slot overlaps desired window.
-    Reservation conflicts are handled at reservation time.
-    """
     try:
         ds = parser.isoparse(req.desired_start)
         de = parser.isoparse(req.desired_end)

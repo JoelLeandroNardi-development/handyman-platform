@@ -3,8 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .event_consumer import start_consumer_with_retry
+from .event_consumer import start_consumer_with_retry, QUEUE_NAME, ROUTING_KEYS
 from .outbox_worker import worker
+from .messaging import RABBIT_URL, EXCHANGE_NAME
 
 
 @asynccontextmanager
@@ -17,9 +18,7 @@ async def lifespan(app: FastAPI):
         nonlocal consumer_conn
         consumer_conn = await start_consumer_with_retry(stop_event)
 
-    # start worker (no-op in this service, but keeps architecture consistent)
     await worker.start()
-
     consumer_task = asyncio.create_task(run_consumer())
 
     try:
@@ -51,5 +50,23 @@ app.include_router(router)
 
 @app.get("/health")
 async def health():
-    # We don't expose consumer state here since it's async; just say ok.
-    return {"status": "ok", "service": "match-service"}
+    return {
+        "status": "ok",
+        "service": "match-service",
+        "events_enabled": bool(RABBIT_URL),
+        "exchange_name": EXCHANGE_NAME,
+        "rabbit_url_set": bool(RABBIT_URL),
+    }
+
+
+@app.get("/debug/rabbit")
+async def debug_rabbit():
+    return {
+        "service": "match-service",
+        "rabbit_url_set": bool(RABBIT_URL),
+        "exchange_name": EXCHANGE_NAME,
+        "consumer": {
+            "queue_name": QUEUE_NAME,
+            "routing_keys": ROUTING_KEYS,
+        },
+    }

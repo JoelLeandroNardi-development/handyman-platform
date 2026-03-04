@@ -146,8 +146,6 @@ async def match_request(data: dict, request_id: str | None = None, user_payload:
     return await _call_with_breaker(cb_match, "POST", f"{MATCH_SERVICE_URL}/match", data, request_id, user_payload)
 
 
-# ---- Booking ----
-
 async def create_booking(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings", data, request_id, user_payload)
 

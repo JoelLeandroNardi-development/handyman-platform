@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .messaging import publisher, RABBIT_URL
-from .event_consumer import start_consumer
+from .messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from .event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
 from .expiry_worker import expiry_loop
-from .outbox_worker import worker
+from .outbox_worker import worker, outbox_stats
 
 
 @asynccontextmanager
@@ -91,4 +91,20 @@ async def health():
         "status": "ok",
         "service": "availability-service",
         "events_enabled": publisher.enabled,
+        "exchange_name": EXCHANGE_NAME,
+        "rabbit_url_set": bool(RABBIT_URL),
+        "outbox": await outbox_stats(),
+    }
+
+
+@app.get("/debug/rabbit")
+async def debug_rabbit():
+    return {
+        "service": "availability-service",
+        "rabbit_url_set": bool(RABBIT_URL),
+        "exchange_name": EXCHANGE_NAME,
+        "consumer": {
+            "queue_name": QUEUE_NAME,
+            "routing_keys": ROUTING_KEYS,
+        },
     }

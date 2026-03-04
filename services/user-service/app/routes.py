@@ -48,11 +48,12 @@ async def create_user(data: CreateUser, db: AsyncSession = Depends(get_db)):
             "longitude": user.longitude,
         },
     )
+
     db.add(
         OutboxEvent(
             event_id=event["event_id"],
             event_type=event["event_type"],
-            routing_key="user.created",
+            routing_key=event["event_type"],  # <-- standardized
             payload=event,
             status="PENDING",
         )
@@ -81,11 +82,12 @@ async def update_location(email: str, data: UpdateLocation, db: AsyncSession = D
             "longitude": user.longitude,
         },
     )
+
     db.add(
         OutboxEvent(
             event_id=event["event_id"],
             event_type=event["event_type"],
-            routing_key="user.location_updated",
+            routing_key=event["event_type"],  # <-- standardized
             payload=event,
             status="PENDING",
         )

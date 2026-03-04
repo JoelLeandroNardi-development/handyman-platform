@@ -20,7 +20,7 @@ async def expiry_loop(stop_event: asyncio.Event):
                 await delete_reservation(booking_id)
 
                 ev = build_event("slot.expired", {"booking_id": booking_id})
-                await enqueue_domain_event("slot.expired", ev)
+                await enqueue_domain_event(ev)
 
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=2.0)

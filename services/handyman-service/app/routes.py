@@ -49,11 +49,12 @@ async def create_handyman(data: CreateHandyman):
                 "longitude": data.longitude,
             },
         )
+
         db.add(
             OutboxEvent(
                 event_id=evt["event_id"],
                 event_type=evt["event_type"],
-                routing_key="handyman.created",
+                routing_key=evt["event_type"],  # <-- standardized
                 payload=evt,
                 status="PENDING",
             )
@@ -98,11 +99,12 @@ async def update_location(email: str, data: UpdateLocation):
             "handyman.location_updated",
             {"email": email, "latitude": data.latitude, "longitude": data.longitude},
         )
+
         db.add(
             OutboxEvent(
                 event_id=evt["event_id"],
                 event_type=evt["event_type"],
-                routing_key="handyman.location_updated",
+                routing_key=evt["event_type"],  # <-- standardized
                 payload=evt,
                 status="PENDING",
             )

@@ -82,8 +82,6 @@ class MatchResult(BaseModel):
     availability_unknown: bool = False
 
 
-# ---- Booking ----
-
 class CreateBookingRequest(BaseModel):
     user_email: str
     handyman_email: str

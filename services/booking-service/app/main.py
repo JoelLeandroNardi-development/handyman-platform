@@ -5,9 +5,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .routes import router
-from .event_consumer import start_consumer
-from .outbox_worker import run_outbox_forever
-from .messaging import publisher
+from .event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
+from .outbox_worker import run_outbox_forever, outbox_stats
+from .messaging import publisher, RABBIT_URL, EXCHANGE_NAME
 
 
 _stop = asyncio.Event()
@@ -74,4 +74,24 @@ app.include_router(router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "booking-service"}
+    return {
+        "status": "ok",
+        "service": "booking-service",
+        "events_enabled": publisher.enabled,
+        "exchange_name": EXCHANGE_NAME,
+        "rabbit_url_set": bool(RABBIT_URL),
+        "outbox": await outbox_stats(),
+    }
+
+
+@app.get("/debug/rabbit")
+async def debug_rabbit():
+    return {
+        "service": "booking-service",
+        "rabbit_url_set": bool(RABBIT_URL),
+        "exchange_name": EXCHANGE_NAME,
+        "consumer": {
+            "queue_name": QUEUE_NAME,
+            "routing_keys": ROUTING_KEYS,
+        },
+    }

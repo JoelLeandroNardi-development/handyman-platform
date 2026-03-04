@@ -29,12 +29,40 @@ def _envelope(routing_key: str, payload: dict) -> dict:
     }
 
 
-async def enqueue_domain_event(routing_key: str, payload: dict):
+async def enqueue_domain_event(event: dict) -> None:
     """
     Producers should call this instead of publishing directly.
+    Enforces routing_key == event["event_type"].
+
     This keeps HTTP + consumers working even if RabbitMQ is down.
     """
-    await redis_client.rpush(OUTBOX_PENDING, json.dumps(_envelope(routing_key, payload)))
+    event_type = (event or {}).get("event_type")
+    if not event_type or not isinstance(event_type, str):
+        # poison event -> DLQ (do not block caller)
+        await redis_client.rpush(OUTBOX_DLQ, json.dumps({"bad_event": event, "reason": "missing_event_type"}))
+        return
+
+    rk = event_type.strip()
+    if not rk:
+        await redis_client.rpush(OUTBOX_DLQ, json.dumps({"bad_event": event, "reason": "empty_event_type"}))
+        return
+
+    await redis_client.rpush(OUTBOX_PENDING, json.dumps(_envelope(rk, event)))
+
+
+async def outbox_stats() -> dict:
+    """
+    Lightweight stats for /health and debugging.
+    """
+    pending = await redis_client.llen(OUTBOX_PENDING)
+    processing = await redis_client.llen(OUTBOX_PROCESSING)
+    dlq = await redis_client.llen(OUTBOX_DLQ)
+    return {
+        "type": "redis",
+        "pending": int(pending or 0),
+        "processing": int(processing or 0),
+        "dlq": int(dlq or 0),
+    }
 
 
 @dataclass
@@ -55,12 +83,6 @@ class OutboxWorker:
                 pass
 
     async def _run(self):
-        # Best-effort (won't crash if Rabbit is briefly down)
-        try:
-            await publisher.start()
-        except Exception:
-            pass
-
         while not self._stop.is_set():
             try:
                 drained = await self._drain_once()
@@ -70,18 +92,13 @@ class OutboxWorker:
                     except asyncio.TimeoutError:
                         pass
             except Exception as e:
-                print(f"[availability-service] outbox worker loop error: {type(e).__name__}: {e}")
+                print(f"[availability-service] outbox worker loop error: {e}")
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=1.0)
                 except asyncio.TimeoutError:
                     pass
 
     async def _drain_once(self) -> bool:
-        """
-        Uses RPOPLPUSH to move a message to processing before publish.
-        On success: remove from processing.
-        On failure: increment attempts; move back to pending (or DLQ).
-        """
         raw = await redis_client.rpoplpush(OUTBOX_PENDING, OUTBOX_PROCESSING)
         if not raw:
             return False
@@ -89,12 +106,11 @@ class OutboxWorker:
         try:
             env = json.loads(raw)
         except Exception:
-            # poison envelope -> DLQ
             await redis_client.lrem(OUTBOX_PROCESSING, 1, raw)
             await redis_client.rpush(OUTBOX_DLQ, raw)
             return True
 
-        routing_key = (env.get("routing_key") or "").strip()
+        routing_key = env.get("routing_key")
         payload = env.get("payload")
         attempts = int(env.get("attempts", 0) or 0)
 
@@ -104,42 +120,20 @@ class OutboxWorker:
             return True
 
         try:
-            # ✅ FIX: keyword-only call + message_id for tracing/idempotency
-            message_id = None
-            if isinstance(payload, dict):
-                message_id = payload.get("event_id")
-
-            await publisher.publish(
-                routing_key=routing_key,
-                payload=payload,
-                message_id=message_id,
-            )
-
-            # ack: remove from processing
+            await publisher.publish(routing_key=routing_key, payload=payload)
             await redis_client.lrem(OUTBOX_PROCESSING, 1, raw)
             return True
-
         except Exception as e:
             attempts += 1
             env["attempts"] = attempts
-            env["last_error"] = f"{type(e).__name__}: {e}"
+            env["last_error"] = str(e)
 
-            # remove old raw from processing
             await redis_client.lrem(OUTBOX_PROCESSING, 1, raw)
 
             if attempts >= MAX_ATTEMPTS:
                 await redis_client.rpush(OUTBOX_DLQ, json.dumps(env))
-                print(
-                    "[availability-service] outbox -> DLQ "
-                    f"rk={routing_key} attempts={attempts} err={type(e).__name__}: {e}"
-                )
             else:
-                # retry later
                 await redis_client.rpush(OUTBOX_PENDING, json.dumps(env))
-                print(
-                    "[availability-service] outbox retry "
-                    f"rk={routing_key} attempts={attempts} err={type(e).__name__}: {e}"
-                )
 
             return True
 

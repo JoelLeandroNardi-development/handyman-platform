@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dateutil import parser
+import aio_pika
 
 from shared.shared.consumer import run_consumer_with_retry_dlq
 from shared.shared.idempotency import already_processed
-
-import aio_pika
 
 from .redis_client import redis_client
 from .reservations import create_reservation, get_reservation, delete_reservation, overlaps
@@ -107,16 +106,16 @@ async def process_event(payload: dict):
         ok_slot = await handyman_has_slot(handyman_email, desired_start, desired_end)
         if not ok_slot:
             ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "no_matching_slot"})
-            await enqueue_domain_event("slot.rejected", ev)
+            await enqueue_domain_event(ev)
             return
 
         ok = await create_reservation(booking_id, handyman_email, desired_start, desired_end)
         if ok:
             ev = build_event("slot.reserved", {"booking_id": booking_id})
-            await enqueue_domain_event("slot.reserved", ev)
+            await enqueue_domain_event(ev)
         else:
             ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "slot_conflict_reserved"})
-            await enqueue_domain_event("slot.rejected", ev)
+            await enqueue_domain_event(ev)
         return
 
     if event_type == "booking.confirm_requested":
@@ -131,14 +130,14 @@ async def process_event(payload: dict):
         res = await get_reservation(booking_id)
         if not res:
             ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "reservation_missing"})
-            await enqueue_domain_event("slot.rejected", ev)
+            await enqueue_domain_event(ev)
             return
 
         await apply_confirm_to_slots(handyman_email, desired_start, desired_end)
         await delete_reservation(booking_id)
 
         ev = build_event("slot.confirmed", {"booking_id": booking_id})
-        await enqueue_domain_event("slot.confirmed", ev)
+        await enqueue_domain_event(ev)
         return
 
     if event_type == "booking.cancel_requested":
@@ -149,7 +148,7 @@ async def process_event(payload: dict):
         await delete_reservation(booking_id)
 
         ev = build_event("slot.released", {"booking_id": booking_id})
-        await enqueue_domain_event("slot.released", ev)
+        await enqueue_domain_event(ev)
         return
 
 
