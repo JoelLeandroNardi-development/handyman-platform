@@ -55,6 +55,7 @@ async def _mark_failure(db: AsyncSession, row_id: int, attempts: int, err: str) 
 
 
 async def run_outbox_forever(stop_event: asyncio.Event) -> None:
+    # Best effort: won't crash if rabbit is briefly down
     await publisher.start()
 
     while not stop_event.is_set():
@@ -69,6 +70,7 @@ async def run_outbox_forever(stop_event: asyncio.Event) -> None:
                                 routing_key=ev.routing_key,
                                 payload=ev.payload,
                                 message_id=ev.event_id,
+                                # mandatory=True by default in shared publisher
                             )
                             await _mark_sent(db, ev.id)
                         except Exception as e:
@@ -83,7 +85,7 @@ async def run_outbox_forever(stop_event: asyncio.Event) -> None:
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            print(f"[booking-service] outbox worker error: {e}")
+            print(f"[booking-service] outbox worker loop error: {type(e).__name__}: {e}")
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=2.0)
             except asyncio.TimeoutError:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from shared.shared.mq import RabbitConfig, RabbitPublisher
 
 cfg = RabbitConfig.from_env(required=True)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shared.shared.events import build_event as _build_event
+from shared.shared.events import build_event_jsonable as _build_event
 
 SERVICE_NAME = "availability-service"
 

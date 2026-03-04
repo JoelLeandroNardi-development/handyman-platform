@@ -4,6 +4,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+try:
+    # Prefer FastAPI's encoder (handles datetime, UUID, Decimal, etc. recursively)
+    from fastapi.encoders import jsonable_encoder  # type: ignore
+except Exception:  # pragma: no cover
+    jsonable_encoder = None  # type: ignore
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -32,3 +38,38 @@ def build_event(
         "source": source,
         "data": data or {},
     }
+
+
+def build_event_jsonable(
+    event_type: str,
+    data: Dict[str, Any],
+    *,
+    source: str,
+    event_id: Optional[str] = None,
+    occurred_at: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Same as build_event(), but guarantees the returned object is JSON-serializable.
+
+    Use this when:
+      - storing events into SQLAlchemy JSON columns (outbox pattern)
+      - publishing to a message bus as JSON
+      - returning events as API responses
+
+    It will convert nested datetimes (e.g. desired_start) into ISO strings.
+    """
+    evt = build_event(
+        event_type,
+        data,
+        source=source,
+        event_id=event_id,
+        occurred_at=occurred_at,
+    )
+
+    if jsonable_encoder is None:
+        # Fallback: at minimum, ensure occurred_at is str (already is).
+        # If FastAPI isn't installed in the shared package, caller must ensure json-safe payloads.
+        return evt
+
+    # jsonable_encoder recursively converts datetime/UUID/etc.
+    return jsonable_encoder(evt)

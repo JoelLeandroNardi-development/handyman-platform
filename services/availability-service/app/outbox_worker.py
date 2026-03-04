@@ -55,17 +55,22 @@ class OutboxWorker:
                 pass
 
     async def _run(self):
+        # Best-effort (won't crash if Rabbit is briefly down)
+        try:
+            await publisher.start()
+        except Exception:
+            pass
+
         while not self._stop.is_set():
             try:
                 drained = await self._drain_once()
                 if not drained:
-                    # no work; wait a bit
                     try:
                         await asyncio.wait_for(self._stop.wait(), timeout=POLL_INTERVAL_SECONDS)
                     except asyncio.TimeoutError:
                         pass
             except Exception as e:
-                print(f"[availability-service] outbox worker loop error: {e}")
+                print(f"[availability-service] outbox worker loop error: {type(e).__name__}: {e}")
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=1.0)
                 except asyncio.TimeoutError:
@@ -89,7 +94,7 @@ class OutboxWorker:
             await redis_client.rpush(OUTBOX_DLQ, raw)
             return True
 
-        routing_key = env.get("routing_key")
+        routing_key = (env.get("routing_key") or "").strip()
         payload = env.get("payload")
         attempts = int(env.get("attempts", 0) or 0)
 
@@ -99,23 +104,42 @@ class OutboxWorker:
             return True
 
         try:
-            await publisher.publish(routing_key, payload)
+            # ✅ FIX: keyword-only call + message_id for tracing/idempotency
+            message_id = None
+            if isinstance(payload, dict):
+                message_id = payload.get("event_id")
+
+            await publisher.publish(
+                routing_key=routing_key,
+                payload=payload,
+                message_id=message_id,
+            )
+
             # ack: remove from processing
             await redis_client.lrem(OUTBOX_PROCESSING, 1, raw)
             return True
+
         except Exception as e:
             attempts += 1
             env["attempts"] = attempts
-            env["last_error"] = str(e)
+            env["last_error"] = f"{type(e).__name__}: {e}"
 
             # remove old raw from processing
             await redis_client.lrem(OUTBOX_PROCESSING, 1, raw)
 
             if attempts >= MAX_ATTEMPTS:
                 await redis_client.rpush(OUTBOX_DLQ, json.dumps(env))
+                print(
+                    "[availability-service] outbox -> DLQ "
+                    f"rk={routing_key} attempts={attempts} err={type(e).__name__}: {e}"
+                )
             else:
                 # retry later
                 await redis_client.rpush(OUTBOX_PENDING, json.dumps(env))
+                print(
+                    "[availability-service] outbox retry "
+                    f"rk={routing_key} attempts={attempts} err={type(e).__name__}: {e}"
+                )
 
             return True
 

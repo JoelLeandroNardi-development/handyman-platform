@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Awaitable, Callable, Iterable
 
 import aio_pika
 from aio_pika import ExchangeType, Message, DeliveryMode
-
 
 Handler = Callable[[dict], Awaitable[None]]
 
@@ -23,8 +22,13 @@ async def setup_consumer_topology(
 ) -> tuple[aio_pika.Exchange, aio_pika.Queue]:
     await channel.set_qos(prefetch_count=prefetch)
 
-    exchange = await channel.declare_exchange(exchange_name, ExchangeType.TOPIC, durable=True)
+    exchange = await channel.declare_exchange(
+        exchange_name,
+        ExchangeType.TOPIC,
+        durable=True,
+    )
 
+    # Main queue: dead-letter to DLQ on reject/nack (we will explicitly reject on poison)
     main_queue = await channel.declare_queue(
         queue_name,
         durable=True,
@@ -34,6 +38,7 @@ async def setup_consumer_topology(
         },
     )
 
+    # Retry queue: TTL then dead-letter back to main queue
     await channel.declare_queue(
         retry_queue,
         durable=True,
@@ -44,9 +49,12 @@ async def setup_consumer_topology(
         },
     )
 
+    # DLQ
     await channel.declare_queue(dlq_queue, durable=True)
 
-    for rk in routing_keys:
+    # Bind main queue to routing keys
+    rks = list(routing_keys)
+    for rk in rks:
         await main_queue.bind(exchange, routing_key=rk)
 
     return exchange, main_queue
@@ -75,6 +83,7 @@ async def run_consumer_with_retry_dlq(
     prefetch: int = 50,
     service_label: str = "service",
 ) -> None:
+    # declare exchange/queues/bindings
     await setup_consumer_topology(
         channel=channel,
         exchange_name=exchange_name,
@@ -88,37 +97,42 @@ async def run_consumer_with_retry_dlq(
 
     main_queue = await channel.get_queue(queue_name, ensure=False)
 
+    print(
+        f"[{service_label}] consuming queue={queue_name} exchange={exchange_name} "
+        f"routing_keys={routing_keys} retry={retry_queue} dlq={dlq_queue}"
+    )
+
     async def _on_message(message: aio_pika.IncomingMessage):
-        async with message.process(requeue=False):
-            try:
-                payload = _safe_decode_json(message)
-                await handler(payload)
-            except Exception as e:
-                headers_in = dict(message.headers or {})
-                retry_count = int(headers_in.get("x-retry-count", 0) or 0)
+        # We will ACK manually on success; on failure we will publish to retry queue and ACK;
+        # on poison we REJECT so queue DLX sends to DLQ.
+        try:
+            payload = _safe_decode_json(message)
+            await handler(payload)
+            await message.ack()
+        except Exception as e:
+            headers_in = dict(message.headers or {})
+            retry_count = int(headers_in.get("x-retry-count", 0) or 0)
 
-                if retry_count >= max_retries:
-                    print(f"[{service_label}] Poison message (DLQ): {type(e).__name__}: {e}")
-                    # send to DLQ explicitly
-                    dlq_msg = Message(
-                        body=message.body,
-                        headers=headers_in,
-                        delivery_mode=DeliveryMode.PERSISTENT,
-                        content_type=message.content_type or "application/json",
-                    )
-                    await message.channel.default_exchange.publish(dlq_msg, routing_key=dlq_queue)
-                    return
+            if retry_count >= max_retries:
+                print(f"[{service_label}] Poison -> DLQ: {type(e).__name__}: {e}")
+                # Reject (no requeue) so the queue's DLX routes to DLQ
+                await message.reject(requeue=False)
+                return
 
-                headers_in["x-retry-count"] = retry_count + 1
+            headers_in["x-retry-count"] = retry_count + 1
 
-                retry_msg = Message(
-                    body=message.body,
-                    headers=headers_in,
-                    delivery_mode=DeliveryMode.PERSISTENT,
-                    content_type=message.content_type or "application/json",
-                )
+            retry_msg = Message(
+                body=message.body,
+                headers=headers_in,
+                delivery_mode=DeliveryMode.PERSISTENT,
+                content_type=message.content_type or "application/json",
+            )
 
-                await message.channel.default_exchange.publish(retry_msg, routing_key=retry_queue)
-                print(f"[{service_label}] retry #{retry_count + 1}")
+            # Publish to retry queue (default exchange routes by queue name)
+            await message.channel.default_exchange.publish(retry_msg, routing_key=retry_queue)
+            print(f"[{service_label}] retry #{retry_count + 1}")
+
+            # Ack original so it doesn't get redelivered immediately
+            await message.ack()
 
     await main_queue.consume(_on_message)

@@ -6,23 +6,29 @@ from dataclasses import dataclass
 from typing import Optional
 
 import aio_pika
-from aio_pika import ExchangeType, Message, DeliveryMode
-
-
-DEFAULT_EXCHANGE_NAME = os.getenv("EXCHANGE_NAME", "domain_events")
+from aio_pika import DeliveryMode, ExchangeType, Message
 
 
 @dataclass(frozen=True)
 class RabbitConfig:
     url: Optional[str]
-    exchange_name: str = DEFAULT_EXCHANGE_NAME
+    exchange_name: str
 
     @staticmethod
     def from_env(required: bool = False) -> "RabbitConfig":
+        """
+        Read config from environment at CALL TIME (not import-time),
+        so docker-compose / env_file values are always respected.
+        """
         url = os.getenv("RABBIT_URL")
         if required and not url:
             raise RuntimeError("RABBIT_URL environment variable is not set")
-        return RabbitConfig(url=url, exchange_name=DEFAULT_EXCHANGE_NAME)
+
+        exchange_name = os.getenv("EXCHANGE_NAME", "domain_events").strip()
+        if not exchange_name:
+            exchange_name = "domain_events"
+
+        return RabbitConfig(url=url, exchange_name=exchange_name)
 
 
 class RabbitPublisher:
@@ -33,6 +39,7 @@ class RabbitPublisher:
       - service startup MUST NOT fail if RabbitMQ is temporarily down
       - publish() may fail (caller/outbox retries)
       - reconnects lazily on publish
+      - detects unroutable messages (mandatory publish) so outbox doesn't mark SENT incorrectly
     """
 
     def __init__(self, cfg: RabbitConfig):
@@ -50,7 +57,6 @@ class RabbitPublisher:
         if not self.enabled:
             return
 
-        # already ready
         if self._conn and not self._conn.is_closed and self._exchange is not None:
             return
 
@@ -62,10 +68,12 @@ class RabbitPublisher:
                 ExchangeType.TOPIC,
                 durable=True,
             )
+            print(f"[shared.mq] publisher ready exchange={self.cfg.exchange_name}")
         except Exception as e:
-            # Do not crash service on startup
-            print(f"[shared.mq] publisher.start() failed (will retry on publish): {type(e).__name__}: {e}")
-            # clean partial state
+            print(
+                f"[shared.mq] publisher.start() failed (will retry on publish): "
+                f"{type(e).__name__}: {e}"
+            )
             await self.close()
 
     async def close(self) -> None:
@@ -97,7 +105,6 @@ class RabbitPublisher:
         if self._exchange is not None and self._conn and not self._conn.is_closed:
             return
 
-        # try reconnect
         self._conn = await aio_pika.connect_robust(self.cfg.url)  # type: ignore[arg-type]
         self._channel = await self._conn.channel(publisher_confirms=True)
         self._exchange = await self._channel.declare_exchange(
@@ -105,6 +112,7 @@ class RabbitPublisher:
             ExchangeType.TOPIC,
             durable=True,
         )
+        print(f"[shared.mq] publisher reconnected exchange={self.cfg.exchange_name}")
 
     async def publish(
         self,
@@ -113,16 +121,25 @@ class RabbitPublisher:
         payload: dict,
         message_id: str | None = None,
         headers: dict | None = None,
+        mandatory: bool = True,
     ) -> None:
         """
         Publish a JSON message.
 
         If RabbitMQ is down, raises so the outbox can retry.
+
+        mandatory=True will raise if the message is unroutable (no bindings),
+        preventing the outbox from marking the event as SENT incorrectly.
         """
         if not self.enabled:
             return
 
+        rk = (routing_key or "").strip()
+        if not rk:
+            raise ValueError("routing_key is required")
+
         await self._ensure_ready()
+        assert self._exchange is not None
 
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         msg = Message(
@@ -132,7 +149,20 @@ class RabbitPublisher:
             message_id=message_id,
             headers=headers or {},
         )
-        await self._exchange.publish(msg, routing_key=routing_key)  # type: ignore[union-attr]
+
+        try:
+            await self._exchange.publish(msg, routing_key=rk, mandatory=mandatory)
+            # Lightweight, very useful when debugging routing.
+            print(
+                f"[shared.mq] published exchange={self.cfg.exchange_name} rk={rk} message_id={message_id}"
+            )
+        except Exception as e:
+            # Important: bubble up so outbox retries instead of marking SENT.
+            print(
+                f"[shared.mq] publish failed exchange={self.cfg.exchange_name} rk={rk} "
+                f"message_id={message_id} err={type(e).__name__}: {e}"
+            )
+            raise
 
 
 async def rabbit_connect(cfg: RabbitConfig) -> aio_pika.RobustConnection | None:

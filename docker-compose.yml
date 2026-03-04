@@ -67,6 +67,7 @@ services:
     environment:
       USER_DB: postgresql+asyncpg://admin:admin@postgres:5432/user_db
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      EXCHANGE_NAME: domain_events
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +84,7 @@ services:
     environment:
       HANDYMAN_DB: postgresql+asyncpg://admin:admin@postgres:5432/handyman_db
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      EXCHANGE_NAME: domain_events
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,6 +101,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      EXCHANGE_NAME: domain_events
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -116,6 +119,7 @@ services:
       MATCH_DB: postgresql+asyncpg://admin:admin@postgres:5432/match_db
       REDIS_URL: redis://redis:6379/0
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      EXCHANGE_NAME: domain_events
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,11 +142,14 @@ services:
     environment:
       BOOKING_DB: postgresql+asyncpg://admin:admin@postgres:5432/booking_db
       RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      EXCHANGE_NAME: domain_events
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      availability-service:
+        condition: service_started
 
   gateway-service:
     build:
@@ -153,6 +160,7 @@ services:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
+      EXCHANGE_NAME: domain_events
     depends_on:
       redis:
         condition: service_healthy
