@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import aio_pika
 
 from shared.shared.consumer import run_consumer_with_retry_dlq
 from shared.shared.idempotency import already_processed
@@ -10,9 +9,12 @@ from .services import (
     redis_client,
     invalidate_bucket,
     buckets_in_radius,
-    fetch_handyman,
     norm,
+    upsert_handyman_projection,
+    get_handyman_projection,
+    upsert_availability_projection,
 )
+
 from .messaging import connect, EXCHANGE_NAME
 
 QUEUE_NAME = "match_service_domain_events"
@@ -68,22 +70,39 @@ async def process_event(payload: dict):
     if await already_processed(redis_client=redis_client, event_id=event_id, ttl_seconds=IDEMPOTENCY_TTL_SECONDS):
         return
 
+    # ---- Approach A: availability.updated includes slots ----
     if event_type == "availability.updated":
         email = data.get("email")
-        if email:
-            profile = await fetch_handyman(email)
-            await _invalidate_for_handyman_profile(profile)
+        slots = data.get("slots") or []
+
+        if not email:
+            return
+
+        await upsert_availability_projection(email=email, slots=slots)
+
+        # Invalidate based on handyman profile projection (if present)
+        profile = await get_handyman_projection(email)
+        await _invalidate_for_handyman_profile(profile)
         return
 
+    # ---- Handyman events -> projection + invalidate ----
     if event_type == "handyman.created":
+        # data includes full profile (per your contract)
+        await upsert_handyman_projection(data)
         await _invalidate_for_handyman_profile(data)
         return
 
     if event_type == "handyman.location_updated":
         email = data.get("email")
-        if email:
-            profile = await fetch_handyman(email)
-            await _invalidate_for_handyman_profile(profile)
+        if not email:
+            return
+
+        existing = await get_handyman_projection(email)
+        merged = dict(existing or {})
+        merged.update(data)
+
+        await upsert_handyman_projection(merged)
+        await _invalidate_for_handyman_profile(merged)
         return
 
 

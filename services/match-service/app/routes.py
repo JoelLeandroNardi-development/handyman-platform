@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,9 +9,10 @@ from .models import MatchLog
 from .schemas import MatchRequest
 from .services import (
     haversine,
-    fetch_handymen,
-    availability_service_up,
-    has_overlapping_availability,
+    list_projected_handymen_by_skill,
+    get_availability_slots,
+    projected_has_overlap,
+    projections_have_any_availability,
     cache_key,
     get_cached_result,
     set_cache_with_index,
@@ -31,9 +34,12 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         return []
 
     requested_skill = norm(data.skill)
+    if not requested_skill:
+        return []
 
-    availability_up = await availability_service_up()
-    degraded = not availability_up
+    # degraded if we don't have any availability projections at all (bootstrap / events disabled)
+    has_any_avail = await projections_have_any_availability()
+    degraded = not has_any_avail
 
     key = cache_key(
         data.latitude,
@@ -46,46 +52,48 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     if cached:
         return json.loads(cached)
 
-    handymen = await fetch_handymen()
+    # Projection-first candidate retrieval by skill (no Handyman-service call)
+    handymen = await list_projected_handymen_by_skill(requested_skill)
+
     results: list[dict] = []
 
     for h in handymen:
-        skills = [norm(x) for x in (h.get("skills") or [])]
-        if requested_skill not in skills:
-            continue
-
         if h.get("latitude") is None or h.get("longitude") is None:
             continue
 
         distance = haversine(data.latitude, data.longitude, h["latitude"], h["longitude"])
-        if distance > h["service_radius_km"]:
+        if distance > (h.get("service_radius_km") or 0):
             continue
 
-        if availability_up:
-            try:
-                ok = await has_overlapping_availability(h["email"], data.desired_start, data.desired_end)
-                if not ok:
-                    continue
-                availability_unknown = False
-            except Exception:
-                availability_up = False
-                availability_unknown = True
-        else:
+        # ---- NO HTTP to availability-service anymore ----
+        slots = await get_availability_slots(h["email"])
+
+        if slots is None:
+            # no projection yet => degraded behavior for this handyman
             availability_unknown = True
+            # In strict mode, we typically filter unknowns out. But since strict/degraded is global here,
+            # we keep it consistent: in degraded mode we keep unknowns; in strict mode we drop.
+            if not degraded:
+                continue
+        else:
+            ok = projected_has_overlap(slots, data.desired_start, data.desired_end)
+            if not ok:
+                continue
+            availability_unknown = False
 
         results.append(
             {
                 "email": h["email"],
                 "distance_km": round(distance, 2),
-                "years_experience": h["years_experience"],
+                "years_experience": h.get("years_experience"),
                 "availability_unknown": availability_unknown,
             }
         )
 
     results.sort(key=lambda x: x["distance_km"])
 
-    mode = "strict" if availability_up else "degraded"
-    ttl = 60 if availability_up else 15
+    mode = "degraded" if degraded else "strict"
+    ttl = 15 if degraded else 60
     b_lat, b_lon = bucket_id(data.latitude, data.longitude)
 
     await set_cache_with_index(
