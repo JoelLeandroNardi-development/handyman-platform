@@ -39,11 +39,11 @@ It uses:
      v
   Gateway  --------------------->  Booking Service (DB: bookings + outbox)
      |                                   |
-     | HTTP /match                        | publish booking.* via outbox
+     | HTTP /match                       | publish booking.* via outbox
      v                                   v
   Match Service (Redis cache/projections) RabbitMQ exchange: domain_events
      |                                   ^
-     | (Approach A removes HTTP calls)    |
+     | (Approach A removes HTTP calls)   |
      v                                   |
 Availability Service (Redis: slots + reservations + Redis outbox)
      |
