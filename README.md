@@ -2,6 +2,8 @@
 
 This repo is a microservices backend for a TaskRabbit/Uber-style “find a handyman + reserve a time slot + confirm/cancel” workflow.
 
+For the frontend app of it, see: https://github.com/JoelLeandroNardi-development/handyman-frontend (this is even on an earlier stage than this one!)
+
 It uses:
 
 - **FastAPI** services (Python)
