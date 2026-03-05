@@ -2,6 +2,7 @@ import time
 import asyncio
 import httpx
 from fastapi import FastAPI, Depends, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
 
 from .schemas import *
@@ -10,6 +11,13 @@ from .security import get_current_user
 from .rbac import require_role
 from .middleware import RequestLoggingMiddleware, RateLimitMiddleware
 from .config import SERVICE_BASE_URLS
+
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
 
 OPENAPI_TAGS = [
     {"name": "System"},
@@ -25,6 +33,13 @@ app = FastAPI(title="Smart API Gateway", openapi_tags=OPENAPI_TAGS)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_per_minute=120)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def _breaker_registry():
     return {
