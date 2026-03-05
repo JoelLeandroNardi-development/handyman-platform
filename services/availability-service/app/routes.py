@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from dateutil import parser
 
 from .redis_client import redis_client
 from .schemas import SetAvailability, OverlapRequest, AvailabilitySlot
-from .reservations import overlaps
+from .reservations import overlaps, get_reservation, delete_reservation
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
 
@@ -17,10 +17,6 @@ def redis_key(email: str) -> str:
 
 
 def _slots_payload(slots: list[AvailabilitySlot]) -> list[dict]:
-    """
-    Convert SetAvailability.slots into a JSON-friendly payload.
-    Slots are strings, but keep it explicit and defensive.
-    """
     out: list[dict] = []
     for s in slots or []:
         try:
@@ -73,10 +69,6 @@ async def clear_availability(email: str):
 
 @router.post("/availability/{email}/overlap")
 async def check_overlap(email: str, req: OverlapRequest):
-    """
-    Still useful for debugging and manual checks.
-    Match should stop calling this in Approach A.
-    """
     try:
         ds = parser.isoparse(req.desired_start)
         de = parser.isoparse(req.desired_end)
@@ -101,3 +93,45 @@ async def check_overlap(email: str, req: OverlapRequest):
             return {"available": True}
 
     return {"available": False}
+
+
+@router.get("/availability")
+async def list_all_availability(
+    limit: int = Query(200, ge=1, le=1000),
+    cursor: int = Query(0, ge=0),
+):
+    """
+    Lists availability keys via SCAN.
+    Returns: {cursor, items:[{email, slots:[{start,end}]}]}
+    """
+    pattern = "availability:*"
+    next_cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=limit)
+
+    items: list[dict] = []
+    for k in keys or []:
+        if not isinstance(k, str) or ":" not in k:
+            continue
+        _, email = k.split(":", 1)
+        slots = await redis_client.lrange(k, 0, -1)
+        parsed: list[dict] = []
+        for slot in slots or []:
+            try:
+                start, end = slot.split("|")
+                parsed.append({"start": start, "end": end})
+            except Exception:
+                continue
+        items.append({"email": email, "slots": parsed})
+
+    return {"cursor": int(next_cursor or 0), "items": items}
+
+
+@router.get("/reservations/{booking_id}")
+async def get_reservation_endpoint(booking_id: str):
+    res = await get_reservation(booking_id)
+    return {"booking_id": booking_id, "reservation": res}
+
+
+@router.delete("/reservations/{booking_id}")
+async def delete_reservation_endpoint(booking_id: str):
+    await delete_reservation(booking_id)
+    return {"message": "deleted", "booking_id": booking_id}

@@ -1,7 +1,7 @@
 import time
 import asyncio
 import httpx
-from fastapi import FastAPI, Depends, Request, HTTPException
+from fastapi import FastAPI, Depends, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
 
@@ -40,6 +40,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 def _breaker_registry():
     return {
@@ -104,10 +105,6 @@ async def health():
 
 @app.get("/system/health", tags=["System"])
 async def system_health(request: Request, user=Depends(get_current_user)):
-    """
-    Admin-only: fan-out to each service /health.
-    Returns per-service status, latency, and raw JSON payload (including outbox stats, exchange_name, etc).
-    """
     require_role(user, ["admin"])
     services = _service_urls("/health")
 
@@ -125,10 +122,6 @@ async def system_health(request: Request, user=Depends(get_current_user)):
 
 @app.get("/system/rabbit", tags=["System"])
 async def system_rabbit(request: Request, user=Depends(get_current_user)):
-    """
-    Admin-only: fan-out to each service /debug/rabbit (where implemented).
-    If a service returns 404, it likely doesn't implement the endpoint (that's fine).
-    """
     require_role(user, ["admin"])
     services = _service_urls("/debug/rabbit")
 
@@ -146,10 +139,6 @@ async def system_rabbit(request: Request, user=Depends(get_current_user)):
 
 @app.get("/system/outbox", tags=["System"])
 async def system_outbox(request: Request, user=Depends(get_current_user)):
-    """
-    Admin-only: fan-out to /health and extract a compact outbox view.
-    Works best once each service includes 'outbox' + 'exchange_name' in /health.
-    """
     require_role(user, ["admin"])
     services = _service_urls("/health")
 
@@ -230,6 +219,43 @@ async def login(data: Login, request: Request):
     return await login_user(data.model_dump(), request_id=request.state.request_id)
 
 
+# Auth back-office (admin)
+
+@app.get("/auth-users", response_model=List[AuthUserResponse], tags=["Auth"])
+async def admin_list_auth_users(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    require_role(user, ["admin"])
+    return await list_auth_users(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset)
+
+
+@app.get("/auth-users/{user_id}", response_model=AuthUserResponse, tags=["Auth"])
+async def admin_get_auth_user(user_id: int, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await get_auth_user(user_id, request_id=request.state.request_id, user_payload=user)
+
+
+@app.get("/auth-users/by-email/{email}", response_model=AuthUserResponse, tags=["Auth"])
+async def admin_get_auth_user_by_email(email: str, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await get_auth_user_by_email(email, request_id=request.state.request_id, user_payload=user)
+
+
+@app.put("/auth-users/{user_id}", response_model=AuthUserResponse, tags=["Auth"])
+async def admin_update_auth_user(user_id: int, data: UpdateAuthUser, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await update_auth_user(user_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+@app.delete("/auth-users/{user_id}", tags=["Auth"])
+async def admin_delete_auth_user(user_id: int, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await delete_auth_user(user_id, request_id=request.state.request_id, user_payload=user)
+
+
 # ---- USERS ----
 
 @app.post("/users", tags=["Users"])
@@ -250,12 +276,42 @@ async def get_user_endpoint(email: str, request: Request, user=Depends(get_curre
     return await get_user(email, request_id=request.state.request_id, user_payload=user)
 
 
+# Users back-office (admin)
+
+@app.get("/users", response_model=List[UserResponse], tags=["Users"])
+async def admin_list_users(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    require_role(user, ["admin"])
+    return await list_users(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset)
+
+
+@app.put("/users/{email}", response_model=UserResponse, tags=["Users"])
+async def admin_update_user_endpoint(email: str, data: UpdateUser, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await update_user(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+@app.delete("/users/{email}", tags=["Users"])
+async def admin_delete_user_endpoint(email: str, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await delete_user(email, request_id=request.state.request_id, user_payload=user)
+
+
 # ---- HANDYMEN ----
 
 @app.get("/handymen", tags=["Handymen"])
-async def list_handymen_endpoint(request: Request, user=Depends(get_current_user)):
+async def list_handymen_endpoint(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
     require_role(user, ["user", "handyman", "admin"])
-    return await list_handymen(request_id=request.state.request_id, user_payload=user)
+    return await list_handymen(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset)
 
 
 @app.post("/handymen", tags=["Handymen"])
@@ -274,6 +330,20 @@ async def get_handyman_endpoint(email: str, request: Request, user=Depends(get_c
 async def update_handyman_location_endpoint(email: str, data: UpdateHandymanLocation, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
     return await update_handyman_location_and_fetch(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+# Handymen back-office (admin)
+
+@app.put("/handymen/{email}", response_model=HandymanResponse, tags=["Handymen"])
+async def admin_update_handyman_endpoint(email: str, data: UpdateHandyman, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await update_handyman(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+@app.delete("/handymen/{email}", tags=["Handymen"])
+async def admin_delete_handyman_endpoint(email: str, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await delete_handyman(email, request_id=request.state.request_id, user_payload=user)
 
 
 # ---- AVAILABILITY ----
@@ -296,12 +366,47 @@ async def clear_availability_endpoint(email: str, request: Request, user=Depends
     return await clear_availability(email, request_id=request.state.request_id, user_payload=user)
 
 
+# Availability back-office (admin)
+
+@app.get("/availability", tags=["Availability"])
+async def admin_list_all_availability(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(200, ge=1, le=1000),
+    cursor: int = Query(0, ge=0),
+):
+    require_role(user, ["admin"])
+    return await list_all_availability(request_id=request.state.request_id, user_payload=user, limit=limit, cursor=cursor)
+
+
 # ---- MATCH ----
 
 @app.post("/match", response_model=List[MatchResult], tags=["Match"])
 async def match_endpoint(data: MatchRequest, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
     return await match_request(data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+@app.get("/match-logs", tags=["Match"])
+async def admin_list_match_logs(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    skill: str | None = Query(default=None),
+):
+    require_role(user, ["admin"])
+    return await list_match_logs(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset, skill=skill)
+
+
+@app.delete("/match-logs/{log_id}", tags=["Match"])
+async def admin_delete_match_log(
+    log_id: int,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    return await delete_match_log(log_id, request_id=request.state.request_id, user_payload=user)
 
 
 # ---- BOOKINGS ----
@@ -328,3 +433,48 @@ async def confirm_booking_endpoint(booking_id: str, request: Request, user=Depen
 async def cancel_booking_endpoint(booking_id: str, data: CancelBookingRequest, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
     return await cancel_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+# Bookings back-office (admin)
+
+@app.get("/bookings", tags=["Bookings"])
+async def admin_list_bookings(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(default=None),
+    user_email: str | None = Query(default=None),
+    handyman_email: str | None = Query(default=None),
+):
+    require_role(user, ["admin"])
+    return await list_bookings(
+        request_id=request.state.request_id,
+        user_payload=user,
+        limit=limit,
+        offset=offset,
+        status=status,
+        user_email=user_email,
+        handyman_email=handyman_email,
+    )
+
+
+@app.put("/bookings/{booking_id}", tags=["Bookings"])
+async def admin_update_booking_endpoint(
+    booking_id: str,
+    data: UpdateBookingAdmin,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    return await admin_update_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+@app.delete("/bookings/{booking_id}", tags=["Bookings"])
+async def admin_delete_booking_endpoint(
+    booking_id: str,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    return await admin_delete_booking(booking_id, request_id=request.state.request_id, user_payload=user)

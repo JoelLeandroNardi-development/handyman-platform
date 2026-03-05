@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import select, delete
 
 from .db import SessionLocal
 from .models import Booking, OutboxEvent
@@ -12,10 +12,24 @@ from .schemas import (
     CancelBooking,
     CancelBookingResponse,
     ConfirmBookingResponse,
+    UpdateBookingAdmin,
 )
 from .events import build_event
 
 router = APIRouter()
+
+
+def _to_response(b: Booking) -> BookingResponse:
+    return BookingResponse(
+        booking_id=b.booking_id,
+        status=b.status,
+        user_email=b.user_email,
+        handyman_email=b.handyman_email,
+        desired_start=b.desired_start,
+        desired_end=b.desired_end,
+        failure_reason=b.failure_reason,
+        cancellation_reason=b.cancellation_reason,
+    )
 
 
 @router.post("/bookings", response_model=BookingResponse)
@@ -75,17 +89,7 @@ async def get_booking(booking_id: str):
         booking = res.scalar_one_or_none()
         if not booking:
             raise HTTPException(status_code=404, detail="Booking not found")
-
-        return BookingResponse(
-            booking_id=booking.booking_id,
-            status=booking.status,
-            user_email=booking.user_email,
-            handyman_email=booking.handyman_email,
-            desired_start=booking.desired_start,
-            desired_end=booking.desired_end,
-            failure_reason=booking.failure_reason,
-            cancellation_reason=booking.cancellation_reason,
-        )
+        return _to_response(booking)
 
 
 @router.post("/bookings/{booking_id}/confirm", response_model=ConfirmBookingResponse)
@@ -170,3 +174,59 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
             status=booking.status,
             cancellation_reason=booking.cancellation_reason,
         )
+
+
+@router.get("/bookings", response_model=list[BookingResponse])
+async def list_bookings(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(default=None),
+    user_email: str | None = Query(default=None),
+    handyman_email: str | None = Query(default=None),
+):
+    async with SessionLocal() as db:
+        stmt = select(Booking).order_by(Booking.created_at.desc()).limit(limit).offset(offset)
+
+        if status:
+            stmt = stmt.where(Booking.status == status)
+        if user_email:
+            stmt = stmt.where(Booking.user_email == user_email)
+        if handyman_email:
+            stmt = stmt.where(Booking.handyman_email == handyman_email)
+
+        res = await db.execute(stmt)
+        rows = res.scalars().all()
+        return [_to_response(b) for b in rows]
+
+
+@router.put("/bookings/{booking_id}", response_model=BookingResponse)
+async def admin_update_booking(booking_id: str, data: UpdateBookingAdmin):
+    async with SessionLocal() as db:
+        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
+        booking = res.scalar_one_or_none()
+        if not booking:
+            raise HTTPException(status_code=404, detail="Booking not found")
+
+        if data.status is not None:
+            booking.status = data.status
+        if data.failure_reason is not None:
+            booking.failure_reason = data.failure_reason
+        if data.cancellation_reason is not None:
+            booking.cancellation_reason = data.cancellation_reason
+
+        await db.commit()
+        await db.refresh(booking)
+        return _to_response(booking)
+
+
+@router.delete("/bookings/{booking_id}")
+async def admin_delete_booking(booking_id: str):
+    async with SessionLocal() as db:
+        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
+        booking = res.scalar_one_or_none()
+        if not booking:
+            raise HTTPException(status_code=404, detail="Booking not found")
+
+        await db.execute(delete(Booking).where(Booking.booking_id == booking_id))
+        await db.commit()
+        return {"message": "deleted", "booking_id": booking_id}

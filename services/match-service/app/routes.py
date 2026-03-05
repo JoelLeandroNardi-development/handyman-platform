@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
 
 from .db import SessionLocal
 from .models import MatchLog
-from .schemas import MatchRequest
+from .schemas import MatchRequest, MatchLogResponse, UpdateMatchLog
 from .services import (
     haversine,
     list_projected_handymen_by_skill,
@@ -26,6 +27,15 @@ router = APIRouter()
 async def get_db():
     async with SessionLocal() as session:
         yield session
+
+
+def _log_to_resp(m: MatchLog) -> MatchLogResponse:
+    return MatchLogResponse(
+        id=m.id,
+        user_latitude=m.user_latitude,
+        user_longitude=m.user_longitude,
+        skill=m.skill,
+    )
 
 
 @router.post("/match")
@@ -104,3 +114,66 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return results
+
+
+@router.get("/match-logs", response_model=list[MatchLogResponse])
+async def list_match_logs(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    skill: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(MatchLog).order_by(MatchLog.id.desc()).limit(limit).offset(offset)
+    if skill:
+        stmt = stmt.where(MatchLog.skill == norm(skill))
+
+    res = await db.execute(stmt)
+    rows = res.scalars().all()
+    return [_log_to_resp(r) for r in rows]
+
+
+@router.get("/match-logs/{log_id}", response_model=MatchLogResponse)
+async def get_match_log(log_id: int, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(MatchLog).where(MatchLog.id == log_id))
+    row = res.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="MatchLog not found")
+    return _log_to_resp(row)
+
+
+@router.put("/match-logs/{log_id}", response_model=MatchLogResponse)
+async def update_match_log(log_id: int, data: UpdateMatchLog, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(MatchLog).where(MatchLog.id == log_id))
+    row = res.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="MatchLog not found")
+
+    if data.user_latitude is not None:
+        row.user_latitude = data.user_latitude
+    if data.user_longitude is not None:
+        row.user_longitude = data.user_longitude
+    if data.skill is not None:
+        row.skill = norm(data.skill)
+
+    await db.commit()
+    await db.refresh(row)
+    return _log_to_resp(row)
+
+
+@router.delete("/match-logs/{log_id}")
+async def delete_match_log(log_id: int, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(MatchLog).where(MatchLog.id == log_id))
+    row = res.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="MatchLog not found")
+
+    await db.execute(delete(MatchLog).where(MatchLog.id == log_id))
+    await db.commit()
+    return {"message": "deleted", "id": log_id}
+
+
+@router.delete("/match-logs")
+async def clear_match_logs(db: AsyncSession = Depends(get_db)):
+    await db.execute(delete(MatchLog))
+    await db.commit()
+    return {"message": "cleared"}

@@ -13,6 +13,8 @@ from .services import (
     upsert_handyman_projection,
     get_handyman_projection,
     upsert_availability_projection,
+    delete_handyman_projection,
+    delete_availability_projection,
 )
 
 from .messaging import connect, EXCHANGE_NAME
@@ -25,6 +27,8 @@ ROUTING_KEYS = [
     "availability.updated",
     "handyman.created",
     "handyman.location_updated",
+    "handyman.updated",
+    "handyman.deleted",
 ]
 
 MAX_RETRIES = 3
@@ -88,7 +92,7 @@ async def process_event(payload: dict):
         await _invalidate_for_handyman_profile(data)
         return
 
-    if event_type == "handyman.location_updated":
+    if event_type in ("handyman.location_updated", "handyman.updated"):
         email = data.get("email")
         if not email:
             return
@@ -99,6 +103,16 @@ async def process_event(payload: dict):
 
         await upsert_handyman_projection(merged)
         await _invalidate_for_handyman_profile(merged)
+        return
+
+    if event_type == "handyman.deleted":
+        email = data.get("email")
+        if not email:
+            return
+
+        old = await delete_handyman_projection(email)
+        await delete_availability_projection(email)
+        await _invalidate_for_handyman_profile(old)
         return
 
 

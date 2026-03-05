@@ -34,3 +34,13 @@ class CancelBookingResponse(BaseModel):
     booking_id: str
     status: str
     cancellation_reason: Optional[str] = None
+
+
+class UpdateBookingAdmin(BaseModel):
+    """
+    Back-office override. This does NOT emit booking.* domain events
+    (to avoid disrupting your existing workflow).
+    """
+    status: Optional[str] = None
+    failure_reason: Optional[str] = None
+    cancellation_reason: Optional[str] = None

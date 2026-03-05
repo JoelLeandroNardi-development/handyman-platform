@@ -4,7 +4,7 @@ import json
 import math
 import os
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
 import httpx
 import redis.asyncio as redis
@@ -26,14 +26,13 @@ TIME_BUCKET_SECONDS = int(os.getenv("MATCH_TIME_BUCKET_SECONDS") or "900")
 
 # ---- Projection keys ----
 PROJ_HANDYMAN_KEY = "proj:handyman:{email}"
-PROJ_HANDYMEN_INDEX = "proj:handymen:index" 
-PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"   
+PROJ_HANDYMEN_INDEX = "proj:handymen:index"
+PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"
 
 PROJ_AVAIL_KEY = "proj:availability:{email}"
 PROJ_AVAIL_INDEX = "proj:availability:index"
 
 
-# Utilities
 def norm(s: str) -> str:
     return (s or "").strip().lower()
 
@@ -49,11 +48,6 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 def parse_dt(x: Any) -> datetime:
-    """
-    Parse datetime coming from:
-      - already a datetime
-      - ISO string
-    """
     if isinstance(x, datetime):
         return _as_utc(x)
     if isinstance(x, str):
@@ -65,7 +59,6 @@ def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datet
     return a_start < b_end and a_end > b_start
 
 
-# Distance + bucketing
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
     d_lat = math.radians(lat2 - lat1)
@@ -132,7 +125,6 @@ def buckets_in_radius(lat: float, lon: float, radius_km: float) -> list[tuple[in
     return out
 
 
-# Match cache invalidation
 async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
     mode = norm(mode)
     if mode not in ("strict", "degraded"):
@@ -155,7 +147,6 @@ async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> in
     return deleted
 
 
-# Projections: Handyman
 def _normalize_handyman(doc: dict) -> dict:
     email = (doc or {}).get("email")
     if not email:
@@ -198,7 +189,6 @@ async def upsert_handyman_projection(doc: dict) -> None:
 
     old = await get_handyman_projection(email)
     old_skills = set((old or {}).get("skills") or [])
-
     new_skills = set(normalized.get("skills") or [])
 
     pipe = redis_client.pipeline()
@@ -212,6 +202,25 @@ async def upsert_handyman_projection(doc: dict) -> None:
         pipe.sadd(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
 
     await pipe.execute()
+
+
+async def delete_handyman_projection(email: str) -> dict | None:
+    """
+    Deletes projection + indices. Returns previous projection (if any) for cache invalidation decisions.
+    """
+    if not email:
+        return None
+
+    old = await get_handyman_projection(email)
+    old_skills = set((old or {}).get("skills") or [])
+
+    pipe = redis_client.pipeline()
+    pipe.delete(PROJ_HANDYMAN_KEY.format(email=email))
+    pipe.srem(PROJ_HANDYMEN_INDEX, email)
+    for s in old_skills:
+        pipe.srem(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
+    await pipe.execute()
+    return old
 
 
 async def list_projected_handymen_by_skill(skill: str) -> list[dict]:
@@ -247,7 +256,6 @@ async def handyman_projection_count() -> int:
         return 0
 
 
-# Projections: Availability
 async def upsert_availability_projection(*, email: str, slots: list[dict]) -> None:
     if not email:
         return
@@ -272,6 +280,15 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
     pipe = redis_client.pipeline()
     pipe.set(PROJ_AVAIL_KEY.format(email=email), json.dumps(payload))
     pipe.sadd(PROJ_AVAIL_INDEX, email)
+    await pipe.execute()
+
+
+async def delete_availability_projection(email: str) -> None:
+    if not email:
+        return
+    pipe = redis_client.pipeline()
+    pipe.delete(PROJ_AVAIL_KEY.format(email=email))
+    pipe.srem(PROJ_AVAIL_INDEX, email)
     await pipe.execute()
 
 
@@ -316,7 +333,6 @@ async def projections_have_any_availability() -> bool:
     return (await availability_projection_count()) > 0
 
 
-# Bootstrap seed (one-time)
 async def fetch_handymen_http() -> list[dict]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         r = await client.get(f"{HANDYMAN_SERVICE_URL}/handymen")
@@ -325,11 +341,6 @@ async def fetch_handymen_http() -> list[dict]:
 
 
 async def seed_handyman_projection_if_empty() -> dict:
-    """
-    Best-effort:
-      - if projection is empty, fetch /handymen once and upsert each
-      - returns status dict for logging / health
-    """
     existing = await handyman_projection_count()
     if existing > 0:
         return {"seeded": False, "reason": "already_present", "count": existing}
@@ -348,6 +359,7 @@ async def seed_handyman_projection_if_empty() -> dict:
             continue
 
     return {"seeded": True, "reason": "bootstrapped", "count": ok}
+
 
 async def get_cached_result(key: str):
     return await redis_client.get(key)

@@ -15,6 +15,12 @@ class UpdateLocation(BaseModel):
     longitude: float
 
 
+class UpdateUser(BaseModel):
+    full_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
 class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None

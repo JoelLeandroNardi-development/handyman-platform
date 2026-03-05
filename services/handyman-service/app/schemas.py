@@ -17,6 +17,14 @@ class UpdateLocation(BaseModel):
     longitude: float
 
 
+class UpdateHandyman(BaseModel):
+    skills: Optional[List[str]] = None
+    years_experience: Optional[int] = None
+    service_radius_km: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
 class HandymanResponse(BaseModel):
     email: str
     skills: List[str]

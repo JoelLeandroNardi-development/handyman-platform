@@ -32,6 +32,35 @@ class TokenResponse(BaseModel):
     access_token: str
 
 
+# ---- Auth back-office ----
+
+class AuthUserResponse(BaseModel):
+    id: int
+    email: str
+    roles: List[str]
+
+
+class UpdateAuthUser(BaseModel):
+    password: Optional[str] = Field(default=None, min_length=6)
+    roles: Optional[List[str]] = None
+
+    def model_post_init(self, __context):
+        if self.roles is None:
+            return
+        normalized = []
+        for r in self.roles:
+            rr = (r or "").strip().lower()
+            if rr not in _ALLOWED_ROLES:
+                raise ValueError(f"Invalid role: {r}. Allowed: {sorted(_ALLOWED_ROLES)}")
+            if rr not in normalized:
+                normalized.append(rr)
+        if not normalized:
+            raise ValueError("roles must not be empty")
+        object.__setattr__(self, "roles", normalized)
+
+
+# ---- Users ----
+
 class CreateUser(BaseModel):
     email: str
     full_name: Optional[str] = None
@@ -43,6 +72,22 @@ class UpdateUserLocation(BaseModel):
     latitude: float
     longitude: float
 
+
+class UpdateUser(BaseModel):
+    full_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class UserResponse(BaseModel):
+    email: str
+    full_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    created_at: datetime
+
+
+# ---- Handymen ----
 
 class CreateHandyman(BaseModel):
     email: str
@@ -58,6 +103,26 @@ class UpdateHandymanLocation(BaseModel):
     longitude: float
 
 
+class UpdateHandyman(BaseModel):
+    skills: Optional[List[str]] = None
+    years_experience: Optional[int] = None
+    service_radius_km: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class HandymanResponse(BaseModel):
+    email: str
+    skills: List[str]
+    years_experience: int
+    service_radius_km: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    created_at: datetime
+
+
+# ---- Availability ----
+
 class AvailabilitySlot(BaseModel):
     start: str
     end: str
@@ -66,6 +131,8 @@ class AvailabilitySlot(BaseModel):
 class SetAvailability(BaseModel):
     slots: List[AvailabilitySlot]
 
+
+# ---- Match ----
 
 class MatchRequest(BaseModel):
     latitude: float
@@ -81,6 +148,8 @@ class MatchResult(BaseModel):
     years_experience: int
     availability_unknown: bool = False
 
+
+# ---- Bookings ----
 
 class CreateBookingRequest(BaseModel):
     user_email: str
@@ -112,4 +181,10 @@ class CancelBookingRequest(BaseModel):
 class CancelBookingResponse(BaseModel):
     booking_id: str
     status: str
+    cancellation_reason: Optional[str] = None
+
+
+class UpdateBookingAdmin(BaseModel):
+    status: Optional[str] = None
+    failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
