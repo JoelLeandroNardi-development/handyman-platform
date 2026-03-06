@@ -71,7 +71,11 @@ async def process_event(payload: dict):
     if event_type not in ROUTING_KEYS:
         return
 
-    if await already_processed(redis_client=redis_client, event_id=event_id, ttl_seconds=IDEMPOTENCY_TTL_SECONDS):
+    if await already_processed(
+        redis_client=redis_client,
+        event_id=event_id,
+        ttl_seconds=IDEMPOTENCY_TTL_SECONDS,
+    ):
         return
 
     if event_type == "availability.updated":

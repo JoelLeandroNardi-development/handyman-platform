@@ -75,8 +75,8 @@ async def list_handymen(
         res = await db.execute(
             select(Handyman).order_by(Handyman.id.asc()).limit(limit).offset(offset)
         )
-        handymen = res.scalars().all()
-        return [_to_response(h) for h in handymen]
+        rows = res.scalars().all()
+        return [_to_response(h) for h in rows]
 
 
 @router.get("/handymen/{email}", response_model=HandymanResponse)

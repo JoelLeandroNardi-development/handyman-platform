@@ -13,6 +13,8 @@ class MatchRequest(BaseModel):
 
 class MatchResult(BaseModel):
     email: str
+    latitude: float
+    longitude: float
     distance_km: float
     years_experience: int
     availability_unknown: bool = False

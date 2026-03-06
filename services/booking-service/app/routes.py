@@ -19,16 +19,16 @@ from .events import build_event
 router = APIRouter()
 
 
-def _to_response(b: Booking) -> BookingResponse:
+def _to_response(booking: Booking) -> BookingResponse:
     return BookingResponse(
-        booking_id=b.booking_id,
-        status=b.status,
-        user_email=b.user_email,
-        handyman_email=b.handyman_email,
-        desired_start=b.desired_start,
-        desired_end=b.desired_end,
-        failure_reason=b.failure_reason,
-        cancellation_reason=b.cancellation_reason,
+        booking_id=booking.booking_id,
+        status=booking.status,
+        user_email=booking.user_email,
+        handyman_email=booking.handyman_email,
+        desired_start=booking.desired_start,
+        desired_end=booking.desired_end,
+        failure_reason=booking.failure_reason,
+        cancellation_reason=booking.cancellation_reason,
     )
 
 

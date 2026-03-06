@@ -85,8 +85,6 @@ async def _call_with_breaker(
         raise HTTPException(status_code=502, detail=f"Bad gateway calling upstream: {url}. err={type(e).__name__}: {e}")
 
 
-# ---- AUTH ----
-
 async def register_user(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/register", data, request_id, None)
 
@@ -115,8 +113,6 @@ async def delete_auth_user(user_id: int, request_id: str | None = None, user_pay
     return await _call_with_breaker(cb_auth, "DELETE", f"{AUTH_SERVICE_URL}/auth-users/{user_id}", None, request_id, user_payload)
 
 
-# ---- USERS ----
-
 async def create_user(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_user, "POST", f"{USER_SERVICE_URL}/users", data, request_id, user_payload)
 
@@ -140,8 +136,6 @@ async def list_users(request_id: str | None = None, user_payload: dict | None = 
 async def get_user(email: str, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_user, "GET", f"{USER_SERVICE_URL}/users/{email}", None, request_id, user_payload)
 
-
-# ---- HANDYMEN ----
 
 async def create_handyman(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_handyman, "POST", f"{HANDYMAN_SERVICE_URL}/handymen", data, request_id, user_payload)
@@ -172,8 +166,6 @@ async def update_handyman_location_and_fetch(email: str, data: dict, request_id:
     return await get_handyman(email, request_id, user_payload)
 
 
-# ---- AVAILABILITY ----
-
 async def set_availability(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_availability, "POST", f"{AVAILABILITY_SERVICE_URL}/availability/{email}", data, request_id, user_payload)
 
@@ -190,8 +182,6 @@ async def list_all_availability(request_id: str | None = None, user_payload: dic
     return await _call_with_breaker(cb_availability, "GET", f"{AVAILABILITY_SERVICE_URL}/availability?limit={limit}&cursor={cursor}", None, request_id, user_payload)
 
 
-# ---- MATCH ----
-
 async def match_request(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_match, "POST", f"{MATCH_SERVICE_URL}/match", data, request_id, user_payload)
 
@@ -206,8 +196,6 @@ async def list_match_logs(request_id: str | None = None, user_payload: dict | No
 async def delete_match_log(log_id: int, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_match, "DELETE", f"{MATCH_SERVICE_URL}/match-logs/{log_id}", None, request_id, user_payload)
 
-
-# ---- BOOKINGS ----
 
 async def create_booking(data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings", data, request_id, user_payload)

@@ -100,10 +100,6 @@ async def list_all_availability(
     limit: int = Query(200, ge=1, le=1000),
     cursor: int = Query(0, ge=0),
 ):
-    """
-    Lists availability keys via SCAN.
-    Returns: {cursor, items:[{email, slots:[{start,end}]}]}
-    """
     pattern = "availability:*"
     next_cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=limit)
 

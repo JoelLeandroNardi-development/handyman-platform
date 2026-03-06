@@ -114,8 +114,8 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
 ):
     res = await db.execute(select(User).order_by(User.id.asc()).limit(limit).offset(offset))
-    users = res.scalars().all()
-    return [to_response(u) for u in users]
+    rows = res.scalars().all()
+    return [to_response(u) for u in rows]
 
 
 @router.put("/users/{email}", response_model=UserResponse)

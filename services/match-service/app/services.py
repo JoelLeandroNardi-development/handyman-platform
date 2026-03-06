@@ -24,7 +24,6 @@ HTTP_TIMEOUT = 2.0
 GRID_DEG = float(os.getenv("MATCH_GRID_DEG") or "0.05")
 TIME_BUCKET_SECONDS = int(os.getenv("MATCH_TIME_BUCKET_SECONDS") or "900")
 
-# ---- Projection keys ----
 PROJ_HANDYMAN_KEY = "proj:handyman:{email}"
 PROJ_HANDYMEN_INDEX = "proj:handymen:index"
 PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"
@@ -205,9 +204,6 @@ async def upsert_handyman_projection(doc: dict) -> None:
 
 
 async def delete_handyman_projection(email: str) -> dict | None:
-    """
-    Deletes projection + indices. Returns previous projection (if any) for cache invalidation decisions.
-    """
     if not email:
         return None
 
@@ -217,8 +213,10 @@ async def delete_handyman_projection(email: str) -> dict | None:
     pipe = redis_client.pipeline()
     pipe.delete(PROJ_HANDYMAN_KEY.format(email=email))
     pipe.srem(PROJ_HANDYMEN_INDEX, email)
+
     for s in old_skills:
         pipe.srem(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
+
     await pipe.execute()
     return old
 

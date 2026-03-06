@@ -98,6 +98,34 @@ def _overall_status(results: List[Dict[str, Any]]) -> str:
     return "up" if all(r.get("status") == "up" for r in results) else "degraded"
 
 
+def _user_email(payload: dict) -> str:
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(status_code=401, detail="Token missing subject")
+    return str(email)
+
+
+def _has_role(payload: dict, role: str) -> bool:
+    roles = payload.get("roles") or []
+    return role.lower() in {str(r).lower() for r in roles}
+
+
+async def _booking_owned_or_admin(booking_id: str, payload: dict, request_id: str) -> dict:
+    booking = await get_booking(booking_id, request_id=request_id, user_payload=payload)
+
+    if _has_role(payload, "admin"):
+        return booking
+
+    current_email = _user_email(payload)
+    is_user_owner = booking.get("user_email") == current_email
+    is_handyman_owner = booking.get("handyman_email") == current_email
+
+    if is_user_owner or is_handyman_owner:
+        return booking
+
+    raise HTTPException(status_code=403, detail="Forbidden for this booking")
+
+
 @app.get("/health", tags=["System"])
 async def health():
     return {"status": "ok", "service": "gateway-service"}
@@ -207,8 +235,6 @@ async def breaker_open(name: str, user=Depends(get_current_user)):
     return {"message": "opened", "breaker": await b.status()}
 
 
-# ---- AUTH ----
-
 @app.post("/register", tags=["Auth"])
 async def register(data: Register, request: Request):
     return await register_user(data.model_dump(), request_id=request.state.request_id)
@@ -219,8 +245,6 @@ async def login(data: Login, request: Request):
     return await login_user(data.model_dump(), request_id=request.state.request_id)
 
 
-# Auth back-office (admin)
-
 @app.get("/auth-users", response_model=List[AuthUserResponse], tags=["Auth"])
 async def admin_list_auth_users(
     request: Request,
@@ -229,7 +253,12 @@ async def admin_list_auth_users(
     offset: int = Query(0, ge=0),
 ):
     require_role(user, ["admin"])
-    return await list_auth_users(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset)
+    return await list_auth_users(
+        request_id=request.state.request_id,
+        user_payload=user,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.get("/auth-users/{user_id}", response_model=AuthUserResponse, tags=["Auth"])
@@ -256,7 +285,35 @@ async def admin_delete_auth_user(user_id: int, request: Request, user=Depends(ge
     return await delete_auth_user(user_id, request_id=request.state.request_id, user_payload=user)
 
 
-# ---- USERS ----
+@app.get("/me", response_model=MeResponse, tags=["Auth"])
+async def get_me(request: Request, user=Depends(get_current_user)):
+    email = _user_email(user)
+    roles = list(user.get("roles") or [])
+
+    user_profile = None
+    handyman_profile = None
+
+    if _has_role(user, "user") or _has_role(user, "admin"):
+        try:
+            user_profile = await get_user(email, request_id=request.state.request_id, user_payload=user)
+        except HTTPException as e:
+            if e.status_code != 404:
+                raise
+
+    if _has_role(user, "handyman") or _has_role(user, "admin"):
+        try:
+            handyman_profile = await get_handyman(email, request_id=request.state.request_id, user_payload=user)
+        except HTTPException as e:
+            if e.status_code != 404:
+                raise
+
+    return MeResponse(
+        email=email,
+        roles=roles,
+        user_profile=user_profile,
+        handyman_profile=handyman_profile,
+    )
+
 
 @app.post("/users", tags=["Users"])
 async def create_user_endpoint(data: CreateUser, request: Request, user=Depends(get_current_user)):
@@ -266,17 +323,17 @@ async def create_user_endpoint(data: CreateUser, request: Request, user=Depends(
 
 @app.put("/users/{email}/location", tags=["Users"])
 async def update_user_location_endpoint(email: str, data: UpdateUserLocation, request: Request, user=Depends(get_current_user)):
+    if not _has_role(user, "admin") and _user_email(user) != email:
+        raise HTTPException(status_code=403, detail="Cannot update another user's location")
     require_role(user, ["user", "admin"])
     return await update_user_location(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/users/{email}", tags=["Users"])
 async def get_user_endpoint(email: str, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["user", "admin"])
+    require_role(user, ["admin"])
     return await get_user(email, request_id=request.state.request_id, user_payload=user)
 
-
-# Users back-office (admin)
 
 @app.get("/users", response_model=List[UserResponse], tags=["Users"])
 async def admin_list_users(
@@ -301,7 +358,17 @@ async def admin_delete_user_endpoint(email: str, request: Request, user=Depends(
     return await delete_user(email, request_id=request.state.request_id, user_payload=user)
 
 
-# ---- HANDYMEN ----
+@app.get("/me/user", response_model=UserResponse, tags=["Users"])
+async def get_me_user(request: Request, user=Depends(get_current_user)):
+    require_role(user, ["user", "admin"])
+    return await get_user(_user_email(user), request_id=request.state.request_id, user_payload=user)
+
+
+@app.put("/me", response_model=UserResponse, tags=["Users"])
+async def update_me(data: UpdateUser, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["user", "admin"])
+    return await update_user(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
 
 @app.get("/handymen", tags=["Handymen"])
 async def list_handymen_endpoint(
@@ -322,17 +389,17 @@ async def create_handyman_endpoint(data: CreateHandyman, request: Request, user=
 
 @app.get("/handymen/{email}", tags=["Handymen"])
 async def get_handyman_endpoint(email: str, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["handyman", "admin"])
+    require_role(user, ["admin"])
     return await get_handyman(email, request_id=request.state.request_id, user_payload=user)
 
 
 @app.put("/handymen/{email}/location", tags=["Handymen"])
 async def update_handyman_location_endpoint(email: str, data: UpdateHandymanLocation, request: Request, user=Depends(get_current_user)):
+    if not _has_role(user, "admin") and _user_email(user) != email:
+        raise HTTPException(status_code=403, detail="Cannot update another handyman's location")
     require_role(user, ["handyman", "admin"])
     return await update_handyman_location_and_fetch(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
-# Handymen back-office (admin)
 
 @app.put("/handymen/{email}", response_model=HandymanResponse, tags=["Handymen"])
 async def admin_update_handyman_endpoint(email: str, data: UpdateHandyman, request: Request, user=Depends(get_current_user)):
@@ -346,27 +413,35 @@ async def admin_delete_handyman_endpoint(email: str, request: Request, user=Depe
     return await delete_handyman(email, request_id=request.state.request_id, user_payload=user)
 
 
-# ---- AVAILABILITY ----
+@app.get("/me/handyman", response_model=HandymanResponse, tags=["Handymen"])
+async def get_me_handyman(request: Request, user=Depends(get_current_user)):
+    require_role(user, ["handyman", "admin"])
+    return await get_handyman(_user_email(user), request_id=request.state.request_id, user_payload=user)
+
+
+@app.put("/me/handyman", response_model=HandymanResponse, tags=["Handymen"])
+async def update_me_handyman(data: UpdateHandyman, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["handyman", "admin"])
+    return await update_handyman(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
 
 @app.post("/availability/{email}", tags=["Availability"])
 async def set_availability_endpoint(email: str, data: SetAvailability, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["handyman", "admin"])
+    require_role(user, ["admin"])
     return await set_availability(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/availability/{email}", tags=["Availability"])
 async def get_availability_endpoint(email: str, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["user", "handyman", "admin"])
+    require_role(user, ["admin"])
     return await get_availability(email, request_id=request.state.request_id, user_payload=user)
 
 
 @app.delete("/availability/{email}", tags=["Availability"])
 async def clear_availability_endpoint(email: str, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["handyman", "admin"])
+    require_role(user, ["admin"])
     return await clear_availability(email, request_id=request.state.request_id, user_payload=user)
 
-
-# Availability back-office (admin)
 
 @app.get("/availability", tags=["Availability"])
 async def admin_list_all_availability(
@@ -379,7 +454,23 @@ async def admin_list_all_availability(
     return await list_all_availability(request_id=request.state.request_id, user_payload=user, limit=limit, cursor=cursor)
 
 
-# ---- MATCH ----
+@app.get("/me/availability", tags=["Availability"])
+async def get_my_availability(request: Request, user=Depends(get_current_user)):
+    require_role(user, ["handyman", "admin"])
+    return await get_availability(_user_email(user), request_id=request.state.request_id, user_payload=user)
+
+
+@app.post("/me/availability", tags=["Availability"])
+async def set_my_availability(data: SetAvailability, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["handyman", "admin"])
+    return await set_availability(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
+
+
+@app.delete("/me/availability", tags=["Availability"])
+async def clear_my_availability(request: Request, user=Depends(get_current_user)):
+    require_role(user, ["handyman", "admin"])
+    return await clear_availability(_user_email(user), request_id=request.state.request_id, user_payload=user)
+
 
 @app.post("/match", response_model=List[MatchResult], tags=["Match"])
 async def match_endpoint(data: MatchRequest, request: Request, user=Depends(get_current_user)):
@@ -409,33 +500,90 @@ async def admin_delete_match_log(
     return await delete_match_log(log_id, request_id=request.state.request_id, user_payload=user)
 
 
-# ---- BOOKINGS ----
-
 @app.post("/bookings", response_model=BookingResponse, tags=["Bookings"])
 async def create_booking_endpoint(data: CreateBookingRequest, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
+
+    if not _has_role(user, "admin") and data.user_email != _user_email(user):
+        raise HTTPException(status_code=403, detail="Cannot create booking for another user")
+
     return await create_booking(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
 @app.get("/bookings/{booking_id}", response_model=BookingResponse, tags=["Bookings"])
 async def get_booking_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "handyman", "admin"])
-    return await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+    booking = await _booking_owned_or_admin(booking_id, user, request.state.request_id)
+    return booking
 
 
 @app.post("/bookings/{booking_id}/confirm", response_model=ConfirmBookingResponse, tags=["Bookings"])
 async def confirm_booking_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["user", "admin"])
+    require_role(user, ["handyman", "admin"])
+
+    booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+    if not _has_role(user, "admin") and booking.get("handyman_email") != _user_email(user):
+        raise HTTPException(status_code=403, detail="Cannot confirm another handyman's booking")
+
     return await confirm_booking(booking_id, request_id=request.state.request_id, user_payload=user)
 
 
 @app.post("/bookings/{booking_id}/cancel", response_model=CancelBookingResponse, tags=["Bookings"])
 async def cancel_booking_endpoint(booking_id: str, data: CancelBookingRequest, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["user", "admin"])
+    require_role(user, ["user", "handyman", "admin"])
+
+    booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+    if not _has_role(user, "admin"):
+        current_email = _user_email(user)
+        is_user_owner = booking.get("user_email") == current_email
+        is_handyman_owner = booking.get("handyman_email") == current_email
+        if not (is_user_owner or is_handyman_owner):
+            raise HTTPException(status_code=403, detail="Cannot cancel another user's booking")
+
     return await cancel_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
-# Bookings back-office (admin)
+@app.get("/me/bookings", response_model=List[BookingResponse], tags=["Bookings"])
+async def get_my_bookings(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(default=None),
+):
+    require_role(user, ["user", "admin"])
+    return await list_bookings(
+        request_id=request.state.request_id,
+        user_payload=user,
+        limit=limit,
+        offset=offset,
+        status=status,
+        user_email=_user_email(user),
+        handyman_email=None,
+    )
+
+
+@app.get("/me/jobs", response_model=List[BookingResponse], tags=["Bookings"])
+async def get_my_jobs(
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(default=None),
+):
+    require_role(user, ["handyman", "admin"])
+    return await list_bookings(
+        request_id=request.state.request_id,
+        user_payload=user,
+        limit=limit,
+        offset=offset,
+        status=status,
+        user_email=None,
+        handyman_email=_user_email(user),
+    )
+
 
 @app.get("/bookings", tags=["Bookings"])
 async def admin_list_bookings(

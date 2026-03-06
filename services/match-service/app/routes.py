@@ -29,12 +29,12 @@ async def get_db():
         yield session
 
 
-def _log_to_resp(m: MatchLog) -> MatchLogResponse:
+def _log_to_response(row: MatchLog) -> MatchLogResponse:
     return MatchLogResponse(
-        id=m.id,
-        user_latitude=m.user_latitude,
-        user_longitude=m.user_longitude,
-        skill=m.skill,
+        id=row.id,
+        user_latitude=row.user_latitude,
+        user_longitude=row.user_longitude,
+        skill=row.skill,
     )
 
 
@@ -88,6 +88,8 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         results.append(
             {
                 "email": h["email"],
+                "latitude": h["latitude"],
+                "longitude": h["longitude"],
                 "distance_km": round(distance, 2),
                 "years_experience": h.get("years_experience"),
                 "availability_unknown": availability_unknown,
@@ -129,7 +131,7 @@ async def list_match_logs(
 
     res = await db.execute(stmt)
     rows = res.scalars().all()
-    return [_log_to_resp(r) for r in rows]
+    return [_log_to_response(r) for r in rows]
 
 
 @router.get("/match-logs/{log_id}", response_model=MatchLogResponse)
@@ -138,7 +140,7 @@ async def get_match_log(log_id: int, db: AsyncSession = Depends(get_db)):
     row = res.scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="MatchLog not found")
-    return _log_to_resp(row)
+    return _log_to_response(row)
 
 
 @router.put("/match-logs/{log_id}", response_model=MatchLogResponse)
@@ -157,7 +159,7 @@ async def update_match_log(log_id: int, data: UpdateMatchLog, db: AsyncSession =
 
     await db.commit()
     await db.refresh(row)
-    return _log_to_resp(row)
+    return _log_to_response(row)
 
 
 @router.delete("/match-logs/{log_id}")

@@ -32,8 +32,6 @@ class TokenResponse(BaseModel):
     access_token: str
 
 
-# ---- Auth back-office ----
-
 class AuthUserResponse(BaseModel):
     id: int
     email: str
@@ -58,8 +56,6 @@ class UpdateAuthUser(BaseModel):
             raise ValueError("roles must not be empty")
         object.__setattr__(self, "roles", normalized)
 
-
-# ---- Users ----
 
 class CreateUser(BaseModel):
     email: str
@@ -86,8 +82,6 @@ class UserResponse(BaseModel):
     longitude: Optional[float] = None
     created_at: datetime
 
-
-# ---- Handymen ----
 
 class CreateHandyman(BaseModel):
     email: str
@@ -121,8 +115,6 @@ class HandymanResponse(BaseModel):
     created_at: datetime
 
 
-# ---- Availability ----
-
 class AvailabilitySlot(BaseModel):
     start: str
     end: str
@@ -131,8 +123,6 @@ class AvailabilitySlot(BaseModel):
 class SetAvailability(BaseModel):
     slots: List[AvailabilitySlot]
 
-
-# ---- Match ----
 
 class MatchRequest(BaseModel):
     latitude: float
@@ -144,12 +134,12 @@ class MatchRequest(BaseModel):
 
 class MatchResult(BaseModel):
     email: str
+    latitude: float
+    longitude: float
     distance_km: float
     years_experience: int
     availability_unknown: bool = False
 
-
-# ---- Bookings ----
 
 class CreateBookingRequest(BaseModel):
     user_email: str
@@ -188,3 +178,10 @@ class UpdateBookingAdmin(BaseModel):
     status: Optional[str] = None
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
+
+
+class MeResponse(BaseModel):
+    email: str
+    roles: List[str]
+    user_profile: Optional[UserResponse] = None
+    handyman_profile: Optional[HandymanResponse] = None

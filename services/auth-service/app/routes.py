@@ -25,7 +25,7 @@ async def get_db():
         yield session
 
 
-def _to_resp(u: AuthUser) -> AuthUserResponse:
+def _to_response(u: AuthUser) -> AuthUserResponse:
     return AuthUserResponse(
         id=u.id,
         email=u.email,
@@ -88,8 +88,8 @@ async def list_auth_users(
     res = await db.execute(
         select(AuthUser).order_by(AuthUser.id.asc()).limit(limit).offset(offset)
     )
-    users = res.scalars().all()
-    return [_to_resp(u) for u in users]
+    rows = res.scalars().all()
+    return [_to_response(u) for u in rows]
 
 
 @router.get("/auth-users/{user_id}", response_model=AuthUserResponse)
@@ -98,7 +98,7 @@ async def get_auth_user(user_id: int, db: AsyncSession = Depends(get_db)):
     u = res.scalar_one_or_none()
     if not u:
         raise HTTPException(status_code=404, detail="Auth user not found")
-    return _to_resp(u)
+    return _to_response(u)
 
 
 @router.get("/auth-users/by-email/{email}", response_model=AuthUserResponse)
@@ -107,7 +107,7 @@ async def get_auth_user_by_email(email: str, db: AsyncSession = Depends(get_db))
     u = res.scalar_one_or_none()
     if not u:
         raise HTTPException(status_code=404, detail="Auth user not found")
-    return _to_resp(u)
+    return _to_response(u)
 
 
 @router.put("/auth-users/{user_id}", response_model=AuthUserResponse)
@@ -129,7 +129,7 @@ async def update_auth_user(
 
     await db.commit()
     await db.refresh(u)
-    return _to_resp(u)
+    return _to_response(u)
 
 
 @router.delete("/auth-users/{user_id}")
@@ -141,4 +141,5 @@ async def delete_auth_user(user_id: int, db: AsyncSession = Depends(get_db)):
 
     await db.execute(delete(AuthUser).where(AuthUser.id == user_id))
     await db.commit()
+
     return {"message": "deleted", "user_id": user_id}
