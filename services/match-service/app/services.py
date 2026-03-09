@@ -59,7 +59,7 @@ def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datet
 
 
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371
+    r = 6371.0
     d_lat = math.radians(lat2 - lat1)
     d_lon = math.radians(lon2 - lon1)
     a = (
@@ -69,7 +69,7 @@ def haversine(lat1, lon1, lat2, lon2):
         * math.sin(d_lon / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+    return r * c
 
 
 def bucket_id(lat: float, lon: float) -> tuple[int, int]:
@@ -156,7 +156,7 @@ def _normalize_handyman(doc: dict) -> dict:
     seen = set()
     skills_norm = [s for s in skills_norm if not (s in seen or seen.add(s))]
 
-    out = {
+    return {
         "email": email,
         "skills": skills_norm,
         "years_experience": doc.get("years_experience"),
@@ -165,7 +165,6 @@ def _normalize_handyman(doc: dict) -> dict:
         "longitude": doc.get("longitude"),
         "updated_at": utc_now_iso(),
     }
-    return out
 
 
 async def get_handyman_projection(email: str) -> dict | None:
@@ -213,10 +212,8 @@ async def delete_handyman_projection(email: str) -> dict | None:
     pipe = redis_client.pipeline()
     pipe.delete(PROJ_HANDYMAN_KEY.format(email=email))
     pipe.srem(PROJ_HANDYMEN_INDEX, email)
-
     for s in old_skills:
         pipe.srem(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
-
     await pipe.execute()
     return old
 
@@ -243,7 +240,6 @@ async def list_projected_handymen_by_skill(skill: str) -> list[dict]:
             out.append(json.loads(raw))
         except Exception:
             continue
-
     return out
 
 
@@ -307,7 +303,7 @@ def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_en
     ds = _as_utc(desired_start)
     de = _as_utc(desired_end)
 
-    for slot in (slots or []):
+    for slot in slots or []:
         try:
             ss = parse_dt(slot.get("start"))
             ee = parse_dt(slot.get("end"))
@@ -335,7 +331,60 @@ async def fetch_handymen_http() -> list[dict]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         r = await client.get(f"{HANDYMAN_SERVICE_URL}/handymen")
         r.raise_for_status()
-        return r.json()
+        data = r.json()
+
+    out: list[dict] = []
+    for h in data or []:
+        if not isinstance(h, dict):
+            continue
+        normalized = _normalize_handyman(h)
+        if normalized.get("email"):
+            out.append(normalized)
+    return out
+
+
+async def fetch_availability_http(email: str) -> list[dict] | None:
+    if not email:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            r = await client.get(f"{AVAILABILITY_SERVICE_URL}/availability/{email}")
+            r.raise_for_status()
+            data = r.json()
+    except Exception:
+        return None
+
+    slots = data.get("slots") or []
+    clean: list[dict] = []
+    for s in slots:
+        if not isinstance(s, dict):
+            continue
+        start = s.get("start")
+        end = s.get("end")
+        if not start or not end:
+            continue
+        try:
+            parse_dt(start)
+            parse_dt(end)
+        except Exception:
+            continue
+        clean.append({"start": start, "end": end})
+
+    return clean
+
+
+async def get_effective_availability_slots(email: str) -> tuple[list[dict] | None, str]:
+    projected = await get_availability_slots(email)
+    if projected is not None:
+        return projected, "projection"
+
+    live = await fetch_availability_http(email)
+    if live is None:
+        return None, "missing"
+
+    await upsert_availability_projection(email=email, slots=live)
+    return live, "live"
 
 
 async def seed_handyman_projection_if_empty() -> dict:
@@ -349,7 +398,7 @@ async def seed_handyman_projection_if_empty() -> dict:
         return {"seeded": False, "reason": f"fetch_failed: {type(e).__name__}: {e}", "count": 0}
 
     ok = 0
-    for h in (handymen or []):
+    for h in handymen or []:
         try:
             await upsert_handyman_projection(h)
             ok += 1
@@ -357,6 +406,26 @@ async def seed_handyman_projection_if_empty() -> dict:
             continue
 
     return {"seeded": True, "reason": "bootstrapped", "count": ok}
+
+
+async def get_live_handymen_for_skill(skill: str) -> list[dict]:
+    skill = norm(skill)
+    if not skill:
+        return []
+
+    all_handymen = await fetch_handymen_http()
+    matched: list[dict] = []
+
+    for h in all_handymen:
+        skills = [norm(s) for s in (h.get("skills") or [])]
+        if skill in skills:
+            matched.append(h)
+            try:
+                await upsert_handyman_projection(h)
+            except Exception:
+                pass
+
+    return matched
 
 
 async def get_cached_result(key: str):
