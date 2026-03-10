@@ -10,7 +10,7 @@ from .models import MatchLog
 from .schemas import MatchRequest, MatchLogResponse, UpdateMatchLog
 from .services import (
     haversine,
-    get_live_handymen_for_skill,
+    get_effective_handymen_for_skill,
     get_effective_availability_slots,
     projected_has_overlap,
     projections_have_any_availability,
@@ -62,13 +62,12 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     if cached:
         try:
             parsed = json.loads(cached)
-            if isinstance(parsed, list) and parsed:
+            if isinstance(parsed, list):
                 return parsed
         except Exception:
             pass
 
-    # Use live handyman-service data as the source of truth for matching.
-    handymen = await get_live_handymen_for_skill(requested_skill)
+    handymen, handyman_source = await get_effective_handymen_for_skill(requested_skill)
 
     results: list[dict] = []
 
@@ -86,7 +85,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         if distance > float(h.get("service_radius_km") or 0):
             continue
 
-        slots, source = await get_effective_availability_slots(h["email"])
+        slots, availability_source = await get_effective_availability_slots(h["email"])
 
         if slots is None:
             availability_unknown = True
@@ -106,7 +105,8 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
                 "distance_km": round(distance, 2),
                 "years_experience": h.get("years_experience"),
                 "availability_unknown": availability_unknown,
-                "availability_source": source,
+                "availability_source": availability_source,
+                "handyman_source": handyman_source,
             }
         )
 
@@ -116,16 +116,15 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     ttl = 15 if degraded else 60
     b_lat, b_lon = bucket_id(data.latitude, data.longitude)
 
-    if results:
-        await set_cache_with_index(
-            cache_key_str=key,
-            value=json.dumps(results),
-            ttl_seconds=ttl,
-            mode=mode,
-            skill=requested_skill,
-            b_lat=b_lat,
-            b_lon=b_lon,
-        )
+    await set_cache_with_index(
+        cache_key_str=key,
+        value=json.dumps(results),
+        ttl_seconds=ttl,
+        mode=mode,
+        skill=requested_skill,
+        b_lat=b_lat,
+        b_lon=b_lon,
+    )
 
     db.add(
         MatchLog(

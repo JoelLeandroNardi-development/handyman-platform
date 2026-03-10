@@ -33,9 +33,43 @@ def parse(dt: str):
     return parser.isoparse(dt)
 
 
+def contains_interval(slot_start, slot_end, desired_start, desired_end) -> bool:
+    return slot_start <= desired_start and slot_end >= desired_end
+
+
+async def read_current_slots(email: str) -> list[dict]:
+    slots = await redis_client.lrange(avail_key(email), 0, -1)
+
+    parsed: list[dict] = []
+    for slot in slots or []:
+        try:
+            s, e = slot.split("|")
+            ss = parse(s)
+            ee = parse(e)
+            parsed.append({"start": ss.isoformat(), "end": ee.isoformat()})
+        except Exception:
+            continue
+
+    return parsed
+
+
+async def emit_availability_updated(email: str) -> None:
+    ev = build_event(
+        "availability.updated",
+        {
+            "email": email,
+            "slots": await read_current_slots(email),
+        },
+    )
+    await enqueue_domain_event(ev)
+
+
 async def handyman_has_slot(email: str, desired_start: str, desired_end: str) -> bool:
     ds = parse(desired_start)
     de = parse(desired_end)
+
+    if de <= ds:
+        return False
 
     slots = await redis_client.lrange(avail_key(email), 0, -1)
     for slot in slots:
@@ -46,8 +80,9 @@ async def handyman_has_slot(email: str, desired_start: str, desired_end: str) ->
         except Exception:
             continue
 
-        if overlaps(ss, ee, ds, de):
+        if contains_interval(ss, ee, ds, de):
             return True
+
     return False
 
 
@@ -91,7 +126,11 @@ async def process_event(payload: dict):
     if event_type not in set(ROUTING_KEYS):
         return
 
-    if await already_processed(redis_client=redis_client, event_id=event_id, ttl_seconds=IDEMPOTENCY_TTL):
+    if await already_processed(
+        redis_client=redis_client,
+        event_id=event_id,
+        ttl_seconds=IDEMPOTENCY_TTL,
+    ):
         return
 
     if event_type == "booking.requested":
@@ -105,16 +144,27 @@ async def process_event(payload: dict):
 
         ok_slot = await handyman_has_slot(handyman_email, desired_start, desired_end)
         if not ok_slot:
-            ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "no_matching_slot"})
+            ev = build_event(
+                "slot.rejected",
+                {"booking_id": booking_id, "reason": "no_matching_slot"},
+            )
             await enqueue_domain_event(ev)
             return
 
-        ok = await create_reservation(booking_id, handyman_email, desired_start, desired_end)
+        ok = await create_reservation(
+            booking_id,
+            handyman_email,
+            desired_start,
+            desired_end,
+        )
         if ok:
             ev = build_event("slot.reserved", {"booking_id": booking_id})
             await enqueue_domain_event(ev)
         else:
-            ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "slot_conflict_reserved"})
+            ev = build_event(
+                "slot.rejected",
+                {"booking_id": booking_id, "reason": "slot_conflict_reserved"},
+            )
             await enqueue_domain_event(ev)
         return
 
@@ -129,12 +179,18 @@ async def process_event(payload: dict):
 
         res = await get_reservation(booking_id)
         if not res:
-            ev = build_event("slot.rejected", {"booking_id": booking_id, "reason": "reservation_missing"})
+            ev = build_event(
+                "slot.rejected",
+                {"booking_id": booking_id, "reason": "reservation_missing"},
+            )
             await enqueue_domain_event(ev)
             return
 
         await apply_confirm_to_slots(handyman_email, desired_start, desired_end)
         await delete_reservation(booking_id)
+
+        # Critical: projections depend on this event staying current.
+        await emit_availability_updated(handyman_email)
 
         ev = build_event("slot.confirmed", {"booking_id": booking_id})
         await enqueue_domain_event(ev)

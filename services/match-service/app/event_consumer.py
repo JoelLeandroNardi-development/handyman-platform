@@ -61,6 +61,11 @@ async def _invalidate_for_handyman_profile(profile: dict | None):
                 await invalidate_bucket(mode, skill, b_lat, b_lon)
 
 
+async def _invalidate_profiles(*profiles: dict | None):
+    for p in profiles:
+        await _invalidate_for_handyman_profile(p)
+
+
 async def process_event(payload: dict):
     event_id = payload.get("event_id")
     event_type = payload.get("event_type")
@@ -85,15 +90,18 @@ async def process_event(payload: dict):
         if not email:
             return
 
-        await upsert_availability_projection(email=email, slots=slots)
+        if slots:
+            await upsert_availability_projection(email=email, slots=slots)
+        else:
+            await delete_availability_projection(email)
 
         profile = await get_handyman_projection(email)
-        await _invalidate_for_handyman_profile(profile)
+        await _invalidate_profiles(profile)
         return
 
     if event_type == "handyman.created":
         await upsert_handyman_projection(data)
-        await _invalidate_for_handyman_profile(data)
+        await _invalidate_profiles(data)
         return
 
     if event_type in ("handyman.location_updated", "handyman.updated"):
@@ -101,12 +109,14 @@ async def process_event(payload: dict):
         if not email:
             return
 
-        existing = await get_handyman_projection(email)
-        merged = dict(existing or {})
+        old = await get_handyman_projection(email)
+        merged = dict(old or {})
         merged.update(data)
 
         await upsert_handyman_projection(merged)
-        await _invalidate_for_handyman_profile(merged)
+
+        # Critical: invalidate both the old and the new buckets.
+        await _invalidate_profiles(old, merged)
         return
 
     if event_type == "handyman.deleted":
@@ -116,7 +126,7 @@ async def process_event(payload: dict):
 
         old = await delete_handyman_projection(email)
         await delete_availability_projection(email)
-        await _invalidate_for_handyman_profile(old)
+        await _invalidate_profiles(old)
         return
 
 

@@ -5,7 +5,7 @@ from dateutil import parser
 
 from .redis_client import redis_client
 from .schemas import SetAvailability, OverlapRequest, AvailabilitySlot
-from .reservations import overlaps, get_reservation, delete_reservation
+from .reservations import get_reservation, delete_reservation
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
 
@@ -14,6 +14,10 @@ router = APIRouter()
 
 def redis_key(email: str) -> str:
     return f"availability:{email}"
+
+
+def contains_interval(slot_start, slot_end, desired_start, desired_end) -> bool:
+    return slot_start <= desired_start and slot_end >= desired_end
 
 
 def _slots_payload(slots: list[AvailabilitySlot]) -> list[dict]:
@@ -89,7 +93,7 @@ async def check_overlap(email: str, req: OverlapRequest):
         except Exception:
             continue
 
-        if overlaps(ss, ee, ds, de):
+        if contains_interval(ss, ee, ds, de):
             return {"available": True}
 
     return {"available": False}

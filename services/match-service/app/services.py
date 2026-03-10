@@ -58,6 +58,10 @@ def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datet
     return a_start < b_end and a_end > b_start
 
 
+def fully_contains(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
+    return a_start <= b_start and a_end >= b_end
+
+
 def haversine(lat1, lon1, lat2, lon2):
     r = 6371.0
     d_lat = math.radians(lat2 - lat1)
@@ -263,11 +267,17 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
         if not start or not end:
             continue
         try:
-            parse_dt(start)
-            parse_dt(end)
+            sdt = parse_dt(start)
+            edt = parse_dt(end)
         except Exception:
             continue
-        clean_slots.append({"start": start, "end": end})
+        if edt <= sdt:
+            continue
+        clean_slots.append({"start": sdt.isoformat(), "end": edt.isoformat()})
+
+    if not clean_slots:
+        await delete_availability_projection(email)
+        return
 
     payload = {"email": email, "slots": clean_slots, "updated_at": utc_now_iso()}
 
@@ -303,6 +313,9 @@ def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_en
     ds = _as_utc(desired_start)
     de = _as_utc(desired_end)
 
+    if de <= ds:
+        return False
+
     for slot in slots or []:
         try:
             ss = parse_dt(slot.get("start"))
@@ -310,7 +323,7 @@ def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_en
         except Exception:
             continue
 
-        if overlaps(ss, ee, ds, de):
+        if fully_contains(ss, ee, ds, de):
             return True
 
     return False
@@ -365,11 +378,13 @@ async def fetch_availability_http(email: str) -> list[dict] | None:
         if not start or not end:
             continue
         try:
-            parse_dt(start)
-            parse_dt(end)
+            sdt = parse_dt(start)
+            edt = parse_dt(end)
         except Exception:
             continue
-        clean.append({"start": start, "end": end})
+        if edt <= sdt:
+            continue
+        clean.append({"start": sdt.isoformat(), "end": edt.isoformat()})
 
     return clean
 
@@ -426,6 +441,19 @@ async def get_live_handymen_for_skill(skill: str) -> list[dict]:
                 pass
 
     return matched
+
+
+async def get_effective_handymen_for_skill(skill: str) -> tuple[list[dict], str]:
+    skill = norm(skill)
+    if not skill:
+        return [], "empty-skill"
+
+    projected = await list_projected_handymen_by_skill(skill)
+    if projected:
+        return projected, "projection"
+
+    live = await get_live_handymen_for_skill(skill)
+    return live, "live"
 
 
 async def get_cached_result(key: str):

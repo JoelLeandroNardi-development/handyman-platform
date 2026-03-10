@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 
 from .db import Base
@@ -17,6 +17,41 @@ class Handyman(Base):
 
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class SkillsCategory(Base):
+    __tablename__ = "skills_categories"
+
+    id = Column(Integer, primary_key=True)
+
+    key = Column(String, unique=True, index=True, nullable=False)
+    label = Column(String, nullable=False)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class SkillCatalogItem(Base):
+    __tablename__ = "skills_catalog_items"
+    __table_args__ = (
+        UniqueConstraint("category_key", "skill_key", name="uq_skill_category_skill"),
+        UniqueConstraint("skill_key", name="uq_skill_key_global"),
+    )
+
+    id = Column(Integer, primary_key=True)
+
+    category_key = Column(String, index=True, nullable=False)
+    skill_key = Column(String, index=True, nullable=False)
+
+    category_label = Column(String, nullable=False)
+    skill_label = Column(String, nullable=False)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

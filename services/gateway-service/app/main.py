@@ -425,6 +425,74 @@ async def update_me_handyman(data: UpdateHandyman, request: Request, user=Depend
     return await update_handyman(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
+@app.get("/skills-catalog", tags=["Handymen"])
+async def get_skills_catalog_endpoint(
+    request: Request,
+    user=Depends(get_current_user),
+    active_only: bool = Query(True),
+):
+    require_role(user, ["user", "handyman", "admin"])
+    return await get_skills_catalog(
+        request_id=request.state.request_id,
+        user_payload=user,
+        active_only=active_only,
+    )
+
+
+@app.get("/skills-catalog/flat", response_model=SkillCatalogFlatResponse, tags=["Handymen"])
+async def get_skills_catalog_flat_endpoint(
+    request: Request,
+    user=Depends(get_current_user),
+    active_only: bool = Query(True),
+):
+    require_role(user, ["user", "handyman", "admin"])
+    return await get_skills_catalog_flat(
+        request_id=request.state.request_id,
+        user_payload=user,
+        active_only=active_only,
+    )
+
+
+@app.put("/admin/skills-catalog", tags=["Handymen"])
+async def replace_skills_catalog_endpoint(
+    data: SkillCatalogReplaceRequest,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    return await replace_skills_catalog(
+        data.model_dump(),
+        request_id=request.state.request_id,
+        user_payload=user,
+    )
+
+
+@app.patch("/admin/skills-catalog", tags=["Handymen"])
+async def patch_skills_catalog_endpoint(
+    data: SkillCatalogPatchRequest,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    return await patch_skills_catalog(
+        data.model_dump(),
+        request_id=request.state.request_id,
+        user_payload=user,
+    )
+
+
+@app.get("/admin/handymen/invalid-skills", response_model=InvalidHandymanSkillsResponse, tags=["Handymen"])
+async def invalid_handymen_skills_endpoint(
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["admin"])
+    return await get_handymen_with_invalid_skills(
+        request_id=request.state.request_id,
+        user_payload=user,
+    )
+
+
 @app.post("/availability/{email}", tags=["Availability"])
 async def set_availability_endpoint(email: str, data: SetAvailability, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])

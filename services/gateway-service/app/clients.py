@@ -166,6 +166,82 @@ async def update_handyman_location_and_fetch(email: str, data: dict, request_id:
     return await get_handyman(email, request_id, user_payload)
 
 
+async def get_skills_catalog(
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+    active_only: bool = True,
+):
+    active_q = "true" if active_only else "false"
+    return await _call_with_breaker(
+        cb_handyman,
+        "GET",
+        f"{HANDYMAN_SERVICE_URL}/skills-catalog?active_only={active_q}",
+        None,
+        request_id,
+        user_payload,
+    )
+
+
+async def get_skills_catalog_flat(
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+    active_only: bool = True,
+):
+    active_q = "true" if active_only else "false"
+    return await _call_with_breaker(
+        cb_handyman,
+        "GET",
+        f"{HANDYMAN_SERVICE_URL}/skills-catalog/flat?active_only={active_q}",
+        None,
+        request_id,
+        user_payload,
+    )
+
+
+async def replace_skills_catalog(
+    data: dict,
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+):
+    return await _call_with_breaker(
+        cb_handyman,
+        "PUT",
+        f"{HANDYMAN_SERVICE_URL}/admin/skills-catalog",
+        data,
+        request_id,
+        user_payload,
+    )
+
+
+async def patch_skills_catalog(
+    data: dict,
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+):
+    return await _call_with_breaker(
+        cb_handyman,
+        "PATCH",
+        f"{HANDYMAN_SERVICE_URL}/admin/skills-catalog",
+        data,
+        request_id,
+        user_payload,
+    )
+
+
+async def get_handymen_with_invalid_skills(
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+):
+    return await _call_with_breaker(
+        cb_handyman,
+        "GET",
+        f"{HANDYMAN_SERVICE_URL}/admin/handymen/invalid-skills",
+        None,
+        request_id,
+        user_payload,
+    )
+
+
 async def set_availability(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_availability, "POST", f"{AVAILABILITY_SERVICE_URL}/availability/{email}", data, request_id, user_payload)
 
