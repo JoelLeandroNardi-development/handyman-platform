@@ -289,6 +289,39 @@ async def cancel_booking(booking_id: str, data: dict, request_id: str | None = N
     return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings/{booking_id}/cancel", data, request_id, user_payload)
 
 
+async def complete_booking_as_user(booking_id: str, request_id: str | None = None, user_payload: dict | None = None):
+    return await _call_with_breaker(
+        cb_booking,
+        "POST",
+        f"{BOOKING_SERVICE_URL}/bookings/{booking_id}/complete/user",
+        None,
+        request_id,
+        user_payload,
+    )
+
+
+async def complete_booking_as_handyman(booking_id: str, request_id: str | None = None, user_payload: dict | None = None):
+    return await _call_with_breaker(
+        cb_booking,
+        "POST",
+        f"{BOOKING_SERVICE_URL}/bookings/{booking_id}/complete/handyman",
+        None,
+        request_id,
+        user_payload,
+    )
+
+
+async def reject_booking_completion(booking_id: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
+    return await _call_with_breaker(
+        cb_booking,
+        "POST",
+        f"{BOOKING_SERVICE_URL}/bookings/{booking_id}/reject",
+        data,
+        request_id,
+        user_payload,
+    )
+
+
 async def list_bookings(request_id: str | None = None, user_payload: dict | None = None, limit: int = 50, offset: int = 0, status: str | None = None, user_email: str | None = None, handyman_email: str | None = None):
     qs = f"limit={limit}&offset={offset}"
     if status:

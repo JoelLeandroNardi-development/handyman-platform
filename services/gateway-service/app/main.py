@@ -799,6 +799,52 @@ async def cancel_booking_endpoint(booking_id: str, data: CancelBookingRequest, r
     return await cancel_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
+@app.post("/bookings/{booking_id}/complete/user", response_model=CompleteBookingResponse, tags=["Bookings"])
+async def complete_booking_user_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["user", "admin"])
+
+    booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+    if not _has_role(user, "admin") and booking.get("user_email") != _user_email(user):
+        raise HTTPException(status_code=403, detail="Cannot complete another user's booking as user")
+
+    return await complete_booking_as_user(booking_id, request_id=request.state.request_id, user_payload=user)
+
+
+@app.post("/bookings/{booking_id}/complete/handyman", response_model=CompleteBookingResponse, tags=["Bookings"])
+async def complete_booking_handyman_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["handyman", "admin"])
+
+    booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+    if not _has_role(user, "admin") and booking.get("handyman_email") != _user_email(user):
+        raise HTTPException(status_code=403, detail="Cannot complete another handyman's booking as handyman")
+
+    return await complete_booking_as_handyman(booking_id, request_id=request.state.request_id, user_payload=user)
+
+
+@app.post("/bookings/{booking_id}/reject", response_model=RejectCompletionResponse, tags=["Bookings"])
+async def reject_booking_completion_endpoint(
+    booking_id: str,
+    data: RejectCompletionRequest,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["handyman", "admin"])
+
+    booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+    if not _has_role(user, "admin") and booking.get("handyman_email") != _user_email(user):
+        raise HTTPException(status_code=403, detail="Cannot reject completion for another handyman's booking")
+
+    return await reject_booking_completion(
+        booking_id,
+        data.model_dump(),
+        request_id=request.state.request_id,
+        user_payload=user,
+    )
+
+
 @app.get("/me/bookings", response_model=List[BookingResponse], tags=["Bookings"])
 async def get_my_bookings(
     request: Request,

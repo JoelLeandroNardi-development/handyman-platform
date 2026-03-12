@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON
+from sqlalchemy import Column, Integer, String, DateTime, JSON, Boolean
 from sqlalchemy.sql import func
 
 from .db import Base
@@ -23,6 +23,13 @@ class Booking(Base):
 
     canceled_at = Column(DateTime(timezone=True), nullable=True)
     cancellation_reason = Column(String, nullable=True)
+
+    completed_by_user = Column(Boolean, nullable=False, default=False)
+    completed_by_handyman = Column(Boolean, nullable=False, default=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    completion_rejected_by_handyman = Column(Boolean, nullable=False, default=False)
+    completion_rejection_reason = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
