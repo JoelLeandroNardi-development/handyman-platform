@@ -30,11 +30,21 @@ router = APIRouter()
 def _to_response(h: Handyman) -> HandymanResponse:
     return HandymanResponse(
         email=h.email,
+        first_name=h.first_name,
+        last_name=h.last_name,
+        phone=h.phone,
+        national_id=h.national_id,
+        address_line=h.address_line,
+        postal_code=h.postal_code,
+        city=h.city,
+        country=h.country,
         skills=list(h.skills or []),
         years_experience=h.years_experience,
         service_radius_km=h.service_radius_km,
         latitude=h.latitude,
         longitude=h.longitude,
+        avg_rating=float(h.avg_rating or 0),
+        rating_count=int(h.rating_count or 0),
         created_at=h.created_at,
     )
 
@@ -62,7 +72,7 @@ async def replace_skills_catalog(data: SkillCatalogReplaceRequest):
 
 
 @router.patch("/admin/skills-catalog")
-async def patch_skills_catalog(data: SkillCatalogPatchRequest):
+async def patch_skills_catalog_endpoint(data: SkillCatalogPatchRequest):
     return await patch_catalog(data.model_dump())
 
 
@@ -91,11 +101,21 @@ async def create_handyman(data: CreateHandyman):
 
         h = Handyman(
             email=data.email,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            phone=data.phone,
+            national_id=data.national_id,
+            address_line=data.address_line,
+            postal_code=data.postal_code,
+            city=data.city,
+            country=data.country,
             skills=normalized_skills,
             years_experience=data.years_experience,
             service_radius_km=data.service_radius_km,
             latitude=data.latitude,
             longitude=data.longitude,
+            avg_rating=0,
+            rating_count=0,
         )
         db.add(h)
 
@@ -103,11 +123,21 @@ async def create_handyman(data: CreateHandyman):
             "handyman.created",
             {
                 "email": data.email,
+                "first_name": data.first_name,
+                "last_name": data.last_name,
+                "phone": data.phone,
+                "national_id": data.national_id,
+                "address_line": data.address_line,
+                "postal_code": data.postal_code,
+                "city": data.city,
+                "country": data.country,
                 "skills": normalized_skills,
                 "years_experience": data.years_experience,
                 "service_radius_km": data.service_radius_km,
                 "latitude": data.latitude,
                 "longitude": data.longitude,
+                "avg_rating": 0,
+                "rating_count": 0,
             },
         )
 
@@ -189,6 +219,23 @@ async def update_handyman(email: str, data: UpdateHandyman):
         if not h:
             raise HTTPException(status_code=404, detail="Handyman not found")
 
+        if data.first_name is not None:
+            h.first_name = data.first_name
+        if data.last_name is not None:
+            h.last_name = data.last_name
+        if data.phone is not None:
+            h.phone = data.phone
+        if data.national_id is not None:
+            h.national_id = data.national_id
+        if data.address_line is not None:
+            h.address_line = data.address_line
+        if data.postal_code is not None:
+            h.postal_code = data.postal_code
+        if data.city is not None:
+            h.city = data.city
+        if data.country is not None:
+            h.country = data.country
+
         if data.skills is not None:
             normalized_skills = normalize_skills_input(data.skills)
             invalid_skills = await find_invalid_skills(normalized_skills)
@@ -215,11 +262,21 @@ async def update_handyman(email: str, data: UpdateHandyman):
             "handyman.updated",
             {
                 "email": h.email,
+                "first_name": h.first_name,
+                "last_name": h.last_name,
+                "phone": h.phone,
+                "national_id": h.national_id,
+                "address_line": h.address_line,
+                "postal_code": h.postal_code,
+                "city": h.city,
+                "country": h.country,
                 "skills": list(h.skills or []),
                 "years_experience": h.years_experience,
                 "service_radius_km": h.service_radius_km,
                 "latitude": h.latitude,
                 "longitude": h.longitude,
+                "avg_rating": float(h.avg_rating or 0),
+                "rating_count": int(h.rating_count or 0),
             },
         )
 

@@ -9,3 +9,4 @@ class MatchLog(Base):
     user_latitude = Column(Float, nullable=False)
     user_longitude = Column(Float, nullable=False)
     skill = Column(String, nullable=False)
+    job_description = Column(String, nullable=True)

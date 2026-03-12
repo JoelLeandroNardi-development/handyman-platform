@@ -110,6 +110,22 @@ def _has_role(payload: dict, role: str) -> bool:
     return role.lower() in {str(r).lower() for r in roles}
 
 
+def _auth_user_has_any_role(auth_user: dict, allowed_roles: list[str]) -> bool:
+    roles = {str(r).lower() for r in (auth_user.get("roles") or [])}
+    allowed = {str(r).lower() for r in allowed_roles}
+    return not roles.isdisjoint(allowed)
+
+
+async def _get_auth_user_after_register(email: str, request_id: str) -> dict:
+    try:
+        return await get_auth_user_by_email(email, request_id=request_id, user_payload=None)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Auth user was registered but could not be fetched afterwards. status={e.status_code}"
+        )
+
+
 async def _booking_owned_or_admin(booking_id: str, payload: dict, request_id: str) -> dict:
     booking = await get_booking(booking_id, request_id=request_id, user_payload=payload)
 
@@ -285,6 +301,154 @@ async def admin_delete_auth_user(user_id: int, request: Request, user=Depends(ge
     return await delete_auth_user(user_id, request_id=request.state.request_id, user_payload=user)
 
 
+@app.post("/onboarding/user", response_model=OnboardingUserResponse, tags=["Auth"])
+async def onboarding_user(data: OnboardingUserRequest, request: Request):
+    await register_user(
+        {
+            "email": data.email,
+            "password": data.password,
+            "roles": list(dict.fromkeys([*(data.roles or []), "user"])),
+        },
+        request_id=request.state.request_id,
+    )
+
+    auth_user = await _get_auth_user_after_register(data.email, request.state.request_id)
+
+    if not _auth_user_has_any_role(auth_user, ["user", "admin"]):
+        raise HTTPException(status_code=422, detail="Auth user must have role user or admin")
+
+    user_profile = await create_user(
+        {
+            "email": data.email,
+            "first_name": data.first_name,
+            "last_name": data.last_name,
+            "phone": data.phone,
+            "national_id": data.national_id,
+            "address_line": data.address_line,
+            "postal_code": data.postal_code,
+            "city": data.city,
+            "country": data.country,
+            "latitude": data.latitude,
+            "longitude": data.longitude,
+        },
+        request_id=request.state.request_id,
+        user_payload=None,
+    )
+
+    return {
+        "auth_user": auth_user,
+        "user_profile": user_profile,
+    }
+
+
+@app.post("/onboarding/handyman", response_model=OnboardingHandymanResponse, tags=["Auth"])
+async def onboarding_handyman(data: OnboardingHandymanRequest, request: Request):
+    await register_user(
+        {
+            "email": data.email,
+            "password": data.password,
+            "roles": list(dict.fromkeys([*(data.roles or []), "handyman"])),
+        },
+        request_id=request.state.request_id,
+    )
+
+    auth_user = await _get_auth_user_after_register(data.email, request.state.request_id)
+
+    if not _auth_user_has_any_role(auth_user, ["handyman", "admin"]):
+        raise HTTPException(status_code=422, detail="Auth user must have role handyman or admin")
+
+    handyman_profile = await create_handyman(
+        {
+            "email": data.email,
+            "first_name": data.first_name,
+            "last_name": data.last_name,
+            "phone": data.phone,
+            "national_id": data.national_id,
+            "address_line": data.address_line,
+            "postal_code": data.postal_code,
+            "city": data.city,
+            "country": data.country,
+            "skills": data.skills,
+            "years_experience": data.years_experience,
+            "service_radius_km": data.service_radius_km,
+            "latitude": data.latitude,
+            "longitude": data.longitude,
+        },
+        request_id=request.state.request_id,
+        user_payload=None,
+    )
+
+    return {
+        "auth_user": auth_user,
+        "handyman_profile": handyman_profile,
+    }
+
+
+@app.post("/onboarding/combined", response_model=OnboardingCombinedResponse, tags=["Auth"])
+async def onboarding_combined(data: OnboardingCombinedRequest, request: Request):
+    await register_user(
+        {
+            "email": data.email,
+            "password": data.password,
+            "roles": list(dict.fromkeys([*(data.roles or []), "user", "handyman"])),
+        },
+        request_id=request.state.request_id,
+    )
+
+    auth_user = await _get_auth_user_after_register(data.email, request.state.request_id)
+
+    if not _auth_user_has_any_role(auth_user, ["user", "admin"]):
+        raise HTTPException(status_code=422, detail="Auth user must have role user or admin")
+
+    if not _auth_user_has_any_role(auth_user, ["handyman", "admin"]):
+        raise HTTPException(status_code=422, detail="Auth user must have role handyman or admin")
+
+    user_profile = await create_user(
+        {
+            "email": data.email,
+            "first_name": data.user_profile.first_name,
+            "last_name": data.user_profile.last_name,
+            "phone": data.user_profile.phone,
+            "national_id": data.user_profile.national_id,
+            "address_line": data.user_profile.address_line,
+            "postal_code": data.user_profile.postal_code,
+            "city": data.user_profile.city,
+            "country": data.user_profile.country,
+            "latitude": data.user_profile.latitude,
+            "longitude": data.user_profile.longitude,
+        },
+        request_id=request.state.request_id,
+        user_payload=None,
+    )
+
+    handyman_profile = await create_handyman(
+        {
+            "email": data.email,
+            "first_name": data.handyman_profile.first_name,
+            "last_name": data.handyman_profile.last_name,
+            "phone": data.handyman_profile.phone,
+            "national_id": data.handyman_profile.national_id,
+            "address_line": data.handyman_profile.address_line,
+            "postal_code": data.handyman_profile.postal_code,
+            "city": data.handyman_profile.city,
+            "country": data.handyman_profile.country,
+            "skills": data.handyman_profile.skills,
+            "years_experience": data.handyman_profile.years_experience,
+            "service_radius_km": data.handyman_profile.service_radius_km,
+            "latitude": data.handyman_profile.latitude,
+            "longitude": data.handyman_profile.longitude,
+        },
+        request_id=request.state.request_id,
+        user_payload=None,
+    )
+
+    return {
+        "auth_user": auth_user,
+        "user_profile": user_profile,
+        "handyman_profile": handyman_profile,
+    }
+
+
 @app.get("/me", response_model=MeResponse, tags=["Auth"])
 async def get_me(request: Request, user=Depends(get_current_user)):
     email = _user_email(user)
@@ -318,6 +482,17 @@ async def get_me(request: Request, user=Depends(get_current_user)):
 @app.post("/users", tags=["Users"])
 async def create_user_endpoint(data: CreateUser, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
+
+    try:
+        auth_user = await get_auth_user_by_email(data.email, request_id=request.state.request_id, user_payload=user)
+    except HTTPException as e:
+        if e.status_code == 404:
+            raise HTTPException(status_code=422, detail="Auth user must exist before creating user profile")
+        raise
+
+    if not _auth_user_has_any_role(auth_user, ["user", "admin"]):
+        raise HTTPException(status_code=422, detail="Auth user must have role user or admin")
+
     return await create_user(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
@@ -384,6 +559,17 @@ async def list_handymen_endpoint(
 @app.post("/handymen", tags=["Handymen"])
 async def create_handyman_endpoint(data: CreateHandyman, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
+
+    try:
+        auth_user = await get_auth_user_by_email(data.email, request_id=request.state.request_id, user_payload=user)
+    except HTTPException as e:
+        if e.status_code == 404:
+            raise HTTPException(status_code=422, detail="Auth user must exist before creating handyman profile")
+        raise
+
+    if not _auth_user_has_any_role(auth_user, ["handyman", "admin"]):
+        raise HTTPException(status_code=422, detail="Auth user must have role handyman or admin")
+
     return await create_handyman(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 

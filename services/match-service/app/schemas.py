@@ -7,6 +7,7 @@ class MatchRequest(BaseModel):
     latitude: float
     longitude: float
     skill: str
+    job_description: Optional[str] = None
     desired_start: datetime
     desired_end: datetime
 
@@ -25,9 +26,11 @@ class MatchLogResponse(BaseModel):
     user_latitude: float
     user_longitude: float
     skill: str
+    job_description: Optional[str] = None
 
 
 class UpdateMatchLog(BaseModel):
     user_latitude: Optional[float] = None
     user_longitude: Optional[float] = None
     skill: Optional[str] = None
+    job_description: Optional[str] = None

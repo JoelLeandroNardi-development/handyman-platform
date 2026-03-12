@@ -59,7 +59,14 @@ class UpdateAuthUser(BaseModel):
 
 class CreateUser(BaseModel):
     email: str
-    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -70,14 +77,28 @@ class UpdateUserLocation(BaseModel):
 
 
 class UpdateUser(BaseModel):
-    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
 
 class UserResponse(BaseModel):
     email: str
-    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     created_at: datetime
@@ -85,6 +106,14 @@ class UserResponse(BaseModel):
 
 class CreateHandyman(BaseModel):
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     skills: List[str]
     years_experience: int
     service_radius_km: int
@@ -98,6 +127,14 @@ class UpdateHandymanLocation(BaseModel):
 
 
 class UpdateHandyman(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     skills: Optional[List[str]] = None
     years_experience: Optional[int] = None
     service_radius_km: Optional[int] = None
@@ -107,12 +144,82 @@ class UpdateHandyman(BaseModel):
 
 class HandymanResponse(BaseModel):
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     skills: List[str]
     years_experience: int
     service_radius_km: int
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    avg_rating: float = 0
+    rating_count: int = 0
     created_at: datetime
+
+
+class OnboardingUserRequest(BaseModel):
+    email: str
+    password: str
+    roles: List[str] = Field(default_factory=lambda: ["user"])
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class OnboardingHandymanRequest(BaseModel):
+    email: str
+    password: str
+    roles: List[str] = Field(default_factory=lambda: ["handyman"])
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    skills: List[str]
+    years_experience: int
+    service_radius_km: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class OnboardingCombinedRequest(BaseModel):
+    email: str
+    password: str
+    roles: List[str] = Field(default_factory=lambda: ["user", "handyman"])
+
+    user_profile: CreateUser
+    handyman_profile: CreateHandyman
+
+
+class OnboardingUserResponse(BaseModel):
+    auth_user: AuthUserResponse
+    user_profile: UserResponse
+
+
+class OnboardingHandymanResponse(BaseModel):
+    auth_user: AuthUserResponse
+    handyman_profile: HandymanResponse
+
+
+class OnboardingCombinedResponse(BaseModel):
+    auth_user: AuthUserResponse
+    user_profile: UserResponse
+    handyman_profile: HandymanResponse
 
 
 class SkillCatalogReplaceRequest(BaseModel):
@@ -172,6 +279,7 @@ class MatchRequest(BaseModel):
     latitude: float
     longitude: float
     skill: str
+    job_description: Optional[str] = None
     desired_start: datetime
     desired_end: datetime
 
@@ -190,6 +298,7 @@ class CreateBookingRequest(BaseModel):
     handyman_email: str
     desired_start: datetime
     desired_end: datetime
+    job_description: Optional[str] = None
 
 
 class BookingResponse(BaseModel):
@@ -199,6 +308,7 @@ class BookingResponse(BaseModel):
     handyman_email: str
     desired_start: datetime
     desired_end: datetime
+    job_description: Optional[str] = None
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
 
@@ -222,6 +332,7 @@ class UpdateBookingAdmin(BaseModel):
     status: Optional[str] = None
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
+    job_description: Optional[str] = None
 
 
 class MeResponse(BaseModel):

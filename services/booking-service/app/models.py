@@ -16,6 +16,8 @@ class Booking(Base):
     desired_start = Column(DateTime(timezone=True), nullable=False)
     desired_end = Column(DateTime(timezone=True), nullable=False)
 
+    job_description = Column(String, nullable=True)
+
     status = Column(String, nullable=False, default="PENDING")
     failure_reason = Column(String, nullable=True)
 

@@ -5,6 +5,14 @@ from datetime import datetime
 
 class CreateHandyman(BaseModel):
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     skills: List[str]
     years_experience: int
     service_radius_km: int
@@ -18,6 +26,14 @@ class UpdateLocation(BaseModel):
 
 
 class UpdateHandyman(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     skills: Optional[List[str]] = None
     years_experience: Optional[int] = None
     service_radius_km: Optional[int] = None
@@ -27,11 +43,21 @@ class UpdateHandyman(BaseModel):
 
 class HandymanResponse(BaseModel):
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    national_id: Optional[str] = None
+    address_line: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     skills: List[str]
     years_experience: int
     service_radius_km: int
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    avg_rating: float
+    rating_count: int
     created_at: datetime
 
 

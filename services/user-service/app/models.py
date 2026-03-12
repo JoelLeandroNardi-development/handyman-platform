@@ -10,7 +10,16 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, index=True, nullable=False)
 
-    full_name = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    national_id = Column(String, nullable=True)
+
+    address_line = Column(String, nullable=True)
+    postal_code = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
 
@@ -22,9 +31,9 @@ class OutboxEvent(Base):
 
     id = Column(Integer, primary_key=True)
 
-    event_id = Column(String, unique=True, index=True, nullable=False)
-    event_type = Column(String, index=True, nullable=False)
-    routing_key = Column(String, index=True, nullable=False)
+    event_id = Column(String, unique=True, nullable=False, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    routing_key = Column(String, nullable=False, index=True)
 
     payload = Column(JSON, nullable=False)
 

@@ -10,6 +10,16 @@ class Handyman(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, index=True, nullable=False)
 
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    national_id = Column(String, nullable=True)
+
+    address_line = Column(String, nullable=True)
+    postal_code = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+
     skills = Column(JSON, nullable=False)
 
     years_experience = Column(Integer, nullable=False)
@@ -17,6 +27,9 @@ class Handyman(Base):
 
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+
+    avg_rating = Column(Float, nullable=False, default=0)
+    rating_count = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

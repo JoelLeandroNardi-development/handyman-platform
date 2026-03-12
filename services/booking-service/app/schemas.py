@@ -8,6 +8,7 @@ class CreateBooking(BaseModel):
     handyman_email: str
     desired_start: datetime
     desired_end: datetime
+    job_description: Optional[str] = None
 
 
 class BookingResponse(BaseModel):
@@ -17,6 +18,7 @@ class BookingResponse(BaseModel):
     handyman_email: str
     desired_start: datetime
     desired_end: datetime
+    job_description: Optional[str] = None
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
 
@@ -40,3 +42,4 @@ class UpdateBookingAdmin(BaseModel):
     status: Optional[str] = None
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
+    job_description: Optional[str] = None

@@ -10,7 +10,7 @@ from .models import MatchLog
 from .schemas import MatchRequest, MatchLogResponse, UpdateMatchLog
 from .services import (
     haversine,
-    get_effective_handymen_for_skill,
+    get_live_handymen_for_skill,
     get_effective_availability_slots,
     projected_has_overlap,
     projections_have_any_availability,
@@ -35,6 +35,7 @@ def _log_to_response(row: MatchLog) -> MatchLogResponse:
         user_latitude=row.user_latitude,
         user_longitude=row.user_longitude,
         skill=row.skill,
+        job_description=row.job_description,
     )
 
 
@@ -62,12 +63,12 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     if cached:
         try:
             parsed = json.loads(cached)
-            if isinstance(parsed, list):
+            if isinstance(parsed, list) and parsed:
                 return parsed
         except Exception:
             pass
 
-    handymen, handyman_source = await get_effective_handymen_for_skill(requested_skill)
+    handymen = await get_live_handymen_for_skill(requested_skill)
 
     results: list[dict] = []
 
@@ -85,7 +86,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
         if distance > float(h.get("service_radius_km") or 0):
             continue
 
-        slots, availability_source = await get_effective_availability_slots(h["email"])
+        slots, source = await get_effective_availability_slots(h["email"])
 
         if slots is None:
             availability_unknown = True
@@ -105,8 +106,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
                 "distance_km": round(distance, 2),
                 "years_experience": h.get("years_experience"),
                 "availability_unknown": availability_unknown,
-                "availability_source": availability_source,
-                "handyman_source": handyman_source,
+                "availability_source": source,
             }
         )
 
@@ -116,21 +116,23 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
     ttl = 15 if degraded else 60
     b_lat, b_lon = bucket_id(data.latitude, data.longitude)
 
-    await set_cache_with_index(
-        cache_key_str=key,
-        value=json.dumps(results),
-        ttl_seconds=ttl,
-        mode=mode,
-        skill=requested_skill,
-        b_lat=b_lat,
-        b_lon=b_lon,
-    )
+    if results:
+        await set_cache_with_index(
+            cache_key_str=key,
+            value=json.dumps(results),
+            ttl_seconds=ttl,
+            mode=mode,
+            skill=requested_skill,
+            b_lat=b_lat,
+            b_lon=b_lon,
+        )
 
     db.add(
         MatchLog(
             user_latitude=data.latitude,
             user_longitude=data.longitude,
             skill=requested_skill,
+            job_description=data.job_description,
         )
     )
     await db.commit()
@@ -176,6 +178,8 @@ async def update_match_log(log_id: int, data: UpdateMatchLog, db: AsyncSession =
         row.user_longitude = data.user_longitude
     if data.skill is not None:
         row.skill = norm(data.skill)
+    if data.job_description is not None:
+        row.job_description = data.job_description
 
     await db.commit()
     await db.refresh(row)

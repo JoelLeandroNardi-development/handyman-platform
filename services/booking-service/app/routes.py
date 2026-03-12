@@ -27,6 +27,7 @@ def _to_response(booking: Booking) -> BookingResponse:
         handyman_email=booking.handyman_email,
         desired_start=booking.desired_start,
         desired_end=booking.desired_end,
+        job_description=booking.job_description,
         failure_reason=booking.failure_reason,
         cancellation_reason=booking.cancellation_reason,
     )
@@ -44,6 +45,7 @@ async def create_booking(data: CreateBooking):
             "handyman_email": data.handyman_email,
             "desired_start": data.desired_start,
             "desired_end": data.desired_end,
+            "job_description": data.job_description,
         },
     )
 
@@ -54,6 +56,7 @@ async def create_booking(data: CreateBooking):
             handyman_email=data.handyman_email,
             desired_start=data.desired_start,
             desired_end=data.desired_end,
+            job_description=data.job_description,
             status="PENDING",
         )
         db.add(booking)
@@ -77,6 +80,7 @@ async def create_booking(data: CreateBooking):
         handyman_email=data.handyman_email,
         desired_start=data.desired_start,
         desired_end=data.desired_end,
+        job_description=data.job_description,
         failure_reason=None,
         cancellation_reason=None,
     )
@@ -213,6 +217,8 @@ async def admin_update_booking(booking_id: str, data: UpdateBookingAdmin):
             booking.failure_reason = data.failure_reason
         if data.cancellation_reason is not None:
             booking.cancellation_reason = data.cancellation_reason
+        if data.job_description is not None:
+            booking.job_description = data.job_description
 
         await db.commit()
         await db.refresh(booking)
