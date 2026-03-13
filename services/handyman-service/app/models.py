@@ -34,6 +34,21 @@ class Handyman(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class HandymanReview(Base):
+    __tablename__ = "handyman_reviews"
+
+    id = Column(Integer, primary_key=True)
+
+    booking_id = Column(String, unique=True, index=True, nullable=False)
+    handyman_email = Column(String, index=True, nullable=False)
+    user_email = Column(String, index=True, nullable=False)
+
+    rating = Column(Integer, nullable=False)
+    review_text = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class SkillsCategory(Base):
     __tablename__ = "skills_categories"
 

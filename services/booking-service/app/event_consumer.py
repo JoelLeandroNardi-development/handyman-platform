@@ -54,7 +54,7 @@ async def process_event(payload: dict):
                 booking.status = "EXPIRED"
 
         elif event_type == "slot.released":
-            if booking.status != "CANCELED":
+            if booking.status not in ("CANCELED", "REJECTED"):
                 booking.status = "CANCELED"
                 booking.cancellation_reason = booking.cancellation_reason or "released"
 

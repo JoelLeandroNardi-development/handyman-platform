@@ -354,6 +354,21 @@ class RejectBookingResponse(BaseModel):
     completed_by_handyman: bool = False
 
 
+class CreateHandymanReviewRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    review_text: Optional[str] = Field(default=None, max_length=2000)
+
+
+class HandymanReviewResponse(BaseModel):
+    id: int
+    booking_id: str
+    handyman_email: str
+    user_email: str
+    rating: int
+    review_text: Optional[str] = None
+    created_at: datetime
+
+
 class UpdateBookingAdmin(BaseModel):
     status: Optional[str] = None
     failure_reason: Optional[str] = None

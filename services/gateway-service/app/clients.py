@@ -242,6 +242,38 @@ async def get_handymen_with_invalid_skills(
     )
 
 
+async def create_handyman_review(
+    data: dict,
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+):
+    return await _call_with_breaker(
+        cb_handyman,
+        "POST",
+        f"{HANDYMAN_SERVICE_URL}/handymen/reviews",
+        data,
+        request_id,
+        user_payload,
+    )
+
+
+async def list_handyman_reviews(
+    email: str,
+    request_id: str | None = None,
+    user_payload: dict | None = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    return await _call_with_breaker(
+        cb_handyman,
+        "GET",
+        f"{HANDYMAN_SERVICE_URL}/handymen/{email}/reviews?limit={limit}&offset={offset}",
+        None,
+        request_id,
+        user_payload,
+    )
+
+
 async def set_availability(email: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(cb_availability, "POST", f"{AVAILABILITY_SERVICE_URL}/availability/{email}", data, request_id, user_payload)
 

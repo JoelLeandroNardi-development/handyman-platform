@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 
 from .db import SessionLocal
-from .models import Handyman, OutboxEvent
+from .models import Handyman, HandymanReview, OutboxEvent
 from .schemas import (
     CreateHandyman,
     UpdateLocation,
@@ -12,6 +12,8 @@ from .schemas import (
     SkillCatalogPatchRequest,
     SkillCatalogFlatResponse,
     InvalidHandymanSkillsResponse,
+    CreateHandymanReview,
+    HandymanReviewResponse,
 )
 from .events import build_event
 from .skills_catalog import (
@@ -47,6 +49,36 @@ def _to_response(h: Handyman) -> HandymanResponse:
         rating_count=int(h.rating_count or 0),
         created_at=h.created_at,
     )
+
+
+def _review_to_response(r: HandymanReview) -> HandymanReviewResponse:
+    return HandymanReviewResponse(
+        id=r.id,
+        booking_id=r.booking_id,
+        handyman_email=r.handyman_email,
+        user_email=r.user_email,
+        rating=r.rating,
+        review_text=r.review_text,
+        created_at=r.created_at,
+    )
+
+
+async def _refresh_handyman_rating(db, handyman_email: str) -> None:
+    res = await db.execute(
+        select(
+            func.count(HandymanReview.id),
+            func.avg(HandymanReview.rating),
+        ).where(HandymanReview.handyman_email == handyman_email)
+    )
+    count_value, avg_value = res.one()
+
+    handyman_res = await db.execute(select(Handyman).where(Handyman.email == handyman_email))
+    handyman = handyman_res.scalar_one_or_none()
+    if handyman is None:
+        return
+
+    handyman.rating_count = int(count_value or 0)
+    handyman.avg_rating = round(float(avg_value or 0), 2)
 
 
 @router.get("/skills-catalog")
@@ -319,3 +351,59 @@ async def delete_handyman(email: str):
         await db.commit()
 
         return {"message": "deleted", "email": email}
+
+
+@router.post("/handymen/reviews", response_model=HandymanReviewResponse)
+async def create_handyman_review(data: CreateHandymanReview):
+    async with SessionLocal() as db:
+        handyman_res = await db.execute(select(Handyman).where(Handyman.email == data.handyman_email))
+        handyman = handyman_res.scalar_one_or_none()
+        if handyman is None:
+            raise HTTPException(status_code=404, detail="Handyman not found")
+
+        existing_res = await db.execute(
+            select(HandymanReview).where(HandymanReview.booking_id == data.booking_id)
+        )
+        existing = existing_res.scalar_one_or_none()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Review already exists for this booking")
+
+        review = HandymanReview(
+            booking_id=data.booking_id,
+            handyman_email=data.handyman_email,
+            user_email=data.user_email,
+            rating=data.rating,
+            review_text=data.review_text,
+        )
+        db.add(review)
+        await db.flush()
+
+        await _refresh_handyman_rating(db, data.handyman_email)
+
+        await db.commit()
+        await db.refresh(review)
+
+        return _review_to_response(review)
+
+
+@router.get("/handymen/{email}/reviews", response_model=list[HandymanReviewResponse])
+async def list_handyman_reviews(
+    email: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    async with SessionLocal() as db:
+        handyman_res = await db.execute(select(Handyman).where(Handyman.email == email))
+        handyman = handyman_res.scalar_one_or_none()
+        if handyman is None:
+            raise HTTPException(status_code=404, detail="Handyman not found")
+
+        res = await db.execute(
+            select(HandymanReview)
+            .where(HandymanReview.handyman_email == email)
+            .order_by(HandymanReview.created_at.desc(), HandymanReview.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        rows = res.scalars().all()
+        return [_review_to_response(r) for r in rows]

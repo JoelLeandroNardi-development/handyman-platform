@@ -12,10 +12,10 @@ from .schemas import (
     CancelBooking,
     CancelBookingResponse,
     ConfirmBookingResponse,
+    UpdateBookingAdmin,
     CompleteBookingResponse,
     RejectBookingRequest,
     RejectBookingResponse,
-    UpdateBookingAdmin,
 )
 from .events import build_event
 
@@ -38,16 +38,6 @@ def _to_response(booking: Booking) -> BookingResponse:
         rejection_reason=booking.rejection_reason,
         failure_reason=booking.failure_reason,
         cancellation_reason=booking.cancellation_reason,
-    )
-
-
-def _complete_response(booking: Booking) -> CompleteBookingResponse:
-    return CompleteBookingResponse(
-        booking_id=booking.booking_id,
-        status=booking.status,
-        completed_by_user=bool(booking.completed_by_user),
-        completed_by_handyman=bool(booking.completed_by_handyman),
-        completed_at=booking.completed_at,
     )
 
 
@@ -140,6 +130,7 @@ async def confirm_booking(booking_id: str):
                 "handyman_email": booking.handyman_email,
                 "desired_start": booking.desired_start,
                 "desired_end": booking.desired_end,
+                "job_description": booking.job_description,
             },
         )
 
@@ -183,6 +174,7 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
                 "handyman_email": booking.handyman_email,
                 "desired_start": booking.desired_start,
                 "desired_end": booking.desired_end,
+                "job_description": booking.job_description,
                 "reason": booking.cancellation_reason,
             },
         )
@@ -214,21 +206,25 @@ async def complete_booking_as_user(booking_id: str):
         if not booking:
             raise HTTPException(status_code=404, detail="Booking not found")
 
-        if booking.status not in ("CONFIRMED", "COMPLETED"):
+        if booking.status != "CONFIRMED":
             raise HTTPException(status_code=400, detail=f"Cannot complete booking in status {booking.status}")
 
         booking.completed_by_user = True
-        booking.rejected_by_handyman = False
-        booking.rejection_reason = None
 
         if booking.completed_by_user and booking.completed_by_handyman:
             booking.status = "COMPLETED"
-            if booking.completed_at is None:
-                booking.completed_at = datetime.now(timezone.utc)
+            booking.completed_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(booking)
-        return _complete_response(booking)
+
+        return CompleteBookingResponse(
+            booking_id=booking.booking_id,
+            status=booking.status,
+            completed_by_user=bool(booking.completed_by_user),
+            completed_by_handyman=bool(booking.completed_by_handyman),
+            completed_at=booking.completed_at,
+        )
 
 
 @router.post("/bookings/{booking_id}/complete/handyman", response_model=CompleteBookingResponse)
@@ -239,21 +235,25 @@ async def complete_booking_as_handyman(booking_id: str):
         if not booking:
             raise HTTPException(status_code=404, detail="Booking not found")
 
-        if booking.status not in ("CONFIRMED", "COMPLETED"):
+        if booking.status != "CONFIRMED":
             raise HTTPException(status_code=400, detail=f"Cannot complete booking in status {booking.status}")
 
         booking.completed_by_handyman = True
-        booking.rejected_by_handyman = False
-        booking.rejection_reason = None
 
         if booking.completed_by_user and booking.completed_by_handyman:
             booking.status = "COMPLETED"
-            if booking.completed_at is None:
-                booking.completed_at = datetime.now(timezone.utc)
+            booking.completed_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(booking)
-        return _complete_response(booking)
+
+        return CompleteBookingResponse(
+            booking_id=booking.booking_id,
+            status=booking.status,
+            completed_by_user=bool(booking.completed_by_user),
+            completed_by_handyman=bool(booking.completed_by_handyman),
+            completed_at=booking.completed_at,
+        )
 
 
 @router.post("/bookings/{booking_id}/reject", response_model=RejectBookingResponse)
@@ -270,9 +270,6 @@ async def reject_booking(booking_id: str, data: RejectBookingRequest):
         booking.status = "REJECTED"
         booking.rejected_by_handyman = True
         booking.rejection_reason = data.reason
-        booking.completed_by_user = False
-        booking.completed_by_handyman = False
-        booking.completed_at = None
 
         await db.commit()
         await db.refresh(booking)

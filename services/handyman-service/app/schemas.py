@@ -103,3 +103,21 @@ class InvalidHandymanSkillsItem(BaseModel):
 class InvalidHandymanSkillsResponse(BaseModel):
     items: List[InvalidHandymanSkillsItem]
     count: int
+
+
+class CreateHandymanReview(BaseModel):
+    booking_id: str
+    handyman_email: str
+    user_email: str
+    rating: int = Field(..., ge=1, le=5)
+    review_text: Optional[str] = Field(default=None, max_length=2000)
+
+
+class HandymanReviewResponse(BaseModel):
+    id: int
+    booking_id: str
+    handyman_email: str
+    user_email: str
+    rating: int
+    review_text: Optional[str] = None
+    created_at: datetime

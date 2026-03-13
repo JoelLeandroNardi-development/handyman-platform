@@ -611,6 +611,24 @@ async def update_me_handyman(data: UpdateHandyman, request: Request, user=Depend
     return await update_handyman(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
+@app.get("/handymen/{email}/reviews", response_model=List[HandymanReviewResponse], tags=["Handymen"])
+async def list_handyman_reviews_endpoint(
+    email: str,
+    request: Request,
+    user=Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    require_role(user, ["user", "handyman", "admin"])
+    return await list_handyman_reviews(
+        email,
+        request_id=request.state.request_id,
+        user_payload=user,
+        limit=limit,
+        offset=offset,
+    )
+
+
 @app.get("/skills-catalog", tags=["Handymen"])
 async def get_skills_catalog_endpoint(
     request: Request,
@@ -839,6 +857,36 @@ async def reject_booking_completion_endpoint(
     return await reject_booking(
         booking_id,
         data.model_dump(),
+        request_id=request.state.request_id,
+        user_payload=user,
+    )
+
+
+@app.post("/bookings/{booking_id}/review", response_model=HandymanReviewResponse, tags=["Bookings"])
+async def create_booking_review_endpoint(
+    booking_id: str,
+    data: CreateHandymanReviewRequest,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    require_role(user, ["user", "admin"])
+
+    booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+    if booking.get("status") != "COMPLETED":
+        raise HTTPException(status_code=400, detail="Can only review completed bookings")
+
+    if not _has_role(user, "admin") and booking.get("user_email") != _user_email(user):
+        raise HTTPException(status_code=403, detail="Cannot review another user's booking")
+
+    return await create_handyman_review(
+        {
+            "booking_id": booking_id,
+            "handyman_email": booking.get("handyman_email"),
+            "user_email": booking.get("user_email"),
+            "rating": data.rating,
+            "review_text": data.review_text,
+        },
         request_id=request.state.request_id,
         user_payload=user,
     )
