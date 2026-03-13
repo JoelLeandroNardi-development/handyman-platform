@@ -311,7 +311,7 @@ async def complete_booking_as_handyman(booking_id: str, request_id: str | None =
     )
 
 
-async def reject_booking_completion(booking_id: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
+async def reject_booking(booking_id: str, data: dict, request_id: str | None = None, user_payload: dict | None = None):
     return await _call_with_breaker(
         cb_booking,
         "POST",

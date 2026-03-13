@@ -22,8 +22,8 @@ class BookingResponse(BaseModel):
     completed_by_user: bool = False
     completed_by_handyman: bool = False
     completed_at: Optional[datetime] = None
-    completion_rejected_by_handyman: bool = False
-    completion_rejection_reason: Optional[str] = None
+    rejected_by_handyman: bool = False
+    rejection_reason: Optional[str] = None
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
 
@@ -51,15 +51,15 @@ class CompleteBookingResponse(BaseModel):
     completed_at: Optional[datetime] = None
 
 
-class RejectCompletionRequest(BaseModel):
+class RejectBookingRequest(BaseModel):
     reason: str = Field(..., min_length=1)
 
 
-class RejectCompletionResponse(BaseModel):
+class RejectBookingResponse(BaseModel):
     booking_id: str
     status: str
-    completion_rejected_by_handyman: bool
-    completion_rejection_reason: Optional[str] = None
+    rejected_by_handyman: bool
+    rejection_reason: Optional[str] = None
     completed_by_user: bool = False
     completed_by_handyman: bool = False
 

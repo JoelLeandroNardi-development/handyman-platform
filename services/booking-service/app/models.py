@@ -28,8 +28,8 @@ class Booking(Base):
     completed_by_handyman = Column(Boolean, nullable=False, default=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
-    completion_rejected_by_handyman = Column(Boolean, nullable=False, default=False)
-    completion_rejection_reason = Column(String, nullable=True)
+    rejected_by_handyman = Column(Boolean, nullable=False, default=False)
+    rejection_reason = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

@@ -785,15 +785,14 @@ async def confirm_booking_endpoint(booking_id: str, request: Request, user=Depen
 
 @app.post("/bookings/{booking_id}/cancel", response_model=CancelBookingResponse, tags=["Bookings"])
 async def cancel_booking_endpoint(booking_id: str, data: CancelBookingRequest, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["user", "handyman", "admin"])
+    require_role(user, ["user", "admin"])
 
     booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
 
     if not _has_role(user, "admin"):
         current_email = _user_email(user)
         is_user_owner = booking.get("user_email") == current_email
-        is_handyman_owner = booking.get("handyman_email") == current_email
-        if not (is_user_owner or is_handyman_owner):
+        if not (is_user_owner):
             raise HTTPException(status_code=403, detail="Cannot cancel another user's booking")
 
     return await cancel_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
@@ -823,10 +822,10 @@ async def complete_booking_handyman_endpoint(booking_id: str, request: Request, 
     return await complete_booking_as_handyman(booking_id, request_id=request.state.request_id, user_payload=user)
 
 
-@app.post("/bookings/{booking_id}/reject", response_model=RejectCompletionResponse, tags=["Bookings"])
+@app.post("/bookings/{booking_id}/reject", response_model=RejectBookingResponse, tags=["Bookings"])
 async def reject_booking_completion_endpoint(
     booking_id: str,
-    data: RejectCompletionRequest,
+    data: RejectBookingRequest,
     request: Request,
     user=Depends(get_current_user),
 ):
@@ -835,9 +834,9 @@ async def reject_booking_completion_endpoint(
     booking = await get_booking(booking_id, request_id=request.state.request_id, user_payload=user)
 
     if not _has_role(user, "admin") and booking.get("handyman_email") != _user_email(user):
-        raise HTTPException(status_code=403, detail="Cannot reject completion for another handyman's booking")
+        raise HTTPException(status_code=403, detail="Cannot reject another handyman's booking")
 
-    return await reject_booking_completion(
+    return await reject_booking(
         booking_id,
         data.model_dump(),
         request_id=request.state.request_id,
