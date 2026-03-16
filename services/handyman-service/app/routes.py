@@ -16,6 +16,8 @@ from .schemas import (
     HandymanReviewResponse,
 )
 from .events import build_event
+from shared.shared.outbox_helpers import add_outbox_event
+from shared.shared.crud_helpers import fetch_or_404, apply_partial_update
 from .skills_catalog import (
     get_grouped_catalog,
     get_catalog_flat,
@@ -173,15 +175,7 @@ async def create_handyman(data: CreateHandyman):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.commit()
         await db.refresh(h)
@@ -205,20 +199,14 @@ async def list_handymen(
 @router.get("/handymen/{email}", response_model=HandymanResponse)
 async def get_handyman(email: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Handyman).where(Handyman.email == email))
-        h = res.scalar_one_or_none()
-        if not h:
-            raise HTTPException(status_code=404, detail="Handyman not found")
+        h = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
         return _to_response(h)
 
 
 @router.put("/handymen/{email}/location", response_model=HandymanResponse)
 async def update_location(email: str, data: UpdateLocation):
     async with SessionLocal() as db:
-        res = await db.execute(select(Handyman).where(Handyman.email == email))
-        h = res.scalar_one_or_none()
-        if not h:
-            raise HTTPException(status_code=404, detail="Handyman not found")
+        h = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
 
         h.latitude = data.latitude
         h.longitude = data.longitude
@@ -228,15 +216,7 @@ async def update_location(email: str, data: UpdateLocation):
             {"email": email, "latitude": data.latitude, "longitude": data.longitude},
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.commit()
         await db.refresh(h)
@@ -246,27 +226,12 @@ async def update_location(email: str, data: UpdateLocation):
 @router.put("/handymen/{email}", response_model=HandymanResponse)
 async def update_handyman(email: str, data: UpdateHandyman):
     async with SessionLocal() as db:
-        res = await db.execute(select(Handyman).where(Handyman.email == email))
-        h = res.scalar_one_or_none()
-        if not h:
-            raise HTTPException(status_code=404, detail="Handyman not found")
+        h = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
 
-        if data.first_name is not None:
-            h.first_name = data.first_name
-        if data.last_name is not None:
-            h.last_name = data.last_name
-        if data.phone is not None:
-            h.phone = data.phone
-        if data.national_id is not None:
-            h.national_id = data.national_id
-        if data.address_line is not None:
-            h.address_line = data.address_line
-        if data.postal_code is not None:
-            h.postal_code = data.postal_code
-        if data.city is not None:
-            h.city = data.city
-        if data.country is not None:
-            h.country = data.country
+        apply_partial_update(h, data, [
+            "first_name", "last_name", "phone", "national_id",
+            "address_line", "postal_code", "city", "country",
+        ])
 
         if data.skills is not None:
             normalized_skills = normalize_skills_input(data.skills)
@@ -281,14 +246,9 @@ async def update_handyman(email: str, data: UpdateHandyman):
                 )
             h.skills = normalized_skills
 
-        if data.years_experience is not None:
-            h.years_experience = data.years_experience
-        if data.service_radius_km is not None:
-            h.service_radius_km = data.service_radius_km
-        if data.latitude is not None:
-            h.latitude = data.latitude
-        if data.longitude is not None:
-            h.longitude = data.longitude
+        apply_partial_update(h, data, [
+            "years_experience", "service_radius_km", "latitude", "longitude",
+        ])
 
         evt = build_event(
             "handyman.updated",
@@ -312,15 +272,7 @@ async def update_handyman(email: str, data: UpdateHandyman):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.commit()
         await db.refresh(h)
@@ -330,22 +282,11 @@ async def update_handyman(email: str, data: UpdateHandyman):
 @router.delete("/handymen/{email}")
 async def delete_handyman(email: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Handyman).where(Handyman.email == email))
-        h = res.scalar_one_or_none()
-        if not h:
-            raise HTTPException(status_code=404, detail="Handyman not found")
+        h = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
 
         evt = build_event("handyman.deleted", {"email": email})
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.execute(delete(Handyman).where(Handyman.email == email))
         await db.commit()
@@ -356,10 +297,7 @@ async def delete_handyman(email: str):
 @router.post("/handymen/reviews", response_model=HandymanReviewResponse)
 async def create_handyman_review(data: CreateHandymanReview):
     async with SessionLocal() as db:
-        handyman_res = await db.execute(select(Handyman).where(Handyman.email == data.handyman_email))
-        handyman = handyman_res.scalar_one_or_none()
-        if handyman is None:
-            raise HTTPException(status_code=404, detail="Handyman not found")
+        handyman = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=data.handyman_email, detail="Handyman not found")
 
         existing_res = await db.execute(
             select(HandymanReview).where(HandymanReview.booking_id == data.booking_id)
@@ -393,10 +331,7 @@ async def list_handyman_reviews(
     offset: int = Query(0, ge=0),
 ):
     async with SessionLocal() as db:
-        handyman_res = await db.execute(select(Handyman).where(Handyman.email == email))
-        handyman = handyman_res.scalar_one_or_none()
-        if handyman is None:
-            raise HTTPException(status_code=404, detail="Handyman not found")
+        handyman = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
 
         res = await db.execute(
             select(HandymanReview)

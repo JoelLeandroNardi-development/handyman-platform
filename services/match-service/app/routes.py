@@ -8,6 +8,7 @@ from sqlalchemy import select, delete
 from .db import SessionLocal
 from .models import MatchLog
 from .schemas import MatchRequest, MatchLogResponse, UpdateMatchLog
+from shared.shared.crud_helpers import fetch_or_404
 from .services import (
     haversine,
     get_live_handymen_for_skill,
@@ -158,19 +159,13 @@ async def list_match_logs(
 
 @router.get("/match-logs/{log_id}", response_model=MatchLogResponse)
 async def get_match_log(log_id: int, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(MatchLog).where(MatchLog.id == log_id))
-    row = res.scalar_one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail="MatchLog not found")
+    row = await fetch_or_404(db, MatchLog, filter_column=MatchLog.id, filter_value=log_id, detail="MatchLog not found")
     return _log_to_response(row)
 
 
 @router.put("/match-logs/{log_id}", response_model=MatchLogResponse)
 async def update_match_log(log_id: int, data: UpdateMatchLog, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(MatchLog).where(MatchLog.id == log_id))
-    row = res.scalar_one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail="MatchLog not found")
+    row = await fetch_or_404(db, MatchLog, filter_column=MatchLog.id, filter_value=log_id, detail="MatchLog not found")
 
     if data.user_latitude is not None:
         row.user_latitude = data.user_latitude
@@ -188,10 +183,7 @@ async def update_match_log(log_id: int, data: UpdateMatchLog, db: AsyncSession =
 
 @router.delete("/match-logs/{log_id}")
 async def delete_match_log(log_id: int, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(MatchLog).where(MatchLog.id == log_id))
-    row = res.scalar_one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail="MatchLog not found")
+    row = await fetch_or_404(db, MatchLog, filter_column=MatchLog.id, filter_value=log_id, detail="MatchLog not found")
 
     await db.execute(delete(MatchLog).where(MatchLog.id == log_id))
     await db.commit()

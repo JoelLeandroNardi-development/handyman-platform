@@ -22,14 +22,6 @@ def build_event(
     event_id: Optional[str] = None,
     occurred_at: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Standard domain event envelope used across all services.
-
-    Contract:
-      - routing_key == event_type
-      - occurred_at is ISO8601 UTC string
-      - source is the producing service name
-    """
     return {
         "event_id": event_id or str(uuid.uuid4()),
         "event_type": event_type,
@@ -47,16 +39,6 @@ def build_event_jsonable(
     event_id: Optional[str] = None,
     occurred_at: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Same as build_event(), but guarantees the returned object is JSON-serializable.
-
-    Use this when:
-      - storing events into SQLAlchemy JSON columns (outbox pattern)
-      - publishing to a message bus as JSON
-      - returning events as API responses
-
-    It will convert nested datetimes (e.g. desired_start) into ISO strings.
-    """
     evt = build_event(
         event_type,
         data,
@@ -69,3 +51,10 @@ def build_event_jsonable(
         return evt
 
     return _jsonable_encoder(evt)
+
+
+def make_event_builder(service_name: str):
+    def build_event(event_type: str, data: dict) -> dict:
+        return build_event_jsonable(event_type, data, source=service_name)
+
+    return build_event

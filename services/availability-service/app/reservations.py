@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 from dateutil import parser
 
+from shared.shared.intervals import overlaps
+
 from .redis_client import redis_client
 
 RES_TTL_SECONDS = 300
@@ -21,10 +23,6 @@ def _res_handyman_set(email: str) -> str:
 
 def _parse(dt_str: str) -> datetime:
     return parser.isoparse(dt_str)
-
-
-def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
-    return a_start < b_end and a_end > b_start
 
 
 async def create_reservation(

@@ -16,10 +16,6 @@ class RabbitConfig:
 
     @staticmethod
     def from_env(required: bool = False) -> "RabbitConfig":
-        """
-        Read config from environment at CALL TIME (not import-time),
-        so docker-compose / env_file values are always respected.
-        """
         url = os.getenv("RABBIT_URL")
         if required and not url:
             raise RuntimeError("RABBIT_URL environment variable is not set")
@@ -32,15 +28,6 @@ class RabbitConfig:
 
 
 class RabbitPublisher:
-    """
-    Robust, best-effort publisher.
-
-    Design goals:
-      - service startup MUST NOT fail if RabbitMQ is temporarily down
-      - publish() may fail (caller/outbox retries)
-      - reconnects lazily on publish
-      - detects unroutable messages (mandatory publish) so outbox doesn't mark SENT incorrectly
-    """
 
     def __init__(self, cfg: RabbitConfig):
         self.cfg = cfg
@@ -50,10 +37,6 @@ class RabbitPublisher:
         self._exchange: aio_pika.Exchange | None = None
 
     async def start(self) -> None:
-        """
-        Best-effort start.
-        If connection fails, do NOT raise; keep enabled but not ready.
-        """
         if not self.enabled:
             return
 
@@ -95,10 +78,6 @@ class RabbitPublisher:
             self._conn = None
 
     async def _ensure_ready(self) -> None:
-        """
-        Ensure we have a working exchange.
-        Raises if cannot connect (caller should retry later).
-        """
         if not self.enabled:
             raise RuntimeError("RabbitPublisher disabled (no RABBIT_URL)")
 
@@ -123,14 +102,6 @@ class RabbitPublisher:
         headers: dict | None = None,
         mandatory: bool = True,
     ) -> None:
-        """
-        Publish a JSON message.
-
-        If RabbitMQ is down, raises so the outbox can retry.
-
-        mandatory=True will raise if the message is unroutable (no bindings),
-        preventing the outbox from marking the event as SENT incorrectly.
-        """
         if not self.enabled:
             return
 
@@ -164,10 +135,12 @@ class RabbitPublisher:
 
 
 async def rabbit_connect(cfg: RabbitConfig) -> aio_pika.RobustConnection | None:
-    """
-    Consumer-side connection helper.
-    If cfg.url is None, returns None (events disabled).
-    """
     if not cfg.url:
         return None
     return await aio_pika.connect_robust(cfg.url)
+
+
+def create_publisher(*, required: bool = True):
+    cfg = RabbitConfig.from_env(required=required)
+    pub = RabbitPublisher(cfg)
+    return pub, cfg

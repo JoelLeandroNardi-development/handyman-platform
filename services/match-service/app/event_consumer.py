@@ -114,8 +114,6 @@ async def process_event(payload: dict):
         merged.update(data)
 
         await upsert_handyman_projection(merged)
-
-        # Critical: invalidate both the old and the new buckets.
         await _invalidate_profiles(old, merged)
         return
 

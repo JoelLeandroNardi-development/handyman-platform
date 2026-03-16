@@ -5,6 +5,8 @@ from .db import SessionLocal
 from .models import User, OutboxEvent
 from .schemas import CreateUser, UpdateUserLocation, UpdateUser, UserResponse
 from .events import build_event
+from shared.shared.outbox_helpers import add_outbox_event
+from shared.shared.crud_helpers import fetch_or_404, apply_partial_update
 
 router = APIRouter()
 
@@ -65,15 +67,7 @@ async def create_user(data: CreateUser):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.commit()
         await db.refresh(u)
@@ -94,20 +88,14 @@ async def list_users(
 @router.get("/users/{email}", response_model=UserResponse)
 async def get_user(email: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(User).where(User.email == email))
-        u = res.scalar_one_or_none()
-        if not u:
-            raise HTTPException(status_code=404, detail="User not found")
+        u = await fetch_or_404(db, User, filter_column=User.email, filter_value=email, detail="User not found")
         return _to_response(u)
 
 
 @router.put("/users/{email}/location", response_model=UserResponse)
 async def update_user_location(email: str, data: UpdateUserLocation):
     async with SessionLocal() as db:
-        res = await db.execute(select(User).where(User.email == email))
-        u = res.scalar_one_or_none()
-        if not u:
-            raise HTTPException(status_code=404, detail="User not found")
+        u = await fetch_or_404(db, User, filter_column=User.email, filter_value=email, detail="User not found")
 
         u.latitude = data.latitude
         u.longitude = data.longitude
@@ -121,15 +109,7 @@ async def update_user_location(email: str, data: UpdateUserLocation):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.commit()
         await db.refresh(u)
@@ -139,31 +119,13 @@ async def update_user_location(email: str, data: UpdateUserLocation):
 @router.put("/users/{email}", response_model=UserResponse)
 async def update_user(email: str, data: UpdateUser):
     async with SessionLocal() as db:
-        res = await db.execute(select(User).where(User.email == email))
-        u = res.scalar_one_or_none()
-        if not u:
-            raise HTTPException(status_code=404, detail="User not found")
+        u = await fetch_or_404(db, User, filter_column=User.email, filter_value=email, detail="User not found")
 
-        if data.first_name is not None:
-            u.first_name = data.first_name
-        if data.last_name is not None:
-            u.last_name = data.last_name
-        if data.phone is not None:
-            u.phone = data.phone
-        if data.national_id is not None:
-            u.national_id = data.national_id
-        if data.address_line is not None:
-            u.address_line = data.address_line
-        if data.postal_code is not None:
-            u.postal_code = data.postal_code
-        if data.city is not None:
-            u.city = data.city
-        if data.country is not None:
-            u.country = data.country
-        if data.latitude is not None:
-            u.latitude = data.latitude
-        if data.longitude is not None:
-            u.longitude = data.longitude
+        apply_partial_update(u, data, [
+            "first_name", "last_name", "phone", "national_id",
+            "address_line", "postal_code", "city", "country",
+            "latitude", "longitude",
+        ])
 
         evt = build_event(
             "user.updated",
@@ -182,15 +144,7 @@ async def update_user(email: str, data: UpdateUser):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.commit()
         await db.refresh(u)
@@ -200,22 +154,11 @@ async def update_user(email: str, data: UpdateUser):
 @router.delete("/users/{email}")
 async def delete_user(email: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(User).where(User.email == email))
-        u = res.scalar_one_or_none()
-        if not u:
-            raise HTTPException(status_code=404, detail="User not found")
+        u = await fetch_or_404(db, User, filter_column=User.email, filter_value=email, detail="User not found")
 
         evt = build_event("user.deleted", {"email": email})
 
-        db.add(
-            OutboxEvent(
-                event_id=evt["event_id"],
-                event_type=evt["event_type"],
-                routing_key=evt["event_type"],
-                payload=evt,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, evt)
 
         await db.execute(delete(User).where(User.email == email))
         await db.commit()

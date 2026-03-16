@@ -8,6 +8,7 @@ from jose import jwt
 from .db import SessionLocal
 from .models import AuthUser
 from .schemas import Register, Login, AuthUserResponse, UpdateAuthUser
+from shared.shared.crud_helpers import fetch_or_404
 
 router = APIRouter()
 
@@ -39,7 +40,7 @@ async def register(data: Register, db: AsyncSession = Depends(get_db)):
     existing = result.scalar_one_or_none()
 
     if existing:
-        raise HTTPException(status_code=400, detail="Email already exists")
+        raise HTTPException(status_code=409, detail="Email already exists")
 
     hashed = pwd_context.hash(data.password)
 
@@ -94,19 +95,13 @@ async def list_auth_users(
 
 @router.get("/auth-users/{user_id}", response_model=AuthUserResponse)
 async def get_auth_user(user_id: int, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(AuthUser).where(AuthUser.id == user_id))
-    u = res.scalar_one_or_none()
-    if not u:
-        raise HTTPException(status_code=404, detail="Auth user not found")
+    u = await fetch_or_404(db, AuthUser, filter_column=AuthUser.id, filter_value=user_id, detail="Auth user not found")
     return _to_response(u)
 
 
 @router.get("/auth-users/by-email/{email}", response_model=AuthUserResponse)
 async def get_auth_user_by_email(email: str, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(AuthUser).where(AuthUser.email == email))
-    u = res.scalar_one_or_none()
-    if not u:
-        raise HTTPException(status_code=404, detail="Auth user not found")
+    u = await fetch_or_404(db, AuthUser, filter_column=AuthUser.email, filter_value=email, detail="Auth user not found")
     return _to_response(u)
 
 
@@ -116,10 +111,7 @@ async def update_auth_user(
     data: UpdateAuthUser,
     db: AsyncSession = Depends(get_db),
 ):
-    res = await db.execute(select(AuthUser).where(AuthUser.id == user_id))
-    u = res.scalar_one_or_none()
-    if not u:
-        raise HTTPException(status_code=404, detail="Auth user not found")
+    u = await fetch_or_404(db, AuthUser, filter_column=AuthUser.id, filter_value=user_id, detail="Auth user not found")
 
     if data.password is not None:
         u.password = pwd_context.hash(data.password)
@@ -134,10 +126,7 @@ async def update_auth_user(
 
 @router.delete("/auth-users/{user_id}")
 async def delete_auth_user(user_id: int, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(AuthUser).where(AuthUser.id == user_id))
-    u = res.scalar_one_or_none()
-    if not u:
-        raise HTTPException(status_code=404, detail="Auth user not found")
+    u = await fetch_or_404(db, AuthUser, filter_column=AuthUser.id, filter_value=user_id, detail="Auth user not found")
 
     await db.execute(delete(AuthUser).where(AuthUser.id == user_id))
     await db.commit()

@@ -5,12 +5,14 @@ import aio_pika
 
 from shared.shared.consumer import run_consumer_with_retry_dlq
 from shared.shared.idempotency import already_processed
+from shared.shared.intervals import fully_contains as contains_interval
 
 from .redis_client import redis_client
 from .reservations import create_reservation, get_reservation, delete_reservation, overlaps
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
 from .messaging import RABBIT_URL, EXCHANGE_NAME
+from .slot_helpers import avail_key, parse_raw_slot
 
 QUEUE_NAME = "availability_service_booking_events"
 RETRY_QUEUE = "availability_service_booking_events_retry"
@@ -25,16 +27,8 @@ ROUTING_KEYS = [
 IDEMPOTENCY_TTL = 3600
 
 
-def avail_key(email: str) -> str:
-    return f"availability:{email}"
-
-
 def parse(dt: str):
     return parser.isoparse(dt)
-
-
-def contains_interval(slot_start, slot_end, desired_start, desired_end) -> bool:
-    return slot_start <= desired_start and slot_end >= desired_end
 
 
 async def read_current_slots(email: str) -> list[dict]:
@@ -188,8 +182,6 @@ async def process_event(payload: dict):
 
         await apply_confirm_to_slots(handyman_email, desired_start, desired_end)
         await delete_reservation(booking_id)
-
-        # Critical: projections depend on this event staying current.
         await emit_availability_updated(handyman_email)
 
         ev = build_event("slot.confirmed", {"booking_id": booking_id})

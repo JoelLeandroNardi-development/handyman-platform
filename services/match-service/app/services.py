@@ -10,6 +10,8 @@ import httpx
 import redis.asyncio as redis
 from dateutil import parser
 
+from shared.shared.intervals import overlaps
+
 HANDYMAN_SERVICE_URL = os.getenv("HANDYMAN_SERVICE_URL", "http://handyman-service:8000")
 AVAILABILITY_SERVICE_URL = os.getenv("AVAILABILITY_SERVICE_URL", "http://availability-service:8000")
 
@@ -52,14 +54,6 @@ def parse_dt(x: Any) -> datetime:
     if isinstance(x, str):
         return _as_utc(parser.isoparse(x))
     raise ValueError(f"Unsupported datetime type: {type(x).__name__}")
-
-
-def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
-    return a_start < b_end and a_end > b_start
-
-
-def fully_contains(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
-    return a_start <= b_start and a_end >= b_end
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -323,7 +317,7 @@ def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_en
         except Exception:
             continue
 
-        if fully_contains(ss, ee, ds, de):
+        if overlaps(ss, ee, ds, de):
             return True
 
     return False

@@ -3,21 +3,16 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from dateutil import parser
 
+from shared.shared.intervals import fully_contains as contains_interval
+
 from .redis_client import redis_client
 from .schemas import SetAvailability, OverlapRequest, AvailabilitySlot
 from .reservations import get_reservation, delete_reservation
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
+from .slot_helpers import avail_key, parse_raw_slot
 
 router = APIRouter()
-
-
-def redis_key(email: str) -> str:
-    return f"availability:{email}"
-
-
-def contains_interval(slot_start, slot_end, desired_start, desired_end) -> bool:
-    return slot_start <= desired_start and slot_end >= desired_end
 
 
 def _slots_payload(slots: list[AvailabilitySlot]) -> list[dict]:
@@ -37,7 +32,7 @@ async def emit_availability_updated(email: str, slots_payload: list[dict]) -> No
 
 @router.post("/availability/{email}")
 async def set_availability(email: str, data: SetAvailability):
-    key = redis_key(email)
+    key = avail_key(email)
     await redis_client.delete(key)
 
     if data.slots:
@@ -49,7 +44,7 @@ async def set_availability(email: str, data: SetAvailability):
 
 @router.get("/availability/{email}")
 async def get_availability(email: str):
-    key = redis_key(email)
+    key = avail_key(email)
     slots = await redis_client.lrange(key, 0, -1)
 
     parsed: list[dict] = []
@@ -65,7 +60,7 @@ async def get_availability(email: str):
 
 @router.delete("/availability/{email}")
 async def clear_availability(email: str):
-    key = redis_key(email)
+    key = avail_key(email)
     await redis_client.delete(key)
     await emit_availability_updated(email, [])
     return {"message": "Availability cleared"}
@@ -82,7 +77,7 @@ async def check_overlap(email: str, req: OverlapRequest):
     if de <= ds:
         return {"available": False}
 
-    key = redis_key(email)
+    key = avail_key(email)
     slots = await redis_client.lrange(key, 0, -1)
 
     for slot in slots:

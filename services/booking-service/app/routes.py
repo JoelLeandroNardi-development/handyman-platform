@@ -18,6 +18,8 @@ from .schemas import (
     RejectBookingResponse,
 )
 from .events import build_event
+from shared.shared.outbox_helpers import add_outbox_event
+from shared.shared.crud_helpers import fetch_or_404
 
 router = APIRouter()
 
@@ -72,15 +74,7 @@ async def create_booking(data: CreateBooking):
         )
         db.add(booking)
 
-        db.add(
-            OutboxEvent(
-                event_id=event["event_id"],
-                event_type=event["event_type"],
-                routing_key=event["event_type"],
-                payload=event,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, event)
 
         await db.commit()
 
@@ -105,20 +99,14 @@ async def create_booking(data: CreateBooking):
 @router.get("/bookings/{booking_id}", response_model=BookingResponse)
 async def get_booking(booking_id: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
         return _to_response(booking)
 
 
 @router.post("/bookings/{booking_id}/confirm", response_model=ConfirmBookingResponse)
 async def confirm_booking(booking_id: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if booking.status != "RESERVED":
             raise HTTPException(status_code=400, detail=f"Cannot confirm booking in status {booking.status}")
@@ -134,15 +122,7 @@ async def confirm_booking(booking_id: str):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=event["event_id"],
-                event_type=event["event_type"],
-                routing_key=event["event_type"],
-                payload=event,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, event)
 
         await db.commit()
         return ConfirmBookingResponse(booking_id=booking.booking_id, status=booking.status)
@@ -151,10 +131,7 @@ async def confirm_booking(booking_id: str):
 @router.post("/bookings/{booking_id}/cancel", response_model=CancelBookingResponse)
 async def cancel_booking(booking_id: str, data: CancelBooking):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if booking.status in ("CANCELED", "FAILED", "EXPIRED", "REJECTED"):
             return CancelBookingResponse(
@@ -179,15 +156,7 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
             },
         )
 
-        db.add(
-            OutboxEvent(
-                event_id=event["event_id"],
-                event_type=event["event_type"],
-                routing_key=event["event_type"],
-                payload=event,
-                status="PENDING",
-            )
-        )
+        add_outbox_event(db, OutboxEvent, event)
 
         await db.commit()
 
@@ -201,10 +170,7 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
 @router.post("/bookings/{booking_id}/complete/user", response_model=CompleteBookingResponse)
 async def complete_booking_as_user(booking_id: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if booking.status != "CONFIRMED":
             raise HTTPException(status_code=400, detail=f"Cannot complete booking in status {booking.status}")
@@ -230,10 +196,7 @@ async def complete_booking_as_user(booking_id: str):
 @router.post("/bookings/{booking_id}/complete/handyman", response_model=CompleteBookingResponse)
 async def complete_booking_as_handyman(booking_id: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if booking.status != "CONFIRMED":
             raise HTTPException(status_code=400, detail=f"Cannot complete booking in status {booking.status}")
@@ -259,10 +222,7 @@ async def complete_booking_as_handyman(booking_id: str):
 @router.post("/bookings/{booking_id}/reject", response_model=RejectBookingResponse)
 async def reject_booking(booking_id: str, data: RejectBookingRequest):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if booking.status not in ("RESERVED", "CONFIRMED"):
             raise HTTPException(status_code=400, detail=f"Cannot reject booking in status {booking.status}")
@@ -310,10 +270,7 @@ async def list_bookings(
 @router.put("/bookings/{booking_id}", response_model=BookingResponse)
 async def admin_update_booking(booking_id: str, data: UpdateBookingAdmin):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if data.status is not None:
             booking.status = data.status
@@ -332,10 +289,7 @@ async def admin_update_booking(booking_id: str, data: UpdateBookingAdmin):
 @router.delete("/bookings/{booking_id}")
 async def admin_delete_booking(booking_id: str):
     async with SessionLocal() as db:
-        res = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
-        booking = res.scalar_one_or_none()
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         await db.execute(delete(Booking).where(Booking.booking_id == booking_id))
         await db.commit()
