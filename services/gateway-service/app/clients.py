@@ -104,6 +104,22 @@ async def logout_user(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/logout", data, request_id, None)
 
 
+async def forgot_password(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/password/forgot", data, request_id, None)
+
+
+async def reset_password(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/password/reset", data, request_id, None)
+
+
+async def request_email_verification(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/email/verify/request", data, request_id, None)
+
+
+async def confirm_email_verification(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/email/verify/confirm", data, request_id, None)
+
+
 async def list_auth_users(request_id: str | None = None, user_payload: dict | None = None, limit: int = 50, offset: int = 0):
     return await _call_with_breaker(cb_auth, "GET", f"{AUTH_SERVICE_URL}/auth-users?limit={limit}&offset={offset}", None, request_id, user_payload)
 

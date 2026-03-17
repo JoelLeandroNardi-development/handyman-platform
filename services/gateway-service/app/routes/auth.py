@@ -7,6 +7,11 @@ from ..schemas import (
     TokenPairResponse,
     RefreshRequest,
     LogoutRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    EmailVerifyRequest,
+    EmailVerifyConfirmRequest,
+    AuthActionResponse,
     AuthUserResponse,
     UpdateAuthUser,
     OnboardingUserRequest,
@@ -22,6 +27,10 @@ from ..clients import (
     login_user,
     refresh_user_token,
     logout_user,
+    forgot_password,
+    reset_password,
+    request_email_verification,
+    confirm_email_verification,
     list_auth_users,
     get_auth_user,
     get_auth_user_by_email,
@@ -62,6 +71,26 @@ async def refresh(data: RefreshRequest, request: Request):
 @router.post("/logout", tags=["Auth"])
 async def logout(data: LogoutRequest, request: Request):
     return await logout_user(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/password/forgot", response_model=AuthActionResponse, tags=["Auth"])
+async def forgot_password_endpoint(data: ForgotPasswordRequest, request: Request):
+    return await forgot_password(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/password/reset", response_model=AuthActionResponse, tags=["Auth"])
+async def reset_password_endpoint(data: ResetPasswordRequest, request: Request):
+    return await reset_password(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/email/verify/request", response_model=AuthActionResponse, tags=["Auth"])
+async def email_verify_request_endpoint(data: EmailVerifyRequest, request: Request):
+    return await request_email_verification(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/email/verify/confirm", response_model=AuthActionResponse, tags=["Auth"])
+async def email_verify_confirm_endpoint(data: EmailVerifyConfirmRequest, request: Request):
+    return await confirm_email_verification(data.model_dump(), request_id=request.state.request_id)
 
 
 @router.get("/auth-users", response_model=List[AuthUserResponse], tags=["Auth"])

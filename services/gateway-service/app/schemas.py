@@ -7,6 +7,11 @@ from shared.shared.schemas.auth import (
     TokenResponse,
     RefreshRequest,
     LogoutRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    EmailVerifyRequest,
+    EmailVerifyConfirmRequest,
+    AuthActionResponse,
     AuthUserResponse,
     UpdateAuthUser,
 )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -42,6 +43,10 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def generate_opaque_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
 def issue_token_pair(*, user_email: str, roles: list[str], session_id: str) -> TokenPair:
     now = _now_utc()
 
@@ -79,6 +84,7 @@ __all__ = [
     "JWTError",
     "TokenPair",
     "decode_token",
+    "generate_opaque_token",
     "hash_token",
     "issue_token_pair",
 ]

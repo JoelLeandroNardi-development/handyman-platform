@@ -39,10 +39,37 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
+
+
+class EmailVerifyRequest(BaseModel):
+    email: str
+
+
+class EmailVerifyConfirmRequest(BaseModel):
+    token: str
+
+
+class AuthActionResponse(BaseModel):
+    ok: bool = True
+    # Useful while SMTP is not wired; frontend can ignore this field.
+    debug_token: str | None = None
+
+
 class AuthUserResponse(BaseModel):
     id: int
     email: str
     roles: List[str]
+    is_email_verified: bool = False
+    auth_provider: str = "local"
+    google_sub: str | None = None
+    last_login_at: datetime | None = None
 
 
 class UpdateAuthUserPassword(BaseModel):
