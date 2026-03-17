@@ -30,7 +30,7 @@ It uses:
 - [Failure scenarios to test](#failure-scenarios-to-test)
 - [Pending architectural items](#pending-architectural-items)
 - [Planned future functions](#planned-future-functions)
-- [Testing plan (next)](#testing-plan-next)
+- [Testing and CI status (March 2026)](#testing-and-ci-status-march-2026)
 
 ---
 
@@ -662,27 +662,179 @@ Options:
 
 ---
 
-## Testing plan (next)
+## Testing and CI status (March 2026)
 
-1. Unit tests
+This section replaces the previous testing plan and serves as the consolidated testing reference for this repository.
 
-- overlap logic
-- reservation idempotency/TTL behavior
-- match bucketing + distance + overlap (pure functions)
+### Current baseline
 
-2. Integration tests (docker compose)
+- 217 passing tests
+- 96% combined coverage over `shared` and `services`
+- Test tracks: unit, integration, and failure-mode
 
-- Booking ↔ Availability lifecycle:
-  - requested → reserved → confirmed
-  - requested → rejected
-  - reserved → expired
-  - canceled → released
+### Test structure
 
-3. Failure-mode tests
+```text
+tests/
+   unit/
+      test_consumer.py
+      test_gateway_helpers.py
+      test_idempotency.py
+      test_intervals.py
+      test_match_services.py
+      test_mq.py
+      test_outbox_worker.py
+      test_reservations.py
+      test_schemas.py
+      test_shared_helpers.py
+      test_shared_models.py
+   integration/
+      test_booking_lifecycle.py
+   failure_mode/
+      test_consumer_failures.py
+```
 
-- RabbitMQ down
-- consumer restarts
-- DLQ/retry behavior
+Key test/config support files:
+
+- `pytest.ini`
+- `conftest.py`
+- `requirements-test.txt`
+- `Makefile`
+- `run_tests.py`
+- `.github/workflows/tests.yml`
+
+### What is covered
+
+Unit coverage includes:
+
+- interval overlap and containment logic
+- Redis idempotency behavior
+- RabbitMQ consumer topology/retry/DLQ behavior
+- shared event, role, DB, and CRUD helper behavior
+- outbox worker claim/send/failure/retry loops
+- match helper and projection/caching behavior
+- availability reservation helpers
+- gateway RBAC and circuit-breaker behavior
+- shared schema validation across auth/users/handymen/bookings/availability/match
+
+Integration coverage includes:
+
+- booking lifecycle transitions with event-driven progression
+
+Failure-mode coverage includes:
+
+- retry and DLQ handling
+- malformed payload handling
+- consumer error path behavior
+
+### Quick start
+
+Install test dependencies:
+
+```bash
+pip install -r requirements-test.txt
+```
+
+Optional editable shared install:
+
+```bash
+cd shared
+pip install -e ".[test]"
+cd ..
+```
+
+Run tests:
+
+```bash
+pytest tests/ -v
+pytest tests/unit/ -v
+pytest tests/integration/ -v
+pytest tests/failure_mode/ -v
+```
+
+Run by marker:
+
+```bash
+pytest -m unit
+pytest -m integration
+pytest -m failure_mode
+pytest -m intervals
+pytest -m idempotency
+pytest -m rabbit
+pytest -m booking_lifecycle
+```
+
+Coverage commands:
+
+```bash
+pytest tests --cov=shared --cov=services --cov-report=term-missing --cov-report=xml
+python -m coverage report
+python -m coverage html
+```
+
+### CI workflow summary
+
+Workflow file: `.github/workflows/tests.yml`
+
+- Triggers: push/pull_request for `main` and `develop`
+- Matrix: Python `3.11` and `3.12`
+- Service containers: Postgres, RabbitMQ, Redis
+- Stages: dependency install, unit tests, integration tests, failure-mode tests, Codecov upload, HTML coverage artifact
+
+### Recent fixes applied
+
+1. GitHub Actions/runtime updates
+
+- `actions/checkout@v5`
+- `actions/setup-python@v5`
+- `actions/upload-artifact@v4`
+- `codecov/codecov-action@v5`
+- `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`
+
+2. Dependency conflict fixes
+
+- removed invalid `unittest-mock==1.5`
+- centralized test dependencies in `requirements-test.txt`
+- kept service `requirements.txt` files runtime-only to avoid duplicate/conflicting test pins
+
+3. Import and coverage execution fixes
+
+- CI `PYTHONPATH` set to repo root to resolve `shared.shared.*` imports
+- coverage invoked with `python -m coverage` to avoid shell path issues
+
+### Troubleshooting
+
+Missing pytest:
+
+```bash
+pip install pytest pytest-asyncio
+```
+
+`ModuleNotFoundError: No module named shared.shared`:
+
+- Ensure `PYTHONPATH` points to repository root
+- Do not set only the `shared` subdirectory as top-level path
+
+Linux/macOS:
+
+```bash
+export PYTHONPATH="$(pwd)"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH = (Get-Location).Path
+```
+
+Dependency resolver conflicts:
+
+- keep test-only dependencies in `requirements-test.txt`
+- keep service requirement files runtime-only
+
+### Remaining optional improvements
+
+- close remaining uncovered branches in `shared/shared/events.py`, `shared/shared/mq.py`, `shared/shared/outbox_worker.py`, and `services/match-service/app/services.py`
 
 ---
 
