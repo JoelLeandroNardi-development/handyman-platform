@@ -194,7 +194,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       EXCHANGE_NAME: domain_events
-      NOTIFICATION_SERVICE_URL: http://notification-service:8010
+      NOTIFICATION_SERVICE_URL: http://notification-service:8000
     depends_on:
       redis:
         condition: service_healthy
