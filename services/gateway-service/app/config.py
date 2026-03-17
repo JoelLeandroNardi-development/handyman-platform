@@ -8,6 +8,7 @@ HANDYMAN_SERVICE_URL = os.getenv("HANDYMAN_SERVICE_URL", "http://handyman-servic
 AVAILABILITY_SERVICE_URL = os.getenv("AVAILABILITY_SERVICE_URL", "http://availability-service:8000")
 MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://match-service:8000")
 BOOKING_SERVICE_URL = os.getenv("BOOKING_SERVICE_URL", "http://booking-service:8000")
+NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8010")
 
 
 def SERVICE_BASE_URLS() -> Dict[str, str]:
@@ -22,4 +23,5 @@ def SERVICE_BASE_URLS() -> Dict[str, str]:
         "availability-service": AVAILABILITY_SERVICE_URL,
         "match-service": MATCH_SERVICE_URL,
         "booking-service": BOOKING_SERVICE_URL,
+        "notification-service": NOTIFICATION_SERVICE_URL,
     }

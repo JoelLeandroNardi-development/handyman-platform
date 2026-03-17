@@ -9,6 +9,7 @@ from .routes.handymen import router as handymen_router
 from .routes.availability import router as availability_router
 from .routes.match import router as match_router
 from .routes.bookings import router as bookings_router
+from .routes.notifications import router as notifications_router
 
 origins = [
     "http://localhost:5173",
@@ -25,6 +26,7 @@ OPENAPI_TAGS = [
     {"name": "Availability"},
     {"name": "Match"},
     {"name": "Bookings"},
+    {"name": "Notifications"},
 ]
 
 app = FastAPI(title="Smart API Gateway", openapi_tags=OPENAPI_TAGS)
@@ -46,3 +48,4 @@ app.include_router(handymen_router)
 app.include_router(availability_router)
 app.include_router(match_router)
 app.include_router(bookings_router)
+app.include_router(notifications_router)

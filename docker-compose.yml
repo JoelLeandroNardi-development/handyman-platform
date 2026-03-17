@@ -16,6 +16,21 @@ services:
       timeout: 5s
       retries: 20
 
+  notification-db:
+    container_name: notification-db
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: notification_db
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d notification_db']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   redis:
     container_name: redis
     image: redis:7
@@ -41,20 +56,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
-
-  mailhog:
-    image: mailhog/mailhog
-    container_name: mailhog
-    ports:
-      - '1025:1025'
-      - '8025:8025'
-
-  ntfy:
-    image: binwiederhier/ntfy:latest
-    container_name: ntfy
-    command: ["serve"]
-    ports:
-      - '8081:80'
 
   auth-service:
     build:
@@ -173,21 +174,15 @@ services:
     env_file:
       - .env
     environment:
-      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
-      EXCHANGE_NAME: domain_events
-      NOTIFY_EMAIL_ENABLED: 'true'
-      SMTP_HOST: mailhog
-      SMTP_PORT: '1025'
-      SMTP_FROM: noreply@handyman.local
-      NOTIFY_PUSH_ENABLED: 'true'
-      NTFY_BASE_URL: http://ntfy:80
+      NOTIFICATION_DB: postgresql+asyncpg://admin:admin@notification-db:5432/notification_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      DOMAIN_EVENTS_EXCHANGE: domain_events
+      NOTIFICATION_QUEUE: notification_service_events
     depends_on:
+      notification-db:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      mailhog:
-        condition: service_started
-      ntfy:
-        condition: service_started
 
   gateway-service:
     build:
@@ -199,6 +194,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       EXCHANGE_NAME: domain_events
+      NOTIFICATION_SERVICE_URL: http://notification-service:8010
     depends_on:
       redis:
         condition: service_healthy

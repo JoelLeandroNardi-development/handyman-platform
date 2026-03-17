@@ -1,145 +1,148 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import os
+
 import pytest
 
 from tests.service_loader import load_service_app_module
 
 
-events_module = load_service_app_module("notification-service", "events", package_name="notification_service_app", reload_modules=True)
-consumer_module = load_service_app_module("notification-service", "event_consumer", package_name="notification_service_app", reload_modules=True)
+os.environ.setdefault("NOTIFICATION_DB", "postgresql+asyncpg://admin:admin@localhost:5432/notification_db")
+
+
+mapper_module = load_service_app_module("notification-service", "mapper", package_name="notification_service_app", reload_modules=True)
+consumer_module = load_service_app_module("notification-service", "consumer", package_name="notification_service_app", reload_modules=True)
 
 
 @pytest.mark.unit
-class TestNotificationEvents:
-    def test_extract_email_recipients_deduplicates(self):
-        data = {
-            "user_email": "User@Example.com",
-            "handyman_email": "user@example.com",
-            "email": "another@example.com",
-        }
-        assert events_module.extract_email_recipients(data) == ["user@example.com", "another@example.com"]
+class TestNotificationMapper:
+    def test_map_event_missing_type_or_id_returns_empty(self):
+        assert mapper_module.map_event_to_notifications({"event_type": "slot.confirmed"}) == []
+        assert mapper_module.map_event_to_notifications({"event_id": "evt-1"}) == []
 
-    def test_extract_push_targets_deduplicates(self):
-        data = {
-            "user_push_topic": "User.Topic",
-            "handyman_push_topic": "user.topic",
-            "push_topic": "another topic",
-        }
-        assert events_module.extract_push_targets(data) == ["user-topic", "another-topic"]
+    def test_map_booking_requested_targets_handyman(self):
+        intents = mapper_module.map_event_to_notifications(
+            {
+                "event_id": "evt-1",
+                "event_type": "booking.requested",
+                "data": {
+                    "booking_id": "b1",
+                    "user_email": "user@example.com",
+                    "handyman_email": "handy@example.com",
+                },
+            }
+        )
+        assert len(intents) == 1
+        assert intents[0]["user_email"] == "handy@example.com"
+        assert intents[0]["type"] == "job_requested"
 
-    def test_extract_push_targets_falls_back_to_emails(self):
-        data = {
-            "user_email": "User@example.com",
-            "handyman_email": "handy@example.com",
-        }
-        assert events_module.extract_push_targets(data) == ["user-example-com", "handy-example-com"]
-
-    def test_channels_for_known_event(self):
-        assert events_module.channels_for_event("slot.confirmed") == ["email", "push"]
-
-    def test_render_notification_with_reason(self):
-        title, body = events_module.render_notification("slot.rejected", {"booking_id": "b1", "reason": "no_slot"})
-        assert title == "Booking rejected"
-        assert "no_slot" in body
+    def test_map_slot_confirmed_targets_both_parties(self):
+        intents = mapper_module.map_event_to_notifications(
+            {
+                "event_id": "evt-2",
+                "event_type": "slot.confirmed",
+                "data": {
+                    "booking_id": "b2",
+                    "user_email": "user@example.com",
+                    "handyman_email": "handy@example.com",
+                },
+            }
+        )
+        assert len(intents) == 2
+        assert {intent["user_email"] for intent in intents} == {"user@example.com", "handy@example.com"}
+        assert {intent["type"] for intent in intents} == {"booking_confirmed", "job_confirmed"}
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestNotificationConsumer:
-    async def test_process_event_ignores_unknown_event(self, monkeypatch):
-        email_calls = []
-        push_calls = []
+    async def test_handle_event_no_intents(self, monkeypatch):
+        called = False
 
-        async def fake_send_email(recipient, title, body, event_id, event_type):
-            email_calls.append((recipient, event_id, event_type))
+        async def fake_publish(_email, _payload):
+            nonlocal called
+            called = True
 
-        async def fake_send_push(topic, title, body, event_id, event_type):
-            push_calls.append((topic, event_id, event_type))
+        monkeypatch.setattr(consumer_module, "map_event_to_notifications", lambda _event: [])
+        monkeypatch.setattr(consumer_module.hub, "publish", fake_publish)
 
-        monkeypatch.setattr(consumer_module, "send_email", fake_send_email)
-        monkeypatch.setattr(consumer_module, "send_push", fake_send_push)
+        await consumer_module.handle_event(db=object(), event={"event_id": "evt-empty", "event_type": "unknown"})
 
-        await consumer_module.process_event(
-            {
-                "event_id": "evt-unknown",
-                "event_type": "user.created",
-                "data": {"user_email": "u@example.com", "booking_id": "b1"},
-            }
-        )
+        assert called is False
 
-        assert email_calls == []
-        assert push_calls == []
-
-    async def test_process_event_fanout(self, monkeypatch):
-        email_calls = []
-        push_calls = []
-
-        async def fake_send_email(recipient, title, body, event_id, event_type):
-            email_calls.append((recipient, title, body, event_id, event_type))
-
-        async def fake_send_push(topic, title, body, event_id, event_type):
-            push_calls.append((topic, title, body, event_id, event_type))
-
-        monkeypatch.setattr(consumer_module, "send_email", fake_send_email)
-        monkeypatch.setattr(consumer_module, "send_push", fake_send_push)
-
-        await consumer_module.process_event(
-            {
-                "event_id": "evt-fanout",
-                "event_type": "slot.confirmed",
-                "data": {
-                    "booking_id": "b123",
-                    "user_email": "user@example.com",
-                    "handyman_email": "handy@example.com",
-                    "user_push_topic": "user-notify",
-                    "handyman_push_topic": "handy-notify",
-                },
-            }
-        )
-
-        assert len(email_calls) == 2
-        assert {entry[0] for entry in email_calls} == {"user@example.com", "handy@example.com"}
-        assert len(push_calls) == 2
-        assert {entry[0] for entry in push_calls} == {"user-notify", "handy-notify"}
-
-    async def test_process_event_push_falls_back_to_email_topics(self, monkeypatch):
-        push_calls = []
-
-        async def fake_send_push(topic, title, body, event_id, event_type):
-            push_calls.append((topic, title, event_id, event_type))
-
-        monkeypatch.setattr(consumer_module, "send_push", fake_send_push)
-
-        await consumer_module.process_event(
-            {
-                "event_id": "evt-push-fallback",
-                "event_type": "slot.reserved",
-                "data": {
-                    "booking_id": "b999",
-                    "user_email": "user@example.com",
-                    "handyman_email": "handy@example.com",
-                },
-            }
-        )
-
-        assert len(push_calls) == 2
-        assert {entry[0] for entry in push_calls} == {"user-example-com", "handy-example-com"}
-
-    async def test_process_event_skips_duplicate_event_id(self, monkeypatch):
-        calls = []
-
-        async def fake_send_push(topic, title, body, event_id, event_type):
-            calls.append((topic, event_id))
-
-        monkeypatch.setattr(consumer_module, "send_push", fake_send_push)
-
-        payload = {
-            "event_id": "evt-dup",
-            "event_type": "slot.reserved",
-            "data": {"booking_id": "b1", "push_topic": "job-b1"},
+    async def test_handle_event_skips_disabled_category(self, monkeypatch):
+        intent = {
+            "user_email": "user@example.com",
+            "event_id": "evt-1",
+            "type": "booking_confirmed",
+            "category": "booking",
+            "priority": "high",
+            "title": "Booking confirmed",
+            "body": "ok",
+            "entity_type": "booking",
+            "entity_id": "b1",
+            "action_url": "/bookings/b1",
+            "payload": {"booking_id": "b1"},
         }
 
-        await consumer_module.process_event(payload)
-        await consumer_module.process_event(payload)
+        async def fake_get_preferences(_db, *, user_email):
+            return {"user_email": user_email}
 
-        assert len(calls) == 1
+        async def fake_create_notification_if_absent(_db, **_kwargs):
+            raise AssertionError("create_notification_if_absent should not be called")
+
+        monkeypatch.setattr(consumer_module, "map_event_to_notifications", lambda _event: [intent])
+        monkeypatch.setattr(consumer_module, "get_preferences", fake_get_preferences)
+        monkeypatch.setattr(consumer_module, "category_enabled", lambda _pref, _category: False)
+        monkeypatch.setattr(consumer_module, "create_notification_if_absent", fake_create_notification_if_absent)
+
+        await consumer_module.handle_event(db=object(), event={"event_id": "evt-1", "event_type": "slot.confirmed"})
+
+    async def test_handle_event_persists_and_publishes(self, monkeypatch):
+        published: list[tuple[str, dict]] = []
+
+        intent = {
+            "user_email": "user@example.com",
+            "event_id": "evt-2",
+            "type": "booking_confirmed",
+            "category": "booking",
+            "priority": "high",
+            "title": "Booking confirmed",
+            "body": "ok",
+            "status": "unread",
+            "entity_type": "booking",
+            "entity_id": "b2",
+            "action_url": "/bookings/b2",
+            "payload": {"booking_id": "b2"},
+            "created_at": datetime.now(timezone.utc),
+            "read_at": None,
+            "id": "notif-1",
+        }
+
+        async def fake_get_preferences(_db, *, user_email):
+            return {"user_email": user_email}
+
+        async def fake_create_notification_if_absent(_db, **kwargs):
+            return dict(intent, **kwargs)
+
+        async def fake_unread_count(_db, *, user_email):
+            assert user_email == "user@example.com"
+            return 3
+
+        async def fake_publish(email, payload):
+            published.append((email, payload))
+
+        monkeypatch.setattr(consumer_module, "map_event_to_notifications", lambda _event: [intent])
+        monkeypatch.setattr(consumer_module, "get_preferences", fake_get_preferences)
+        monkeypatch.setattr(consumer_module, "category_enabled", lambda _pref, _category: True)
+        monkeypatch.setattr(consumer_module, "create_notification_if_absent", fake_create_notification_if_absent)
+        monkeypatch.setattr(consumer_module, "unread_count", fake_unread_count)
+        monkeypatch.setattr(consumer_module.hub, "publish", fake_publish)
+
+        await consumer_module.handle_event(db=object(), event={"event_id": "evt-2", "event_type": "slot.confirmed"})
+
+        assert len(published) == 1
+        assert published[0][0] == "user@example.com"
+        assert published[0][1]["type"] == "notification.created"
+        assert published[0][1]["unread_count"] == 3
