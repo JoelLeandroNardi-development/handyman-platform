@@ -4,7 +4,9 @@ from typing import List
 from ..schemas import (
     Register,
     Login,
-    TokenResponse,
+    TokenPairResponse,
+    RefreshRequest,
+    LogoutRequest,
     AuthUserResponse,
     UpdateAuthUser,
     OnboardingUserRequest,
@@ -18,6 +20,8 @@ from ..schemas import (
 from ..clients import (
     register_user,
     login_user,
+    refresh_user_token,
+    logout_user,
     list_auth_users,
     get_auth_user,
     get_auth_user_by_email,
@@ -45,9 +49,19 @@ async def register(data: Register, request: Request):
     return await register_user(data.model_dump(), request_id=request.state.request_id)
 
 
-@router.post("/login", response_model=TokenResponse, tags=["Auth"])
+@router.post("/login", response_model=TokenPairResponse, tags=["Auth"])
 async def login(data: Login, request: Request):
     return await login_user(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/refresh", response_model=TokenPairResponse, tags=["Auth"])
+async def refresh(data: RefreshRequest, request: Request):
+    return await refresh_user_token(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/logout", tags=["Auth"])
+async def logout(data: LogoutRequest, request: Request):
+    return await logout_user(data.model_dump(), request_id=request.state.request_id)
 
 
 @router.get("/auth-users", response_model=List[AuthUserResponse], tags=["Auth"])

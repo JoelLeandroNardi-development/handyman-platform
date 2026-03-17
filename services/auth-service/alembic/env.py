@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.db import Base
-from app.models import AuthUser
+from app.models import AuthSession, AuthUser
 
 config = context.config
 fileConfig(config.config_file_name)

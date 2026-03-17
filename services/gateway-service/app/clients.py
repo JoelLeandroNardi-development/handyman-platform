@@ -96,6 +96,14 @@ async def login_user(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/login", data, request_id, None)
 
 
+async def refresh_user_token(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/refresh", data, request_id, None)
+
+
+async def logout_user(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/logout", data, request_id, None)
+
+
 async def list_auth_users(request_id: str | None = None, user_payload: dict | None = None, limit: int = 50, offset: int = 0):
     return await _call_with_breaker(cb_auth, "GET", f"{AUTH_SERVICE_URL}/auth-users?limit={limit}&offset={offset}", None, request_id, user_payload)
 

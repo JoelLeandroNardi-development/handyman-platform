@@ -1,25 +1,28 @@
 import os
+from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
+from datetime import datetime, timezone
 from passlib.context import CryptContext
-from jose import jwt
 
 from .db import SessionLocal
-from .models import AuthUser
-from .schemas import Register, Login, AuthUserResponse, UpdateAuthUser
+from .models import AuthSession, AuthUser
+from .schemas import (
+    Register,
+    Login,
+    TokenPairResponse,
+    RefreshRequest,
+    LogoutRequest,
+    AuthUserResponse,
+    UpdateAuthUser,
+)
+from .token_service import JWTError, decode_token, hash_token, issue_token_pair
 from shared.shared.crud_helpers import fetch_or_404
 
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"])
-
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM") or "HS256"
-
-if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET environment variable is not set")
-
 
 async def get_db():
     async with SessionLocal() as session:
@@ -57,7 +60,7 @@ async def register(data: Register, db: AsyncSession = Depends(get_db)):
     return {"message": "User registered", "roles": user.roles}
 
 
-@router.post("/login")
+@router.post("/login", response_model=TokenPairResponse)
 async def login(data: Login, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AuthUser).where(AuthUser.email == data.email))
     user = result.scalar_one_or_none()
@@ -68,16 +71,112 @@ async def login(data: Login, db: AsyncSession = Depends(get_db)):
     if not pwd_context.verify(data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = jwt.encode(
-        {
-            "sub": user.email,
-            "roles": user.roles,
-        },
-        JWT_SECRET,
-        algorithm=JWT_ALGORITHM,
+    session_id = str(uuid4())
+    tokens = issue_token_pair(
+        user_email=user.email,
+        roles=list(user.roles or []),
+        session_id=session_id,
     )
 
-    return {"access_token": token}
+    session = AuthSession(
+        id=session_id,
+        user_id=user.id,
+        refresh_token_hash=hash_token(tokens.refresh_token),
+        expires_at=tokens.refresh_expires_at,
+    )
+    db.add(session)
+    await db.commit()
+
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "expires_in": int((tokens.access_expires_at - datetime.now(timezone.utc)).total_seconds()),
+    }
+
+
+@router.post("/refresh", response_model=TokenPairResponse)
+async def refresh_tokens(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        token_payload = decode_token(payload.refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    if token_payload.get("typ") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
+    sid = token_payload.get("sid")
+    sub = token_payload.get("sub")
+    roles = token_payload.get("roles") or []
+    if not sid or not sub:
+        raise HTTPException(status_code=401, detail="Malformed refresh token")
+
+    session = await db.get(AuthSession, str(sid))
+    if not session:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    now = datetime.now(timezone.utc)
+    if session.revoked_at is not None:
+        raise HTTPException(status_code=401, detail="Session revoked")
+    if session.expires_at <= now:
+        raise HTTPException(status_code=401, detail="Session expired")
+    if session.refresh_token_hash != hash_token(payload.refresh_token):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    session.revoked_at = now
+
+    user_result = await db.execute(select(AuthUser).where(AuthUser.email == str(sub)))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    new_session_id = str(uuid4())
+    tokens = issue_token_pair(
+        user_email=user.email,
+        roles=list(user.roles or roles),
+        session_id=new_session_id,
+    )
+
+    db.add(
+        AuthSession(
+            id=new_session_id,
+            user_id=user.id,
+            refresh_token_hash=hash_token(tokens.refresh_token),
+            expires_at=tokens.refresh_expires_at,
+            last_seen_at=now,
+        )
+    )
+    await db.commit()
+
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "expires_in": int((tokens.access_expires_at - now).total_seconds()),
+    }
+
+
+@router.post("/logout")
+async def logout(payload: LogoutRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        token_payload = decode_token(payload.refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    sid = token_payload.get("sid")
+    if not sid:
+        raise HTTPException(status_code=401, detail="Malformed refresh token")
+
+    session = await db.get(AuthSession, str(sid))
+    if not session:
+        return {"ok": True}
+
+    if session.refresh_token_hash != hash_token(payload.refresh_token):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if session.revoked_at is None:
+        session.revoked_at = datetime.now(timezone.utc)
+        await db.commit()
+
+    return {"ok": True}
 
 
 @router.get("/auth-users", response_model=list[AuthUserResponse])

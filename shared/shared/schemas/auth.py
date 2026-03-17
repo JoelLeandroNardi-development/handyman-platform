@@ -21,8 +21,22 @@ class Login(BaseModel):
     password: str
 
 
-class TokenResponse(BaseModel):
+class TokenPairResponse(BaseModel):
     access_token: str
+    refresh_token: str
+    expires_in: int | None = None
+
+
+class TokenResponse(TokenPairResponse):
+    pass
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
 
 
 class AuthUserResponse(BaseModel):
