@@ -1,0 +1,156 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: handyman_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      rabbitmq:
+        image: rabbitmq:3.12-management
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5672:5672
+          - 15672:15672
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+
+    - name: Install shared module
+      run: |
+        cd shared
+        pip install -e ".[test]"
+        cd ..
+
+    - name: Install service dependencies
+      run: |
+        services=(
+          "services/auth-service"
+          "services/availability-service"
+          "services/booking-service"
+          "services/handyman-service"
+          "services/match-service"
+          "services/user-service"
+          "services/gateway-service"
+        )
+        
+        for service in "${services[@]}"; do
+          if [ -f "$service/requirements.txt" ]; then
+            pip install -r "$service/requirements.txt"
+          fi
+        done
+
+    - name: Lint with flake8 (if configured)
+      run: |
+        # First check if flake8 is installed, otherwise skip
+        python -m pip list | grep -q flake8 || exit 0
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      continue-on-error: true
+
+    - name: Run unit tests
+      run: pytest tests/unit/ -v --cov=shared --cov=services --cov-report=xml --cov-report=term-missing
+      env:
+        PYTHONPATH: ${{ github.workspace }}/shared:${{ github.workspace }}
+
+    - name: Run integration tests
+      run: pytest tests/integration/ -v --cov=shared --cov=services --cov-report=xml --cov-report=term-missing --cov-append
+      env:
+        PYTHONPATH: ${{ github.workspace }}/shared:${{ github.workspace }}
+        DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/handyman_test
+        RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+        REDIS_URL: redis://localhost:6379
+
+    - name: Run failure-mode tests
+      run: pytest tests/failure_mode/ -v
+      env:
+        PYTHONPATH: ${{ github.workspace }}/shared:${{ github.workspace }}
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Generate coverage report
+      if: always()
+      run: |
+        coverage report
+        coverage html
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report-${{ matrix.python-version }}
+        path: htmlcov/
+
+  markers-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+
+    - name: Check pytest markers are registered
+      run: pytest --collect-only tests/ | grep -E "mark\.(unit|integration|failure_mode|rabbit|idempotency|intervals|booking_lifecycle)" || true

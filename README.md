@@ -709,6 +709,13 @@ Gateway exposed:
 
 ---
 
+## Documentation
+
+- [Testing Guide](tests/README.md) — Comprehensive testing documentation including unit, integration, and failure-mode tests
+- [Testing Quickref](TESTING_QUICKREF.md) — Quick reference for common testing commands
+- [Testing Details](TESTING.md) — Detailed testing strategies and patterns
+- [Testing Delivery](TESTING_DELIVERY.md) — Testing implementation and delivery notes
+
 ## Notes
 
 - The system is designed so **writes** are local/transactional and **reads** can be cached/projection-driven.

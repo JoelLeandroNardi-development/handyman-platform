@@ -10,6 +10,17 @@ dependencies = [
     "pydantic>=2.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "httpx>=0.25",
+    "aiosqlite>=0.19",
+    "coverage>=7.4",
+]
+
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
