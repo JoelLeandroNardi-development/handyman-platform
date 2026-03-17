@@ -129,35 +129,54 @@ async def process_event(payload: dict):
 
     if event_type == "booking.requested":
         booking_id = data.get("booking_id")
+        user_email = data.get("user_email")
         handyman_email = data.get("handyman_email")
         desired_start = data.get("desired_start")
         desired_end = data.get("desired_end")
 
-        if not all([booking_id, handyman_email, desired_start, desired_end]):
+        if not all([booking_id, user_email, handyman_email, desired_start, desired_end]):
             return
 
         ok_slot = await handyman_has_slot(handyman_email, desired_start, desired_end)
         if not ok_slot:
             ev = build_event(
                 "slot.rejected",
-                {"booking_id": booking_id, "reason": "no_matching_slot"},
+                {
+                    "booking_id": booking_id,
+                    "user_email": user_email,
+                    "handyman_email": handyman_email,
+                    "reason": "no_matching_slot",
+                },
             )
             await enqueue_domain_event(ev)
             return
 
         ok = await create_reservation(
             booking_id,
+            user_email,
             handyman_email,
             desired_start,
             desired_end,
         )
         if ok:
-            ev = build_event("slot.reserved", {"booking_id": booking_id})
+            ev = build_event(
+                "slot.reserved",
+                {
+                    "booking_id": booking_id,
+                    "user_email": user_email,
+                    "handyman_email": handyman_email,
+                },
+            )
             await enqueue_domain_event(ev)
         else:
             ev = build_event(
                 "slot.rejected",
-                {"booking_id": booking_id, "reason": "slot_conflict_reserved"},
+                {
+                    "booking_id": booking_id,
+                    "user_email": user_email,
+                    "handyman_email": handyman_email,
+                    "reason": "slot_conflict_reserved",
+                },
             )
             await enqueue_domain_event(ev)
         return
@@ -175,7 +194,12 @@ async def process_event(payload: dict):
         if not res:
             ev = build_event(
                 "slot.rejected",
-                {"booking_id": booking_id, "reason": "reservation_missing"},
+                {
+                    "booking_id": booking_id,
+                    "user_email": data.get("user_email"),
+                    "handyman_email": handyman_email,
+                    "reason": "reservation_missing",
+                },
             )
             await enqueue_domain_event(ev)
             return
@@ -184,7 +208,14 @@ async def process_event(payload: dict):
         await delete_reservation(booking_id)
         await emit_availability_updated(handyman_email)
 
-        ev = build_event("slot.confirmed", {"booking_id": booking_id})
+        ev = build_event(
+            "slot.confirmed",
+            {
+                "booking_id": booking_id,
+                "user_email": res.get("user_email") or data.get("user_email"),
+                "handyman_email": res.get("handyman_email") or handyman_email,
+            },
+        )
         await enqueue_domain_event(ev)
         return
 
@@ -193,9 +224,18 @@ async def process_event(payload: dict):
         if not booking_id:
             return
 
+        res = await get_reservation(booking_id)
         await delete_reservation(booking_id)
 
-        ev = build_event("slot.released", {"booking_id": booking_id})
+        ev = build_event(
+            "slot.released",
+            {
+                "booking_id": booking_id,
+                "user_email": data.get("user_email") or (res or {}).get("user_email"),
+                "handyman_email": data.get("handyman_email") or (res or {}).get("handyman_email"),
+                "reason": data.get("reason"),
+            },
+        )
         await enqueue_domain_event(ev)
         return
 

@@ -60,6 +60,7 @@ class TestReservationCrud:
 
         result = await reservations_module.create_reservation(
             "booking-1",
+            "user@example.com",
             "pro@example.com",
             "2026-03-17T10:00:00+00:00",
             "2026-03-17T12:00:00+00:00",
@@ -69,6 +70,7 @@ class TestReservationCrud:
         payload_json = fake_pipe.set.call_args.args[1]
         payload = json.loads(payload_json)
         assert payload["booking_id"] == "booking-1"
+        assert payload["user_email"] == "user@example.com"
         assert payload["handyman_email"] == "pro@example.com"
         fake_pipe.expire.assert_called_once_with("reservations_by_handyman:pro@example.com", reservations_module.RES_TTL_SECONDS + 30)
         fake_pipe.zadd.assert_called_once_with("reservation_expiry", {"booking-1": 1000.0 + reservations_module.RES_TTL_SECONDS})
@@ -87,6 +89,7 @@ class TestReservationCrud:
 
         result = await reservations_module.create_reservation(
             "booking-new",
+            "user@example.com",
             "pro@example.com",
             "2026-03-17T11:00:00+00:00",
             "2026-03-17T13:00:00+00:00",
@@ -108,6 +111,7 @@ class TestReservationCrud:
 
         result = await reservations_module.create_reservation(
             "booking-new",
+            "user@example.com",
             "pro@example.com",
             "2026-03-17T13:00:00+00:00",
             "2026-03-17T14:00:00+00:00",

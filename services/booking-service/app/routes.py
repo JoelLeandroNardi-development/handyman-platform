@@ -115,6 +115,7 @@ async def confirm_booking(booking_id: str):
             "booking.confirm_requested",
             {
                 "booking_id": booking.booking_id,
+                "user_email": booking.user_email,
                 "handyman_email": booking.handyman_email,
                 "desired_start": booking.desired_start,
                 "desired_end": booking.desired_end,
@@ -148,6 +149,7 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
             "booking.cancel_requested",
             {
                 "booking_id": booking.booking_id,
+                "user_email": booking.user_email,
                 "handyman_email": booking.handyman_email,
                 "desired_start": booking.desired_start,
                 "desired_end": booking.desired_end,

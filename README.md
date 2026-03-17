@@ -148,6 +148,38 @@ Current direction:
 - **Stop calling handyman-service at request time** by maintaining a handyman projection (Redis) fed by `handyman.created` + `handyman.location_updated`.
 - **Approach A**: stop calling availability-service at request time by using availability projection fed by `availability.updated` which includes full slots.
 
+### notification-service
+
+**Role:** event-driven fanout for customer and handyman notifications.
+
+**Consumes**
+
+- `booking.requested`
+- `slot.reserved`
+- `slot.confirmed`
+- `slot.rejected`
+- `slot.expired`
+- `booking.cancel_requested`
+
+**Fanout channels (current)**
+
+- email
+- push
+
+Provider implementation (open-source/self-hosted):
+
+- Email via SMTP (default local target: MailHog)
+- Push via ntfy (`binwiederhier/ntfy`)
+
+Notification target fields expected in event `data`:
+
+- email targets: `user_email`, `handyman_email`, `email`
+- push targets: `user_push_topic`, `handyman_push_topic`, `push_topic`
+
+**Planned later**
+
+- SMS
+
 ---
 
 ## Shared library (`shared/shared/`)

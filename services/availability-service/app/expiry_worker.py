@@ -2,7 +2,7 @@ import asyncio
 import time
 
 from .redis_client import redis_client
-from .reservations import delete_reservation
+from .reservations import delete_reservation, get_reservation
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
 
@@ -17,9 +17,17 @@ async def expiry_loop(stop_event: asyncio.Event):
         if expired:
             for booking_id in expired:
                 await redis_client.zrem(EXPIRY_ZSET, booking_id)
+                reservation = await get_reservation(booking_id)
                 await delete_reservation(booking_id)
 
-                ev = build_event("slot.expired", {"booking_id": booking_id})
+                ev = build_event(
+                    "slot.expired",
+                    {
+                        "booking_id": booking_id,
+                        "user_email": (reservation or {}).get("user_email"),
+                        "handyman_email": (reservation or {}).get("handyman_email"),
+                    },
+                )
                 await enqueue_domain_event(ev)
 
         try:

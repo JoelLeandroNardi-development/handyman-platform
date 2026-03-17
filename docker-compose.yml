@@ -42,6 +42,20 @@ services:
       timeout: 5s
       retries: 12
 
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    container_name: ntfy
+    command: ["serve"]
+    ports:
+      - '8081:80'
+
   auth-service:
     build:
       context: .
@@ -151,6 +165,30 @@ services:
       availability-service:
         condition: service_started
 
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: notification-service
+    env_file:
+      - .env
+    environment:
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
+      EXCHANGE_NAME: domain_events
+      NOTIFY_EMAIL_ENABLED: 'true'
+      SMTP_HOST: mailhog
+      SMTP_PORT: '1025'
+      SMTP_FROM: noreply@handyman.local
+      NOTIFY_PUSH_ENABLED: 'true'
+      NTFY_BASE_URL: http://ntfy:80
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+      ntfy:
+        condition: service_started
+
   gateway-service:
     build:
       context: .
@@ -175,6 +213,8 @@ services:
       match-service:
         condition: service_started
       booking-service:
+        condition: service_started
+      notification-service:
         condition: service_started
     ports:
       - '8000:8000'

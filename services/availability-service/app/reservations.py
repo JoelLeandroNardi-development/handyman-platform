@@ -27,6 +27,7 @@ def _parse(dt_str: str) -> datetime:
 
 async def create_reservation(
     booking_id: str,
+    user_email: str,
     handyman_email: str,
     desired_start: str,
     desired_end: str,
@@ -55,6 +56,7 @@ async def create_reservation(
 
     payload = {
         "booking_id": booking_id,
+        "user_email": user_email,
         "handyman_email": handyman_email,
         "desired_start": desired_start,
         "desired_end": desired_end,
