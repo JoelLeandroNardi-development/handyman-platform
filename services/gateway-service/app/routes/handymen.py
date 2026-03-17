@@ -125,13 +125,11 @@ async def list_handyman_reviews_endpoint(
 @router.get("/skills-catalog", tags=["Handymen"])
 async def get_skills_catalog_endpoint(
     request: Request,
-    user=Depends(get_current_user),
     active_only: bool = Query(True),
 ):
-    require_role(user, ["user", "handyman", "admin"])
     return await get_skills_catalog(
         request_id=request.state.request_id,
-        user_payload=user,
+        user_payload=None,
         active_only=active_only,
     )
 
@@ -139,13 +137,11 @@ async def get_skills_catalog_endpoint(
 @router.get("/skills-catalog/flat", response_model=SkillCatalogFlatResponse, tags=["Handymen"])
 async def get_skills_catalog_flat_endpoint(
     request: Request,
-    user=Depends(get_current_user),
     active_only: bool = Query(True),
 ):
-    require_role(user, ["user", "handyman", "admin"])
     return await get_skills_catalog_flat(
         request_id=request.state.request_id,
-        user_payload=user,
+        user_payload=None,
         active_only=active_only,
     )
 
