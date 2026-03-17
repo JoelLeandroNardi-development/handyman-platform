@@ -27,8 +27,10 @@ class TokenPairResponse(BaseModel):
     expires_in: int | None = None
 
 
-class TokenResponse(TokenPairResponse):
-    pass
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+    expires_in: int | None = None
 
 
 class RefreshRequest(BaseModel):
