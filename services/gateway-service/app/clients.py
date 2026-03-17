@@ -96,6 +96,10 @@ async def login_user(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/login", data, request_id, None)
 
 
+async def google_login_user(data: dict, request_id: str | None = None):
+    return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/auth/google", data, request_id, None)
+
+
 async def refresh_user_token(data: dict, request_id: str | None = None):
     return await _call_with_breaker(cb_auth, "POST", f"{AUTH_SERVICE_URL}/refresh", data, request_id, None)
 

@@ -7,3 +7,4 @@ passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 python-jose==3.3.0
 pydantic==2.6.1
+google-auth==2.38.0

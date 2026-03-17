@@ -4,6 +4,8 @@ from typing import List
 from ..schemas import (
     Register,
     Login,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
     TokenPairResponse,
     RefreshRequest,
     LogoutRequest,
@@ -25,6 +27,7 @@ from ..schemas import (
 from ..clients import (
     register_user,
     login_user,
+    google_login_user,
     refresh_user_token,
     logout_user,
     forgot_password,
@@ -61,6 +64,11 @@ async def register(data: Register, request: Request):
 @router.post("/login", response_model=TokenPairResponse, tags=["Auth"])
 async def login(data: Login, request: Request):
     return await login_user(data.model_dump(), request_id=request.state.request_id)
+
+
+@router.post("/auth/google", response_model=GoogleLoginResponse, tags=["Auth"])
+async def google_login(data: GoogleLoginRequest, request: Request):
+    return await google_login_user(data.model_dump(), request_id=request.state.request_id)
 
 
 @router.post("/refresh", response_model=TokenPairResponse, tags=["Auth"])

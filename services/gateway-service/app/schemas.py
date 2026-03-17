@@ -3,6 +3,8 @@ from typing import List, Optional
 from shared.shared.schemas.auth import (
     Register,
     Login,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
     TokenPairResponse,
     TokenResponse,
     RefreshRequest,

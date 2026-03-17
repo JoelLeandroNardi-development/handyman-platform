@@ -21,10 +21,20 @@ class Login(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+
 class TokenPairResponse(BaseModel):
     access_token: str
     refresh_token: str
     expires_in: int | None = None
+
+
+class GoogleLoginResponse(TokenPairResponse):
+    is_new_user: bool
+    email: str
+    roles: List[str]
 
 
 class TokenResponse(BaseModel):

@@ -11,6 +11,8 @@ from .models import AuthSession, AuthUser, EmailVerificationToken, PasswordReset
 from .schemas import (
     Register,
     Login,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
     TokenPairResponse,
     RefreshRequest,
     LogoutRequest,
@@ -105,6 +107,95 @@ async def login(data: Login, db: AsyncSession = Depends(get_db)):
         "access_token": tokens.access_token,
         "refresh_token": tokens.refresh_token,
         "expires_in": int((tokens.access_expires_at - now).total_seconds()),
+    }
+
+
+@router.post("/auth/google", response_model=GoogleLoginResponse)
+async def google_login(payload: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(status_code=503, detail="GOOGLE_CLIENT_ID is not configured")
+
+    try:
+        from google.auth.transport.requests import Request as GoogleRequest
+        from google.oauth2 import id_token as google_id_token
+
+        token_payload = google_id_token.verify_oauth2_token(
+            payload.id_token,
+            GoogleRequest(),
+            audience=client_id,
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+
+    issuer = token_payload.get("iss")
+    if issuer not in {"accounts.google.com", "https://accounts.google.com"}:
+        raise HTTPException(status_code=401, detail="Invalid Google token issuer")
+
+    email = str(token_payload.get("email") or "").strip().lower()
+    google_sub = str(token_payload.get("sub") or "").strip()
+    email_verified = bool(token_payload.get("email_verified"))
+
+    if not email or not google_sub:
+        raise HTTPException(status_code=401, detail="Google token missing required claims")
+    if not email_verified:
+        raise HTTPException(status_code=401, detail="Google account email is not verified")
+
+    user = (
+        await db.execute(select(AuthUser).where(AuthUser.google_sub == google_sub))
+    ).scalar_one_or_none()
+    is_new_user = False
+
+    if not user:
+        user = (await db.execute(select(AuthUser).where(AuthUser.email == email))).scalar_one_or_none()
+
+    if not user:
+        is_new_user = True
+        user = AuthUser(
+            email=email,
+            password=pwd_context.hash(generate_opaque_token()),
+            roles=["user"],
+            is_email_verified=True,
+            auth_provider="google",
+            google_sub=google_sub,
+        )
+        db.add(user)
+        await db.flush()
+    else:
+        if not user.google_sub:
+            user.google_sub = google_sub
+        user.is_email_verified = bool(user.is_email_verified) or email_verified
+        if not user.auth_provider:
+            user.auth_provider = "google"
+
+    now = datetime.now(timezone.utc)
+    user.last_login_at = now
+
+    session_id = str(uuid4())
+    roles = list(user.roles or ["user"])
+    tokens = issue_token_pair(
+        user_email=user.email,
+        roles=roles,
+        session_id=session_id,
+    )
+
+    db.add(
+        AuthSession(
+            id=session_id,
+            user_id=user.id,
+            refresh_token_hash=hash_token(tokens.refresh_token),
+            expires_at=tokens.refresh_expires_at,
+        )
+    )
+    await db.commit()
+
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "expires_in": int((tokens.access_expires_at - now).total_seconds()),
+        "is_new_user": is_new_user,
+        "email": user.email,
+        "roles": roles,
     }
 
 
