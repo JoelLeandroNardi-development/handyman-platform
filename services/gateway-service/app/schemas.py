@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import datetime
 from shared.shared.schemas.auth import (
     Register,
     Login,
@@ -47,6 +46,16 @@ from shared.shared.schemas.bookings import (
 )
 from shared.shared.schemas.bookings import CreateBooking as CreateBookingRequest
 from shared.shared.schemas.bookings import CancelBooking as CancelBookingRequest
+from shared.shared.schemas.notifications import (
+    MarkAllReadResponse,
+    NotificationItem,
+    NotificationListResponse,
+    NotificationPreferencesResponse,
+    PushDeviceResponse,
+    RegisterPushDeviceRequest,
+    UnreadCountResponse,
+    UpdateNotificationPreferencesRequest,
+)
 
 class OnboardingUserRequest(BaseModel):
     email: str
@@ -118,3 +127,7 @@ class MeResponse(BaseModel):
     roles: List[str]
     user_profile: Optional[UserResponse] = None
     handyman_profile: Optional[HandymanResponse] = None
+
+
+class OkResponse(BaseModel):
+    ok: bool = True
