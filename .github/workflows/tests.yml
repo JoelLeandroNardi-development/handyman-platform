@@ -8,6 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONPATH: ${{ github.workspace }}
 
 jobs:
   test:
@@ -103,21 +104,16 @@ jobs:
 
     - name: Run unit tests
       run: pytest tests/unit/ -v --cov=shared --cov=services --cov-report=xml --cov-report=term-missing
-      env:
-        PYTHONPATH: ${{ github.workspace }}/shared:${{ github.workspace }}
 
     - name: Run integration tests
       run: pytest tests/integration/ -v --cov=shared --cov=services --cov-report=xml --cov-report=term-missing --cov-append
       env:
-        PYTHONPATH: ${{ github.workspace }}/shared:${{ github.workspace }}
         DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/handyman_test
         RABBITMQ_URL: amqp://guest:guest@localhost:5672/
         REDIS_URL: redis://localhost:6379
 
     - name: Run failure-mode tests
       run: pytest tests/failure_mode/ -v
-      env:
-        PYTHONPATH: ${{ github.workspace }}/shared:${{ github.workspace }}
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
