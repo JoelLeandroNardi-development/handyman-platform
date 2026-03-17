@@ -130,8 +130,8 @@ jobs:
     - name: Generate coverage report
       if: always()
       run: |
-        coverage report
-        coverage html
+        python -m coverage report
+        python -m coverage html
 
     - name: Upload coverage report
       if: always()
