@@ -29,7 +29,7 @@ OPENAPI_TAGS = [
     {"name": "Notifications"},
 ]
 
-app = FastAPI(title="Smart API Gateway", openapi_tags=OPENAPI_TAGS)
+app = FastAPI(title="NearHand API Gateway", openapi_tags=OPENAPI_TAGS)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_per_minute=120)
 
