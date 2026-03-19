@@ -15,7 +15,7 @@ from .repository import create_notification_if_absent, get_preferences, unread_c
 from .sse import hub
 from .schemas import NotificationItem
 
-RABBIT_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+RABBIT_URL = os.getenv("RABBIT_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE_NAME = os.getenv("DOMAIN_EVENTS_EXCHANGE", "domain_events")
 QUEUE_NAME = os.getenv("NOTIFICATION_QUEUE", "notification_service_events")
 RETRY_QUEUE = f"{QUEUE_NAME}_retry"

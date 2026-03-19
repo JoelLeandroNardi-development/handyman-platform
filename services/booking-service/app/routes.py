@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import Booking, OutboxEvent
@@ -22,6 +22,11 @@ from shared.shared.outbox_helpers import add_outbox_event
 from shared.shared.crud_helpers import fetch_or_404
 
 router = APIRouter()
+
+VALID_BOOKING_STATUSES = frozenset({
+    "PENDING", "RESERVED", "CONFIRMED", "COMPLETED",
+    "CANCELED", "FAILED", "EXPIRED", "REJECTED",
+})
 
 
 def _to_response(booking: Booking) -> BookingResponse:
@@ -77,23 +82,9 @@ async def create_booking(data: CreateBooking):
         add_outbox_event(db, OutboxEvent, event)
 
         await db.commit()
+        await db.refresh(booking)
 
-    return BookingResponse(
-        booking_id=booking_id,
-        status="PENDING",
-        user_email=data.user_email,
-        handyman_email=data.handyman_email,
-        desired_start=data.desired_start,
-        desired_end=data.desired_end,
-        job_description=data.job_description,
-        completed_by_user=False,
-        completed_by_handyman=False,
-        completed_at=None,
-        rejected_by_handyman=False,
-        rejection_reason=None,
-        failure_reason=None,
-        cancellation_reason=None,
-    )
+    return _to_response(booking)
 
 
 @router.get("/bookings/{booking_id}", response_model=BookingResponse)
@@ -275,6 +266,11 @@ async def admin_update_booking(booking_id: str, data: UpdateBookingAdmin):
         booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if data.status is not None:
+            if data.status not in VALID_BOOKING_STATUSES:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid booking status: {data.status!r}. Allowed: {sorted(VALID_BOOKING_STATUSES)}",
+                )
             booking.status = data.status
         if data.failure_reason is not None:
             booking.failure_reason = data.failure_reason
@@ -293,6 +289,6 @@ async def admin_delete_booking(booking_id: str):
     async with SessionLocal() as db:
         booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
-        await db.execute(delete(Booking).where(Booking.booking_id == booking_id))
+        await db.delete(booking)
         await db.commit()
         return {"message": "deleted", "booking_id": booking_id}

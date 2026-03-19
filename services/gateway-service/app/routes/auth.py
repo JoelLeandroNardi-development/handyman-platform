@@ -147,7 +147,7 @@ async def onboarding_user(data: OnboardingUserRequest, request: Request):
         {
             "email": data.email,
             "password": data.password,
-            "roles": list(dict.fromkeys([*(data.roles or []), "user"])),
+            "roles": list({*(data.roles or []), "user"}),
         },
         request_id=request.state.request_id,
     )
@@ -187,7 +187,7 @@ async def onboarding_handyman(data: OnboardingHandymanRequest, request: Request)
         {
             "email": data.email,
             "password": data.password,
-            "roles": list(dict.fromkeys([*(data.roles or []), "handyman"])),
+            "roles": list({*(data.roles or []), "handyman"}),
         },
         request_id=request.state.request_id,
     )
@@ -230,7 +230,7 @@ async def onboarding_combined(data: OnboardingCombinedRequest, request: Request)
         {
             "email": data.email,
             "password": data.password,
-            "roles": list(dict.fromkeys([*(data.roles or []), "user", "handyman"])),
+            "roles": list({*(data.roles or []), "user", "handyman"}),
         },
         request_id=request.state.request_id,
     )

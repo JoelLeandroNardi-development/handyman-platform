@@ -2,7 +2,7 @@ import os
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 
@@ -26,14 +26,14 @@ from .schemas import (
 )
 from .token_service import JWTError, decode_token, generate_opaque_token, hash_token, issue_token_pair
 from shared.shared.crud_helpers import fetch_or_404
+from shared.shared.db import make_get_db
 
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"])
+get_db = make_get_db(SessionLocal)
 
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
+_DEBUG = os.getenv("DEBUG_MODE", "").lower() in ("1", "true", "yes")
 
 
 def _to_response(u: AuthUser) -> AuthUserResponse:
@@ -297,12 +297,12 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Dep
         id=str(uuid4()),
         user_id=user.id,
         token_hash=hash_token(raw_token),
-        expires_at=datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
     )
     db.add(reset)
     await db.commit()
 
-    return {"ok": True, "debug_token": raw_token}
+    return {"ok": True, "debug_token": raw_token if _DEBUG else None}
 
 
 @router.post("/password/reset", response_model=AuthActionResponse)
@@ -344,12 +344,12 @@ async def request_email_verification(payload: EmailVerifyRequest, db: AsyncSessi
         id=str(uuid4()),
         user_id=user.id,
         token_hash=hash_token(raw_token),
-        expires_at=datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=24),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
     )
     db.add(verify)
     await db.commit()
 
-    return {"ok": True, "debug_token": raw_token}
+    return {"ok": True, "debug_token": raw_token if _DEBUG else None}
 
 
 @router.post("/email/verify/confirm", response_model=AuthActionResponse)
@@ -426,7 +426,7 @@ async def update_auth_user(
 async def delete_auth_user(user_id: int, db: AsyncSession = Depends(get_db)):
     u = await fetch_or_404(db, AuthUser, filter_column=AuthUser.id, filter_value=user_id, detail="Auth user not found")
 
-    await db.execute(delete(AuthUser).where(AuthUser.id == user_id))
+    await db.delete(u)
     await db.commit()
 
     return {"message": "deleted", "user_id": user_id}

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
 
 import aio_pika
 from aio_pika import DeliveryMode, ExchangeType, Message
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -51,11 +54,11 @@ class RabbitPublisher:
                 ExchangeType.TOPIC,
                 durable=True,
             )
-            print(f"[shared.mq] publisher ready exchange={self.cfg.exchange_name}")
+            logger.info("publisher ready exchange=%s", self.cfg.exchange_name)
         except Exception as e:
-            print(
-                f"[shared.mq] publisher.start() failed (will retry on publish): "
-                f"{type(e).__name__}: {e}"
+            logger.warning(
+                "publisher.start() failed (will retry on publish): %s: %s",
+                type(e).__name__, e,
             )
             await self.close()
 
@@ -81,7 +84,7 @@ class RabbitPublisher:
         if not self.enabled:
             raise RuntimeError("RabbitPublisher disabled (no RABBIT_URL)")
 
-        if self._exchange is not None and self._conn and not self._conn.is_closed:
+        if self._exchange is not None and self._conn is not None and not self._conn.is_closed:
             return
 
         self._conn = await aio_pika.connect_robust(self.cfg.url)
@@ -91,7 +94,7 @@ class RabbitPublisher:
             ExchangeType.TOPIC,
             durable=True,
         )
-        print(f"[shared.mq] publisher reconnected exchange={self.cfg.exchange_name}")
+        logger.info("publisher reconnected exchange=%s", self.cfg.exchange_name)
 
     async def publish(
         self,
@@ -110,7 +113,8 @@ class RabbitPublisher:
             raise ValueError("routing_key is required")
 
         await self._ensure_ready()
-        assert self._exchange is not None
+        if self._exchange is None:
+            raise RuntimeError("Exchange is not initialized after _ensure_ready")
 
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         msg = Message(
@@ -123,13 +127,14 @@ class RabbitPublisher:
 
         try:
             await self._exchange.publish(msg, routing_key=rk, mandatory=mandatory)
-            print(
-                f"[shared.mq] published exchange={self.cfg.exchange_name} rk={rk} message_id={message_id}"
+            logger.debug(
+                "published exchange=%s rk=%s message_id=%s",
+                self.cfg.exchange_name, rk, message_id,
             )
         except Exception as e:
-            print(
-                f"[shared.mq] publish failed exchange={self.cfg.exchange_name} rk={rk} "
-                f"message_id={message_id} err={type(e).__name__}: {e}"
+            logger.error(
+                "publish failed exchange=%s rk=%s message_id=%s err=%s: %s",
+                self.cfg.exchange_name, rk, message_id, type(e).__name__, e,
             )
             raise
 

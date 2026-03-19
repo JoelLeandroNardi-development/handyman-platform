@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Awaitable, Callable, Iterable
 
 import aio_pika
 from aio_pika import ExchangeType, Message, DeliveryMode
+
+logger = logging.getLogger(__name__)
 
 Handler = Callable[[dict], Awaitable[None]]
 
@@ -92,9 +95,9 @@ async def run_consumer_with_retry_dlq(
 
     main_queue = await channel.get_queue(queue_name, ensure=False)
 
-    print(
-        f"[{service_label}] consuming queue={queue_name} exchange={exchange_name} "
-        f"routing_keys={routing_keys} retry={retry_queue} dlq={dlq_queue}"
+    logger.info(
+        "[%s] consuming queue=%s exchange=%s routing_keys=%s retry=%s dlq=%s",
+        service_label, queue_name, exchange_name, routing_keys, retry_queue, dlq_queue,
     )
 
     async def _on_message(message: aio_pika.IncomingMessage):
@@ -107,7 +110,7 @@ async def run_consumer_with_retry_dlq(
             retry_count = int(headers_in.get("x-retry-count", 0) or 0)
 
             if retry_count >= max_retries:
-                print(f"[{service_label}] Poison -> DLQ: {type(e).__name__}: {e}")
+                logger.error("[%s] Poison -> DLQ: %s: %s", service_label, type(e).__name__, e)
                 await message.reject(requeue=False)
                 return
 
@@ -121,7 +124,7 @@ async def run_consumer_with_retry_dlq(
             )
 
             await message.channel.default_exchange.publish(retry_msg, routing_key=retry_queue)
-            print(f"[{service_label}] retry #{retry_count + 1}")
+            logger.warning("[%s] retry #%d", service_label, retry_count + 1)
 
             await message.ack()
 

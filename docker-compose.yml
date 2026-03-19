@@ -175,7 +175,7 @@ services:
       - .env
     environment:
       NOTIFICATION_DB: postgresql+asyncpg://admin:admin@notification-db:5432/notification_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672/
       DOMAIN_EVENTS_EXCHANGE: domain_events
       NOTIFICATION_QUEUE: notification_service_events
     depends_on:

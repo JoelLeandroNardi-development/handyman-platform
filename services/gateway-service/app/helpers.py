@@ -11,6 +11,7 @@ from .clients import (
     cb_availability,
     cb_match,
     cb_booking,
+    cb_notification,
     get_auth_user_by_email,
     get_booking,
 )
@@ -25,6 +26,7 @@ def _breaker_registry():
         "availability-service": cb_availability,
         "match-service": cb_match,
         "booking-service": cb_booking,
+        "notification-service": cb_notification,
     }
 
 

@@ -5,10 +5,10 @@ import aio_pika
 
 from shared.shared.consumer import run_consumer_with_retry_dlq
 from shared.shared.idempotency import already_processed
-from shared.shared.intervals import fully_contains as contains_interval
+from shared.shared.intervals import fully_contains as contains_interval, overlaps
 
 from .redis_client import redis_client
-from .reservations import create_reservation, get_reservation, delete_reservation, overlaps
+from .reservations import create_reservation, get_reservation, delete_reservation
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
 from .messaging import RABBIT_URL, EXCHANGE_NAME
@@ -27,22 +27,16 @@ ROUTING_KEYS = [
 IDEMPOTENCY_TTL = 3600
 
 
-def parse(dt: str):
-    return parser.isoparse(dt)
-
-
 async def read_current_slots(email: str) -> list[dict]:
     slots = await redis_client.lrange(avail_key(email), 0, -1)
 
     parsed: list[dict] = []
     for slot in slots or []:
-        try:
-            s, e = slot.split("|")
-            ss = parse(s)
-            ee = parse(e)
-            parsed.append({"start": ss.isoformat(), "end": ee.isoformat()})
-        except Exception:
+        result = parse_raw_slot(slot)
+        if result is None:
             continue
+        ss, ee = result
+        parsed.append({"start": ss.isoformat(), "end": ee.isoformat()})
 
     return parsed
 
@@ -59,21 +53,18 @@ async def emit_availability_updated(email: str) -> None:
 
 
 async def handyman_has_slot(email: str, desired_start: str, desired_end: str) -> bool:
-    ds = parse(desired_start)
-    de = parse(desired_end)
+    ds = parser.isoparse(desired_start)
+    de = parser.isoparse(desired_end)
 
     if de <= ds:
         return False
 
     slots = await redis_client.lrange(avail_key(email), 0, -1)
     for slot in slots:
-        try:
-            s, e = slot.split("|")
-            ss = parse(s)
-            ee = parse(e)
-        except Exception:
+        result = parse_raw_slot(slot)
+        if result is None:
             continue
-
+        ss, ee = result
         if contains_interval(ss, ee, ds, de):
             return True
 
@@ -81,20 +72,18 @@ async def handyman_has_slot(email: str, desired_start: str, desired_end: str) ->
 
 
 async def apply_confirm_to_slots(email: str, desired_start: str, desired_end: str):
-    ds = parse(desired_start)
-    de = parse(desired_end)
+    ds = parser.isoparse(desired_start)
+    de = parser.isoparse(desired_end)
 
     key = avail_key(email)
     slots = await redis_client.lrange(key, 0, -1)
 
     new_slots: list[str] = []
     for slot in slots:
-        try:
-            s, e = slot.split("|")
-            ss = parse(s)
-            ee = parse(e)
-        except Exception:
+        result = parse_raw_slot(slot)
+        if result is None:
             continue
+        ss, ee = result
 
         if not overlaps(ss, ee, ds, de):
             new_slots.append(f"{ss.isoformat()}|{ee.isoformat()}")

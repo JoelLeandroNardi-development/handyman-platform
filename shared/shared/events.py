@@ -54,7 +54,7 @@ def build_event_jsonable(
 
 
 def make_event_builder(service_name: str):
-    def build_event(event_type: str, data: dict) -> dict:
+    def _build(event_type: str, data: dict) -> dict:
         return build_event_jsonable(event_type, data, source=service_name)
 
-    return build_event
+    return _build

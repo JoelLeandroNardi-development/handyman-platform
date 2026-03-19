@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
 from typing import Sequence
 
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 
 async def _claim_batch(
@@ -110,7 +113,7 @@ async def run_outbox_loop(
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            print(f"[{service_label}] outbox worker loop error: {type(e).__name__}: {e}")
+            logger.error("[%s] outbox worker loop error: %s: %s", service_label, type(e).__name__, e)
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=2.0)
             except asyncio.TimeoutError:

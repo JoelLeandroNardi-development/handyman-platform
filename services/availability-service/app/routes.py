@@ -10,7 +10,7 @@ from .schemas import SetAvailability, OverlapRequest, AvailabilitySlot
 from .reservations import get_reservation, delete_reservation
 from .events import build_event
 from .outbox_worker import enqueue_domain_event
-from .slot_helpers import avail_key, parse_raw_slot
+from .slot_helpers import avail_key
 
 router = APIRouter()
 

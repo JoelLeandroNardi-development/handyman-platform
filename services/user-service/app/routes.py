@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import User, OutboxEvent
@@ -50,22 +50,7 @@ async def create_user(data: CreateUser):
         )
         db.add(u)
 
-        evt = build_event(
-            "user.created",
-            {
-                "email": data.email,
-                "first_name": data.first_name,
-                "last_name": data.last_name,
-                "phone": data.phone,
-                "national_id": data.national_id,
-                "address_line": data.address_line,
-                "postal_code": data.postal_code,
-                "city": data.city,
-                "country": data.country,
-                "latitude": data.latitude,
-                "longitude": data.longitude,
-            },
-        )
+        add_outbox_event(db, OutboxEvent, build_event("user.created", data.model_dump()))
 
         add_outbox_event(db, OutboxEvent, evt)
 
@@ -156,10 +141,8 @@ async def delete_user(email: str):
     async with SessionLocal() as db:
         u = await fetch_or_404(db, User, filter_column=User.email, filter_value=email, detail="User not found")
 
-        evt = build_event("user.deleted", {"email": email})
+        add_outbox_event(db, OutboxEvent, build_event("user.deleted", {"email": email}))
 
-        add_outbox_event(db, OutboxEvent, evt)
-
-        await db.execute(delete(User).where(User.email == email))
+        await db.delete(u)
         await db.commit()
         return {"message": "deleted", "email": email}
