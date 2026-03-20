@@ -179,3 +179,160 @@ class TestRunOutboxLoop:
         )
 
         assert 2.0 in wait_calls
+
+
+@pytest.mark.unit
+class TestBookingRejectedOutboxBehavior:
+    """Verify outbox worker handles booking.rejected events correctly,
+    covering the retry and idempotency acceptance criteria."""
+
+    @pytest.mark.asyncio
+    async def test_booking_rejected_event_published_and_marked_sent(self, monkeypatch):
+        stop_event = asyncio.Event()
+        publisher = MagicMock()
+        publisher.start = AsyncMock()
+        publisher.publish = AsyncMock(side_effect=lambda **kwargs: stop_event.set())
+        session = MagicMock()
+        session.begin.return_value = _BeginCtx()
+
+        ev = SimpleNamespace(
+            id=10,
+            routing_key="booking.rejected",
+            payload={"event_type": "booking.rejected", "data": {"booking_id": "b-001", "reason": "Unavailable"}},
+            event_id="evt-rejected-1",
+            attempts=0,
+        )
+        mark_sent = AsyncMock()
+
+        monkeypatch.setattr("shared.shared.outbox_worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_sent", mark_sent)
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_failure", AsyncMock())
+
+        await run_outbox_loop(
+            stop_event=stop_event,
+            SessionLocal=lambda: _SessionCtx(session),
+            OutboxEvent=OutboxEventModel,
+            publisher=publisher,
+            poll_interval=0.01,
+        )
+
+        publisher.publish.assert_awaited_once_with(
+            routing_key="booking.rejected",
+            payload=ev.payload,
+            message_id="evt-rejected-1",
+        )
+        mark_sent.assert_awaited_once_with(session, OutboxEventModel, 10)
+
+    @pytest.mark.asyncio
+    async def test_booking_rejected_event_retried_on_publish_failure(self, monkeypatch):
+        stop_event = asyncio.Event()
+        publisher = MagicMock()
+        publisher.start = AsyncMock()
+
+        async def fail_publish(**kwargs):
+            stop_event.set()
+            raise RuntimeError("broker unreachable")
+
+        publisher.publish = AsyncMock(side_effect=fail_publish)
+        session = MagicMock()
+        session.begin.return_value = _BeginCtx()
+
+        ev = SimpleNamespace(
+            id=11,
+            routing_key="booking.rejected",
+            payload={"event_type": "booking.rejected", "data": {"booking_id": "b-002"}},
+            event_id="evt-rejected-2",
+            attempts=3,
+        )
+        mark_failure = AsyncMock()
+
+        monkeypatch.setattr("shared.shared.outbox_worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_sent", AsyncMock())
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_failure", mark_failure)
+
+        await run_outbox_loop(
+            stop_event=stop_event,
+            SessionLocal=lambda: _SessionCtx(session),
+            OutboxEvent=OutboxEventModel,
+            publisher=publisher,
+            max_attempts=10,
+            poll_interval=0.01,
+        )
+
+        mark_failure.assert_awaited_once_with(session, OutboxEventModel, 11, 4, "broker unreachable", 10)
+
+    @pytest.mark.asyncio
+    async def test_booking_rejected_event_marked_failed_after_max_attempts(self, monkeypatch):
+        stop_event = asyncio.Event()
+        publisher = MagicMock()
+        publisher.start = AsyncMock()
+
+        async def fail_publish(**kwargs):
+            stop_event.set()
+            raise RuntimeError("permanent failure")
+
+        publisher.publish = AsyncMock(side_effect=fail_publish)
+        session = MagicMock()
+        session.begin.return_value = _BeginCtx()
+
+        ev = SimpleNamespace(
+            id=12,
+            routing_key="booking.rejected",
+            payload={"event_type": "booking.rejected", "data": {"booking_id": "b-003"}},
+            event_id="evt-rejected-3",
+            attempts=19,
+        )
+        mark_failure = AsyncMock()
+
+        monkeypatch.setattr("shared.shared.outbox_worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_sent", AsyncMock())
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_failure", mark_failure)
+
+        await run_outbox_loop(
+            stop_event=stop_event,
+            SessionLocal=lambda: _SessionCtx(session),
+            OutboxEvent=OutboxEventModel,
+            publisher=publisher,
+            max_attempts=20,
+            poll_interval=0.01,
+        )
+
+        # attempts reaches max_attempts → _mark_failure transitions status to FAILED
+        mark_failure.assert_awaited_once_with(session, OutboxEventModel, 12, 20, "permanent failure", 20)
+
+    @pytest.mark.asyncio
+    async def test_booking_completed_event_published_and_marked_sent(self, monkeypatch):
+        stop_event = asyncio.Event()
+        publisher = MagicMock()
+        publisher.start = AsyncMock()
+        publisher.publish = AsyncMock(side_effect=lambda **kwargs: stop_event.set())
+        session = MagicMock()
+        session.begin.return_value = _BeginCtx()
+
+        ev = SimpleNamespace(
+            id=20,
+            routing_key="booking.completed",
+            payload={"event_type": "booking.completed", "data": {"booking_id": "b-complete-001"}},
+            event_id="evt-completed-1",
+            attempts=0,
+        )
+        mark_sent = AsyncMock()
+
+        monkeypatch.setattr("shared.shared.outbox_worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_sent", mark_sent)
+        monkeypatch.setattr("shared.shared.outbox_worker._mark_failure", AsyncMock())
+
+        await run_outbox_loop(
+            stop_event=stop_event,
+            SessionLocal=lambda: _SessionCtx(session),
+            OutboxEvent=OutboxEventModel,
+            publisher=publisher,
+            poll_interval=0.01,
+        )
+
+        publisher.publish.assert_awaited_once_with(
+            routing_key="booking.completed",
+            payload=ev.payload,
+            message_id="evt-completed-1",
+        )
+        mark_sent.assert_awaited_once_with(session, OutboxEventModel, 20)

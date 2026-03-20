@@ -29,6 +29,8 @@ ROUTING_KEYS = [
     "slot.expired",
     "slot.released",
     "booking.cancel_requested",
+    "booking.completed",
+    "booking.rejected",
 ]
 
 

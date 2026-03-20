@@ -330,3 +330,179 @@ class TestBookingCompletion:
 
         assert booking.completed_at is not None
         assert isinstance(booking.completed_at, datetime)
+
+
+@pytest.mark.integration
+@pytest.mark.booking_lifecycle
+class TestBookingRejectedEventFlow:
+
+    @pytest.mark.asyncio
+    async def test_reject_booking_emits_rejected_event(self, sample_booking_data, booking_modules):
+        _, events_module = booking_modules
+
+        booking_id = "booking-reject-event-001"
+        reason = "Conflicting schedule"
+
+        event = events_module.build_event(
+            "booking.rejected",
+            {
+                "booking_id": booking_id,
+                "user_email": sample_booking_data["user_email"],
+                "handyman_email": sample_booking_data["handyman_email"],
+                "desired_start": sample_booking_data["desired_start"],
+                "desired_end": sample_booking_data["desired_end"],
+                "job_description": sample_booking_data["job_description"],
+                "reason": reason,
+            },
+        )
+
+        assert event["source"] == "booking-service"
+        assert event["event_type"] == "booking.rejected"
+        assert event["data"]["booking_id"] == booking_id
+        assert event["data"]["reason"] == reason
+
+    @pytest.mark.asyncio
+    async def test_rejected_event_payload_contains_booking_parties(self, sample_booking_data, booking_modules):
+        _, events_module = booking_modules
+
+        event = events_module.build_event(
+            "booking.rejected",
+            {
+                "booking_id": "booking-reject-event-002",
+                "user_email": sample_booking_data["user_email"],
+                "handyman_email": sample_booking_data["handyman_email"],
+                "desired_start": sample_booking_data["desired_start"],
+                "desired_end": sample_booking_data["desired_end"],
+                "job_description": sample_booking_data["job_description"],
+                "reason": "Tools unavailable",
+            },
+        )
+
+        assert event["data"]["user_email"] == sample_booking_data["user_email"]
+        assert event["data"]["handyman_email"] == sample_booking_data["handyman_email"]
+        assert event["data"]["job_description"] == sample_booking_data["job_description"]
+
+    @pytest.mark.asyncio
+    async def test_rejected_outbox_event_persisted_with_correct_fields(
+        self, sample_booking_data, mock_db_session, booking_modules
+    ):
+        models_module, events_module = booking_modules
+        OutboxEvent = models_module.OutboxEvent
+
+        booking_id = str(uuid.uuid4())
+
+        event = events_module.build_event(
+            "booking.rejected",
+            {
+                "booking_id": booking_id,
+                "user_email": sample_booking_data["user_email"],
+                "handyman_email": sample_booking_data["handyman_email"],
+                "desired_start": sample_booking_data["desired_start"],
+                "desired_end": sample_booking_data["desired_end"],
+                "job_description": sample_booking_data["job_description"],
+                "reason": "No longer available",
+            },
+        )
+
+        add_outbox_event(mock_db_session, OutboxEvent, event)
+        added_event = mock_db_session.add.call_args.args[0]
+
+        assert added_event.event_id == event["event_id"]
+        assert added_event.event_type == "booking.rejected"
+        assert added_event.routing_key == "booking.rejected"
+        assert added_event.status == "PENDING"
+        assert added_event.payload["data"]["booking_id"] == booking_id
+        assert added_event.payload["data"]["reason"] == "No longer available"
+
+    @pytest.mark.asyncio
+    async def test_rejected_event_ids_are_unique_per_rejection(self, sample_booking_data, booking_modules):
+        _, events_module = booking_modules
+
+        payload = {
+            "booking_id": "booking-idem-001",
+            "user_email": sample_booking_data["user_email"],
+            "handyman_email": sample_booking_data["handyman_email"],
+            "desired_start": sample_booking_data["desired_start"],
+            "desired_end": sample_booking_data["desired_end"],
+            "job_description": sample_booking_data["job_description"],
+            "reason": "Duplicate test",
+        }
+
+        event_a = events_module.build_event("booking.rejected", payload)
+        event_b = events_module.build_event("booking.rejected", payload)
+
+        assert event_a["event_id"] != event_b["event_id"]
+
+
+@pytest.mark.integration
+@pytest.mark.booking_lifecycle
+class TestBookingCompletedEventFlow:
+
+    @pytest.mark.asyncio
+    async def test_completed_outbox_event_persisted_when_both_parties_confirm(
+        self, sample_booking_data, mock_db_session, booking_modules
+    ):
+        models_module, events_module = booking_modules
+        OutboxEvent = models_module.OutboxEvent
+
+        booking_id = str(uuid.uuid4())
+
+        event = events_module.build_event(
+            "booking.completed",
+            {
+                "booking_id": booking_id,
+                "user_email": sample_booking_data["user_email"],
+                "handyman_email": sample_booking_data["handyman_email"],
+                "desired_start": sample_booking_data["desired_start"],
+                "desired_end": sample_booking_data["desired_end"],
+                "job_description": sample_booking_data["job_description"],
+            },
+        )
+
+        add_outbox_event(mock_db_session, OutboxEvent, event)
+        added_event = mock_db_session.add.call_args.args[0]
+
+        assert added_event.event_id == event["event_id"]
+        assert added_event.event_type == "booking.completed"
+        assert added_event.routing_key == "booking.completed"
+        assert added_event.status == "PENDING"
+        assert added_event.payload["data"]["booking_id"] == booking_id
+
+    @pytest.mark.asyncio
+    async def test_completed_event_has_correct_source(self, sample_booking_data, booking_modules):
+        _, events_module = booking_modules
+
+        event = events_module.build_event(
+            "booking.completed",
+            {
+                "booking_id": "booking-complete-evt-001",
+                "user_email": sample_booking_data["user_email"],
+                "handyman_email": sample_booking_data["handyman_email"],
+                "desired_start": sample_booking_data["desired_start"],
+                "desired_end": sample_booking_data["desired_end"],
+                "job_description": sample_booking_data["job_description"],
+            },
+        )
+
+        assert event["source"] == "booking-service"
+        assert event["event_type"] == "booking.completed"
+        assert "event_id" in event
+        assert "occurred_at" in event
+
+    @pytest.mark.asyncio
+    async def test_completed_event_ids_are_unique(self, sample_booking_data, booking_modules):
+        _, events_module = booking_modules
+
+        payload = {
+            "booking_id": "booking-idem-002",
+            "user_email": sample_booking_data["user_email"],
+            "handyman_email": sample_booking_data["handyman_email"],
+            "desired_start": sample_booking_data["desired_start"],
+            "desired_end": sample_booking_data["desired_end"],
+            "job_description": sample_booking_data["job_description"],
+        }
+
+        event_a = events_module.build_event("booking.completed", payload)
+        event_b = events_module.build_event("booking.completed", payload)
+
+        assert event_a["event_id"] != event_b["event_id"]

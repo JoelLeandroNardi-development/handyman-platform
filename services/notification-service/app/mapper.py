@@ -205,6 +205,73 @@ def _booking_released(event_id: str, data: dict[str, Any]) -> list[NotificationI
     return intents
 
 
+def _booking_completed(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
+    booking_id = data.get("booking_id")
+    user_email = data.get("user_email")
+    handyman_email = data.get("handyman_email")
+    desired_start = data.get("desired_start")
+
+    intents: list[NotificationIntent] = []
+    if user_email:
+        intents.append(
+            _intent(
+                event_id=event_id,
+                user_email=user_email,
+                type="booking_completed",
+                priority="normal",
+                title="Booking completed",
+                body="Your booking has been marked as completed.",
+                booking_id=booking_id,
+                action_prefix="bookings",
+                payload={
+                    "booking_id": booking_id,
+                    "desired_start": desired_start,
+                    "handyman_email": handyman_email,
+                },
+            )
+        )
+    if handyman_email:
+        intents.append(
+            _intent(
+                event_id=event_id,
+                user_email=handyman_email,
+                type="job_completed",
+                priority="normal",
+                title="Job completed",
+                body="A job has been marked as completed.",
+                booking_id=booking_id,
+                action_prefix="jobs",
+                payload={
+                    "booking_id": booking_id,
+                    "desired_start": desired_start,
+                    "user_email": user_email,
+                },
+            )
+        )
+    return intents
+
+
+def _booking_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
+    booking_id = data.get("booking_id")
+    user_email = data.get("user_email")
+    reason = data.get("reason")
+    if not user_email:
+        return []
+    return [
+        _intent(
+            event_id=event_id,
+            user_email=user_email,
+            type="booking_rejected_by_handyman",
+            priority="high",
+            title="Booking rejected",
+            body="Your booking was rejected by the handyman.",
+            booking_id=booking_id,
+            action_prefix="bookings",
+            payload={"booking_id": booking_id, "reason": reason},
+        )
+    ]
+
+
 EVENT_MAPPERS: dict[str, Any] = {
     "booking.requested": _booking_requested,
     "slot.reserved": _slot_reserved,
@@ -213,6 +280,8 @@ EVENT_MAPPERS: dict[str, Any] = {
     "slot.expired": _slot_expired,
     "slot.released": _booking_released,
     "booking.cancel_requested": _booking_released,
+    "booking.completed": _booking_completed,
+    "booking.rejected": _booking_rejected,
 }
 
 
