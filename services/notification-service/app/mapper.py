@@ -43,7 +43,7 @@ def _booking_requested(event_id: str, data: dict[str, Any]) -> list[Notification
         _intent(
             event_id=event_id,
             user_email=handyman_email,
-            type="job_requested",
+            type="job.requested",
             priority="normal",
             title="New booking request",
             body="A user requested a booking with you.",
@@ -67,7 +67,7 @@ def _slot_reserved(event_id: str, data: dict[str, Any]) -> list[NotificationInte
         _intent(
             event_id=event_id,
             user_email=user_email,
-            type="booking_reserved",
+            type="booking.reserved",
             priority="high",
             title="Time slot reserved",
             body="Your requested time slot is temporarily reserved.",
@@ -93,7 +93,7 @@ def _slot_confirmed(event_id: str, data: dict[str, Any]) -> list[NotificationInt
             _intent(
                 event_id=event_id,
                 user_email=user_email,
-                type="booking_confirmed",
+                type="booking.confirmed",
                 priority="high",
                 title="Booking confirmed",
                 body="Your booking has been confirmed.",
@@ -111,7 +111,7 @@ def _slot_confirmed(event_id: str, data: dict[str, Any]) -> list[NotificationInt
             _intent(
                 event_id=event_id,
                 user_email=handyman_email,
-                type="job_confirmed",
+                type="job.confirmed",
                 priority="high",
                 title="New confirmed job",
                 body="A booking has been confirmed for you.",
@@ -136,7 +136,7 @@ def _slot_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationInte
         _intent(
             event_id=event_id,
             user_email=user_email,
-            type="booking_rejected",
+            type="booking.rejected",
             priority="high",
             title="Time slot unavailable",
             body="That booking request could not be reserved.",
@@ -156,7 +156,7 @@ def _slot_expired(event_id: str, data: dict[str, Any]) -> list[NotificationInten
         _intent(
             event_id=event_id,
             user_email=user_email,
-            type="booking_expired",
+            type="booking.expired",
             priority="normal",
             title="Reservation expired",
             body="Your temporary reservation expired before confirmation.",
@@ -179,7 +179,7 @@ def _booking_released(event_id: str, data: dict[str, Any]) -> list[NotificationI
             _intent(
                 event_id=event_id,
                 user_email=user_email,
-                type="booking_cancelled",
+                type="booking.cancelled",
                 priority="normal",
                 title="Booking cancelled",
                 body="Your booking reservation was released.",
@@ -193,7 +193,7 @@ def _booking_released(event_id: str, data: dict[str, Any]) -> list[NotificationI
             _intent(
                 event_id=event_id,
                 user_email=handyman_email,
-                type="job_released",
+                type="job.released",
                 priority="normal",
                 title="Job released",
                 body="A reservation associated with your schedule was released.",
@@ -217,7 +217,7 @@ def _booking_completed(event_id: str, data: dict[str, Any]) -> list[Notification
             _intent(
                 event_id=event_id,
                 user_email=user_email,
-                type="booking_completed",
+                type="booking.completed",
                 priority="normal",
                 title="Booking completed",
                 body="Your booking has been marked as completed.",
@@ -235,7 +235,7 @@ def _booking_completed(event_id: str, data: dict[str, Any]) -> list[Notification
             _intent(
                 event_id=event_id,
                 user_email=handyman_email,
-                type="job_completed",
+                type="job.completed",
                 priority="normal",
                 title="Job completed",
                 body="A job has been marked as completed.",
@@ -261,13 +261,55 @@ def _booking_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationI
         _intent(
             event_id=event_id,
             user_email=user_email,
-            type="booking_rejected_by_handyman",
+            type="booking.rejected_by_handyman",
             priority="high",
             title="Booking rejected",
             body="Your booking was rejected by the handyman.",
             booking_id=booking_id,
             action_prefix="bookings",
             payload={"booking_id": booking_id, "reason": reason},
+        )
+    ]
+
+
+def _booking_completed_by_user(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
+    booking_id = data.get("booking_id")
+    handyman_email = data.get("handyman_email")
+    user_email = data.get("user_email")
+    if not handyman_email:
+        return []
+    return [
+        _intent(
+            event_id=event_id,
+            user_email=handyman_email,
+            type="job.completion_requested",
+            priority="high",
+            title="Customer marked job as complete",
+            body="The customer has marked this booking as complete. Please confirm your side to close it.",
+            booking_id=booking_id,
+            action_prefix="jobs",
+            payload={"booking_id": booking_id, "user_email": user_email},
+        )
+    ]
+
+
+def _booking_completed_by_handyman(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
+    booking_id = data.get("booking_id")
+    user_email = data.get("user_email")
+    handyman_email = data.get("handyman_email")
+    if not user_email:
+        return []
+    return [
+        _intent(
+            event_id=event_id,
+            user_email=user_email,
+            type="booking.completion_requested",
+            priority="high",
+            title="Handyman marked job as complete",
+            body="Your handyman has marked the job as complete. Please confirm your side to close the booking.",
+            booking_id=booking_id,
+            action_prefix="bookings",
+            payload={"booking_id": booking_id, "handyman_email": handyman_email},
         )
     ]
 
@@ -282,6 +324,8 @@ EVENT_MAPPERS: dict[str, Any] = {
     "booking.cancel_requested": _booking_released,
     "booking.completed": _booking_completed,
     "booking.rejected": _booking_rejected,
+    "booking.completed_by_user": _booking_completed_by_user,
+    "booking.completed_by_handyman": _booking_completed_by_handyman,
 }
 
 

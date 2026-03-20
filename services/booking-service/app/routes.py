@@ -173,7 +173,6 @@ async def complete_booking_as_user(booking_id: str):
         if booking.completed_by_user and booking.completed_by_handyman:
             booking.status = "COMPLETED"
             booking.completed_at = datetime.now(timezone.utc)
-
             event = build_event(
                 "booking.completed",
                 {
@@ -185,8 +184,20 @@ async def complete_booking_as_user(booking_id: str):
                     "job_description": booking.job_description,
                 },
             )
+        else:
+            event = build_event(
+                "booking.completed_by_user",
+                {
+                    "booking_id": booking.booking_id,
+                    "user_email": booking.user_email,
+                    "handyman_email": booking.handyman_email,
+                    "desired_start": booking.desired_start,
+                    "desired_end": booking.desired_end,
+                    "job_description": booking.job_description,
+                },
+            )
 
-            add_outbox_event(db, OutboxEvent, event)
+        add_outbox_event(db, OutboxEvent, event)
 
         await db.commit()
         await db.refresh(booking)
@@ -213,7 +224,6 @@ async def complete_booking_as_handyman(booking_id: str):
         if booking.completed_by_user and booking.completed_by_handyman:
             booking.status = "COMPLETED"
             booking.completed_at = datetime.now(timezone.utc)
-
             event = build_event(
                 "booking.completed",
                 {
@@ -225,8 +235,20 @@ async def complete_booking_as_handyman(booking_id: str):
                     "job_description": booking.job_description,
                 },
             )
+        else:
+            event = build_event(
+                "booking.completed_by_handyman",
+                {
+                    "booking_id": booking.booking_id,
+                    "user_email": booking.user_email,
+                    "handyman_email": booking.handyman_email,
+                    "desired_start": booking.desired_start,
+                    "desired_end": booking.desired_end,
+                    "job_description": booking.job_description,
+                },
+            )
 
-            add_outbox_event(db, OutboxEvent, event)
+        add_outbox_event(db, OutboxEvent, event)
 
         await db.commit()
         await db.refresh(booking)

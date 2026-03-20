@@ -35,7 +35,7 @@ class TestNotificationMapper:
         )
         assert len(intents) == 1
         assert intents[0]["user_email"] == "handy@example.com"
-        assert intents[0]["type"] == "job_requested"
+        assert intents[0]["type"] == "job.requested"
 
     def test_map_slot_confirmed_targets_both_parties(self):
         intents = mapper_module.map_event_to_notifications(
@@ -51,7 +51,7 @@ class TestNotificationMapper:
         )
         assert len(intents) == 2
         assert {intent["user_email"] for intent in intents} == {"user@example.com", "handy@example.com"}
-        assert {intent["type"] for intent in intents} == {"booking_confirmed", "job_confirmed"}
+        assert {intent["type"] for intent in intents} == {"booking.confirmed", "job.confirmed"}
 
     def test_map_booking_completed_targets_both_parties(self):
         intents = mapper_module.map_event_to_notifications(
@@ -70,7 +70,7 @@ class TestNotificationMapper:
         emails = {i["user_email"] for i in intents}
         assert emails == {"user@example.com", "handy@example.com"}
         types = {i["type"] for i in intents}
-        assert types == {"booking_completed", "job_completed"}
+        assert types == {"booking.completed", "job.completed"}
         for intent in intents:
             assert intent["entity_id"] == "b-complete-1"
             assert intent["category"] == "booking"
@@ -88,7 +88,7 @@ class TestNotificationMapper:
         )
         assert len(intents) == 1
         assert intents[0]["user_email"] == "user@example.com"
-        assert intents[0]["type"] == "booking_completed"
+        assert intents[0]["type"] == "booking.completed"
 
     def test_map_booking_completed_empty_when_no_parties(self):
         intents = mapper_module.map_event_to_notifications(
@@ -115,7 +115,7 @@ class TestNotificationMapper:
         )
         assert len(intents) == 1
         assert intents[0]["user_email"] == "user@example.com"
-        assert intents[0]["type"] == "booking_rejected_by_handyman"
+        assert intents[0]["type"] == "booking.rejected_by_handyman"
         assert intents[0]["priority"] == "high"
         assert intents[0]["payload"]["reason"] == "Conflicting schedule"
         assert intents[0]["entity_id"] == "b-reject-1"
@@ -126,6 +126,64 @@ class TestNotificationMapper:
                 "event_id": "evt-rejected-2",
                 "event_type": "booking.rejected",
                 "data": {"booking_id": "b-reject-2", "reason": "Unavailable"},
+            }
+        )
+        assert intents == []
+
+    def test_map_booking_completed_by_user_targets_handyman(self):
+        intents = mapper_module.map_event_to_notifications(
+            {
+                "event_id": "evt-cbu-1",
+                "event_type": "booking.completed_by_user",
+                "data": {
+                    "booking_id": "b-cbu-1",
+                    "user_email": "user@example.com",
+                    "handyman_email": "handy@example.com",
+                },
+            }
+        )
+        assert len(intents) == 1
+        assert intents[0]["user_email"] == "handy@example.com"
+        assert intents[0]["type"] == "job.completion_requested"
+        assert intents[0]["priority"] == "high"
+        assert intents[0]["payload"]["user_email"] == "user@example.com"
+        assert intents[0]["entity_id"] == "b-cbu-1"
+
+    def test_map_booking_completed_by_user_empty_when_no_handyman(self):
+        intents = mapper_module.map_event_to_notifications(
+            {
+                "event_id": "evt-cbu-2",
+                "event_type": "booking.completed_by_user",
+                "data": {"booking_id": "b-cbu-2", "user_email": "user@example.com"},
+            }
+        )
+        assert intents == []
+
+    def test_map_booking_completed_by_handyman_targets_user(self):
+        intents = mapper_module.map_event_to_notifications(
+            {
+                "event_id": "evt-cbh-1",
+                "event_type": "booking.completed_by_handyman",
+                "data": {
+                    "booking_id": "b-cbh-1",
+                    "user_email": "user@example.com",
+                    "handyman_email": "handy@example.com",
+                },
+            }
+        )
+        assert len(intents) == 1
+        assert intents[0]["user_email"] == "user@example.com"
+        assert intents[0]["type"] == "booking.completion_requested"
+        assert intents[0]["priority"] == "high"
+        assert intents[0]["payload"]["handyman_email"] == "handy@example.com"
+        assert intents[0]["entity_id"] == "b-cbh-1"
+
+    def test_map_booking_completed_by_handyman_empty_when_no_user(self):
+        intents = mapper_module.map_event_to_notifications(
+            {
+                "event_id": "evt-cbh-2",
+                "event_type": "booking.completed_by_handyman",
+                "data": {"booking_id": "b-cbh-2", "handyman_email": "handy@example.com"},
             }
         )
         assert intents == []
@@ -152,7 +210,7 @@ class TestNotificationConsumer:
         intent = {
             "user_email": "user@example.com",
             "event_id": "evt-1",
-            "type": "booking_confirmed",
+            "type": "booking.confirmed",
             "category": "booking",
             "priority": "high",
             "title": "Booking confirmed",
@@ -182,7 +240,7 @@ class TestNotificationConsumer:
         intent = {
             "user_email": "user@example.com",
             "event_id": "evt-2",
-            "type": "booking_confirmed",
+            "type": "booking.confirmed",
             "category": "booking",
             "priority": "high",
             "title": "Booking confirmed",
@@ -231,7 +289,7 @@ class TestNotificationConsumer:
             {
                 "user_email": "user@example.com",
                 "event_id": "evt-fanout-1",
-                "type": "booking_completed",
+                "type": "booking.completed",
                 "category": "booking",
                 "priority": "normal",
                 "title": "Booking completed",
@@ -248,7 +306,7 @@ class TestNotificationConsumer:
             {
                 "user_email": "handy@example.com",
                 "event_id": "evt-fanout-1",
-                "type": "job_completed",
+                "type": "job.completed",
                 "category": "booking",
                 "priority": "normal",
                 "title": "Job completed",
@@ -295,7 +353,7 @@ class TestNotificationConsumer:
         intent = {
             "user_email": "user@example.com",
             "event_id": "evt-dup-1",
-            "type": "booking_rejected_by_handyman",
+            "type": "booking.rejected_by_handyman",
             "category": "booking",
             "priority": "high",
             "title": "Booking rejected",

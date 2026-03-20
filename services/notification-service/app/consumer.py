@@ -31,6 +31,8 @@ ROUTING_KEYS = [
     "booking.cancel_requested",
     "booking.completed",
     "booking.rejected",
+    "booking.completed_by_user",
+    "booking.completed_by_handyman",
 ]
 
 
