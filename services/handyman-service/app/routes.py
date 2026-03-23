@@ -71,6 +71,29 @@ def _to_response(h: Handyman) -> HandymanResponse:
     )
 
 
+def _handyman_event_data(h) -> dict:
+    """Build the shared event payload dict from a Handyman model instance."""
+    return {
+        "email": h.email,
+        "first_name": h.first_name,
+        "last_name": h.last_name,
+        "phone": h.phone,
+        "national_id": h.national_id,
+        "address_line": h.address_line,
+        "postal_code": h.postal_code,
+        "city": h.city,
+        "country": h.country,
+        "skills": list(h.skills or []),
+        "years_experience": h.years_experience,
+        "service_radius_km": h.service_radius_km,
+        "latitude": h.latitude,
+        "longitude": h.longitude,
+        "avg_rating": float(h.avg_rating or 0),
+        "rating_count": int(h.rating_count or 0),
+        "profile_completeness": _completeness(h),
+    }
+
+
 def _review_to_response(r: HandymanReview) -> HandymanReviewResponse:
     return HandymanReviewResponse(
         id=r.id,
@@ -171,41 +194,7 @@ async def create_handyman(data: CreateHandyman):
         )
         db.add(h)
 
-        completeness = compute_profile_completeness(
-            first_name=data.first_name,
-            last_name=data.last_name,
-            phone=data.phone,
-            city=data.city,
-            country=data.country,
-            skills=normalized_skills,
-            years_experience=data.years_experience,
-            service_radius_km=data.service_radius_km,
-            latitude=data.latitude,
-            longitude=data.longitude,
-        )
-
-        evt = build_event(
-            "handyman.created",
-            {
-                "email": data.email,
-                "first_name": data.first_name,
-                "last_name": data.last_name,
-                "phone": data.phone,
-                "national_id": data.national_id,
-                "address_line": data.address_line,
-                "postal_code": data.postal_code,
-                "city": data.city,
-                "country": data.country,
-                "skills": normalized_skills,
-                "years_experience": data.years_experience,
-                "service_radius_km": data.service_radius_km,
-                "latitude": data.latitude,
-                "longitude": data.longitude,
-                "avg_rating": 0,
-                "rating_count": 0,
-                "profile_completeness": completeness,
-            },
-        )
+        evt = build_event("handyman.created", _handyman_event_data(h))
 
         add_outbox_event(db, OutboxEvent, evt)
 
@@ -282,28 +271,7 @@ async def update_handyman(email: str, data: UpdateHandyman):
             "years_experience", "service_radius_km", "latitude", "longitude",
         ])
 
-        evt = build_event(
-            "handyman.updated",
-            {
-                "email": h.email,
-                "first_name": h.first_name,
-                "last_name": h.last_name,
-                "phone": h.phone,
-                "national_id": h.national_id,
-                "address_line": h.address_line,
-                "postal_code": h.postal_code,
-                "city": h.city,
-                "country": h.country,
-                "skills": list(h.skills or []),
-                "years_experience": h.years_experience,
-                "service_radius_km": h.service_radius_km,
-                "latitude": h.latitude,
-                "longitude": h.longitude,
-                "avg_rating": float(h.avg_rating or 0),
-                "rating_count": int(h.rating_count or 0),
-                "profile_completeness": _completeness(h),
-            },
-        )
+        evt = build_event("handyman.updated", _handyman_event_data(h))
 
         add_outbox_event(db, OutboxEvent, evt)
 

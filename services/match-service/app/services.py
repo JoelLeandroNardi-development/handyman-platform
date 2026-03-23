@@ -252,11 +252,9 @@ async def handyman_projection_count() -> int:
         return 0
 
 
-async def upsert_availability_projection(*, email: str, slots: list[dict]) -> None:
-    if not email:
-        return
-
-    clean_slots: list[dict] = []
+def _clean_slots(slots: list[dict] | None) -> list[dict]:
+    """Parse and validate availability slots, dropping malformed entries."""
+    clean: list[dict] = []
     for s in (slots or []):
         if not isinstance(s, dict):
             continue
@@ -271,7 +269,15 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
             continue
         if edt <= sdt:
             continue
-        clean_slots.append({"start": sdt.isoformat(), "end": edt.isoformat()})
+        clean.append({"start": sdt.isoformat(), "end": edt.isoformat()})
+    return clean
+
+
+async def upsert_availability_projection(*, email: str, slots: list[dict]) -> None:
+    if not email:
+        return
+
+    clean_slots = _clean_slots(slots)
 
     if not clean_slots:
         await delete_availability_projection(email)
@@ -367,24 +373,7 @@ async def fetch_availability_http(email: str) -> list[dict] | None:
         return None
 
     slots = data.get("slots") or []
-    clean: list[dict] = []
-    for s in slots:
-        if not isinstance(s, dict):
-            continue
-        start = s.get("start")
-        end = s.get("end")
-        if not start or not end:
-            continue
-        try:
-            sdt = parse_dt(start)
-            edt = parse_dt(end)
-        except Exception:
-            continue
-        if edt <= sdt:
-            continue
-        clean.append({"start": sdt.isoformat(), "end": edt.isoformat()})
-
-    return clean
+    return _clean_slots(slots)
 
 
 async def get_effective_availability_slots(email: str) -> tuple[list[dict] | None, str]:

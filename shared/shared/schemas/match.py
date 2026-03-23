@@ -19,6 +19,10 @@ class MatchResult(BaseModel):
     distance_km: float
     years_experience: int
     availability_unknown: bool = False
+    avg_rating: float = 0
+    rating_count: int = 0
+    profile_completeness: int = 0
+    completed_jobs_count: int = 0
 
 
 class MatchLogResponse(BaseModel):

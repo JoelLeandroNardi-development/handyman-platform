@@ -26,6 +26,8 @@ from ..clients import (
     list_bookings,
     admin_update_booking,
     admin_delete_booking,
+    get_completed_count,
+    get_completed_counts_batch,
 )
 from ..security import get_current_user
 from ..rbac import require_role
@@ -239,3 +241,15 @@ async def admin_delete_booking_endpoint(
 ):
     require_role(user, ["admin"])
     return await admin_delete_booking(booking_id, request_id=request.state.request_id, user_payload=user)
+
+
+@router.get("/bookings/completed-count/{handyman_email}", tags=["Bookings"])
+async def completed_count_endpoint(handyman_email: str, request: Request, user=Depends(get_current_user)):
+    require_role(user, ["user", "handyman", "admin"])
+    return await get_completed_count(handyman_email, request_id=request.state.request_id, user_payload=user)
+
+
+@router.post("/bookings/completed-counts", tags=["Bookings"])
+async def completed_counts_batch_endpoint(emails: List[str], request: Request, user=Depends(get_current_user)):
+    require_role(user, ["admin"])
+    return await get_completed_counts_batch(emails, request_id=request.state.request_id, user_payload=user)

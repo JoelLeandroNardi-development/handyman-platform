@@ -126,6 +126,28 @@ class TestMatchSchemas:
         )
 
         assert payload.availability_unknown is False
+        assert payload.avg_rating == 0
+        assert payload.rating_count == 0
+        assert payload.profile_completeness == 0
+        assert payload.completed_jobs_count == 0
+
+    def test_match_result_with_reputation_fields(self):
+        payload = MatchResult(
+            email="pro@example.com",
+            latitude=45.0,
+            longitude=9.0,
+            distance_km=3.5,
+            years_experience=8,
+            avg_rating=4.7,
+            rating_count=15,
+            profile_completeness=88,
+            completed_jobs_count=12,
+        )
+
+        assert payload.avg_rating == 4.7
+        assert payload.rating_count == 15
+        assert payload.profile_completeness == 88
+        assert payload.completed_jobs_count == 12
 
     def test_match_log_response_schema(self):
         payload = MatchLogResponse(id=1, user_latitude=1.0, user_longitude=2.0, skill="plumbing")

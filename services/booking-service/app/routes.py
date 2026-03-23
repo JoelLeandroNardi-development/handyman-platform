@@ -161,42 +161,34 @@ async def cancel_booking(booking_id: str, data: CancelBooking):
         )
 
 
-@router.post("/bookings/{booking_id}/complete/user", response_model=CompleteBookingResponse)
-async def complete_booking_as_user(booking_id: str):
+async def _complete_booking_side(booking_id: str, *, side: str) -> CompleteBookingResponse:
+    """Shared logic for completing a booking from either the user or handyman side."""
     async with SessionLocal() as db:
         booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
         if booking.status != "CONFIRMED":
             raise HTTPException(status_code=400, detail=f"Cannot complete booking in status {booking.status}")
 
-        booking.completed_by_user = True
+        if side == "user":
+            booking.completed_by_user = True
+        else:
+            booking.completed_by_handyman = True
+
+        event_data = {
+            "booking_id": booking.booking_id,
+            "user_email": booking.user_email,
+            "handyman_email": booking.handyman_email,
+            "desired_start": booking.desired_start,
+            "desired_end": booking.desired_end,
+            "job_description": booking.job_description,
+        }
 
         if booking.completed_by_user and booking.completed_by_handyman:
             booking.status = "COMPLETED"
             booking.completed_at = datetime.now(timezone.utc)
-            event = build_event(
-                "booking.completed",
-                {
-                    "booking_id": booking.booking_id,
-                    "user_email": booking.user_email,
-                    "handyman_email": booking.handyman_email,
-                    "desired_start": booking.desired_start,
-                    "desired_end": booking.desired_end,
-                    "job_description": booking.job_description,
-                },
-            )
+            event = build_event("booking.completed", event_data)
         else:
-            event = build_event(
-                "booking.completed_by_user",
-                {
-                    "booking_id": booking.booking_id,
-                    "user_email": booking.user_email,
-                    "handyman_email": booking.handyman_email,
-                    "desired_start": booking.desired_start,
-                    "desired_end": booking.desired_end,
-                    "job_description": booking.job_description,
-                },
-            )
+            event = build_event(f"booking.completed_by_{side}", event_data)
 
         add_outbox_event(db, OutboxEvent, event)
 
@@ -210,57 +202,16 @@ async def complete_booking_as_user(booking_id: str):
             completed_by_handyman=bool(booking.completed_by_handyman),
             completed_at=booking.completed_at,
         )
+
+
+@router.post("/bookings/{booking_id}/complete/user", response_model=CompleteBookingResponse)
+async def complete_booking_as_user(booking_id: str):
+    return await _complete_booking_side(booking_id, side="user")
 
 
 @router.post("/bookings/{booking_id}/complete/handyman", response_model=CompleteBookingResponse)
 async def complete_booking_as_handyman(booking_id: str):
-    async with SessionLocal() as db:
-        booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
-
-        if booking.status != "CONFIRMED":
-            raise HTTPException(status_code=400, detail=f"Cannot complete booking in status {booking.status}")
-
-        booking.completed_by_handyman = True
-
-        if booking.completed_by_user and booking.completed_by_handyman:
-            booking.status = "COMPLETED"
-            booking.completed_at = datetime.now(timezone.utc)
-            event = build_event(
-                "booking.completed",
-                {
-                    "booking_id": booking.booking_id,
-                    "user_email": booking.user_email,
-                    "handyman_email": booking.handyman_email,
-                    "desired_start": booking.desired_start,
-                    "desired_end": booking.desired_end,
-                    "job_description": booking.job_description,
-                },
-            )
-        else:
-            event = build_event(
-                "booking.completed_by_handyman",
-                {
-                    "booking_id": booking.booking_id,
-                    "user_email": booking.user_email,
-                    "handyman_email": booking.handyman_email,
-                    "desired_start": booking.desired_start,
-                    "desired_end": booking.desired_end,
-                    "job_description": booking.job_description,
-                },
-            )
-
-        add_outbox_event(db, OutboxEvent, event)
-
-        await db.commit()
-        await db.refresh(booking)
-
-        return CompleteBookingResponse(
-            booking_id=booking.booking_id,
-            status=booking.status,
-            completed_by_user=bool(booking.completed_by_user),
-            completed_by_handyman=bool(booking.completed_by_handyman),
-            completed_at=booking.completed_at,
-        )
+    return await _complete_booking_side(booking_id, side="handyman")
 
 
 @router.post("/bookings/{booking_id}/reject", response_model=RejectBookingResponse)

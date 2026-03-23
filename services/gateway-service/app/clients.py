@@ -404,6 +404,14 @@ async def admin_delete_booking(booking_id: str, request_id: str | None = None, u
     return await _call_with_breaker(cb_booking, "DELETE", f"{BOOKING_SERVICE_URL}/bookings/{booking_id}", None, request_id, user_payload)
 
 
+async def get_completed_count(handyman_email: str, request_id: str | None = None, user_payload: dict | None = None):
+    return await _call_with_breaker(cb_booking, "GET", f"{BOOKING_SERVICE_URL}/bookings/completed-count/{handyman_email}", None, request_id, user_payload)
+
+
+async def get_completed_counts_batch(emails: list[str], request_id: str | None = None, user_payload: dict | None = None):
+    return await _call_with_breaker(cb_booking, "POST", f"{BOOKING_SERVICE_URL}/bookings/completed-counts", emails, request_id, user_payload)
+
+
 async def list_my_notifications(
     request_id: str | None = None,
     user_payload: dict | None = None,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -7,6 +8,10 @@ import redis.asyncio as redis_async
 from fastapi import HTTPException
 
 from tests.service_loader import load_service_app_module
+
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-helpers")
+os.environ.setdefault("JWT_ALGORITHM", "HS256")
 
 
 @pytest.fixture
@@ -211,3 +216,175 @@ class TestCircuitBreaker:
         assert status["failures"] == 3
         assert status["opened_at_epoch"] == 100.0
         assert status["open_for_seconds"] == 8.2
+
+
+@pytest.fixture
+def helpers_module(monkeypatch):
+    """Load the gateway helpers module with fake Redis and stubbed clients."""
+    fake_redis = MagicMock()
+    fake_redis.get = AsyncMock(return_value=None)
+    fake_redis.set = AsyncMock(return_value=True)
+    fake_redis.incr = AsyncMock(return_value=1)
+    fake_redis.expire = AsyncMock(return_value=True)
+    fake_redis.mget = AsyncMock(return_value=[None, None, None])
+    fake_redis.pipeline = MagicMock()
+
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
+
+    load_service_app_module(
+        "gateway-service",
+        "redis_client",
+        package_name="gateway_helpers_test_app",
+        reload_modules=True,
+    )
+    load_service_app_module(
+        "gateway-service",
+        "breaker",
+        package_name="gateway_helpers_test_app",
+    )
+    load_service_app_module(
+        "gateway-service",
+        "config",
+        package_name="gateway_helpers_test_app",
+    )
+    load_service_app_module(
+        "gateway-service",
+        "clients",
+        package_name="gateway_helpers_test_app",
+    )
+    helpers_mod = load_service_app_module(
+        "gateway-service",
+        "helpers",
+        package_name="gateway_helpers_test_app",
+    )
+    return helpers_mod
+
+
+@pytest.mark.unit
+class TestUserEmail:
+
+    def test_returns_sub(self, helpers_module):
+        assert helpers_module._user_email({"sub": "u@ex.com"}) == "u@ex.com"
+
+    def test_raises_when_sub_missing(self, helpers_module):
+        with pytest.raises(HTTPException) as exc:
+            helpers_module._user_email({})
+        assert exc.value.status_code == 401
+
+    def test_returns_string_for_numeric_sub(self, helpers_module):
+        assert helpers_module._user_email({"sub": 42}) == "42"
+
+
+@pytest.mark.unit
+class TestHasRole:
+
+    def test_has_role_case_insensitive(self, helpers_module):
+        assert helpers_module._has_role({"roles": ["Admin"]}, "admin") is True
+
+    def test_has_role_returns_false_when_absent(self, helpers_module):
+        assert helpers_module._has_role({"roles": ["user"]}, "admin") is False
+
+    def test_has_role_returns_false_for_empty_roles(self, helpers_module):
+        assert helpers_module._has_role({}, "admin") is False
+
+
+@pytest.mark.unit
+class TestAuthUserHasAnyRole:
+
+    def test_matching_roles(self, helpers_module):
+        assert helpers_module._auth_user_has_any_role({"roles": ["handyman"]}, ["handyman", "admin"]) is True
+
+    def test_disjoint_roles(self, helpers_module):
+        assert helpers_module._auth_user_has_any_role({"roles": ["user"]}, ["admin"]) is False
+
+    def test_empty_auth_roles(self, helpers_module):
+        assert helpers_module._auth_user_has_any_role({}, ["admin"]) is False
+
+
+@pytest.mark.unit
+class TestOverallStatus:
+
+    def test_all_up(self, helpers_module):
+        results = [{"status": "up"}, {"status": "up"}]
+        assert helpers_module._overall_status(results) == "up"
+
+    def test_degraded(self, helpers_module):
+        results = [{"status": "up"}, {"status": "down"}]
+        assert helpers_module._overall_status(results) == "degraded"
+
+    def test_empty_list(self, helpers_module):
+        assert helpers_module._overall_status([]) == "up"
+
+
+@pytest.mark.unit
+class TestBookingOwnedOrAdmin:
+
+    @pytest.mark.asyncio
+    async def test_admin_always_allowed(self, helpers_module):
+        booking = {"user_email": "a@ex.com", "handyman_email": "b@ex.com"}
+        helpers_module.get_booking = AsyncMock(return_value=booking)
+
+        result = await helpers_module._booking_owned_or_admin(
+            "b-1", {"sub": "admin@ex.com", "roles": ["admin"]}, "req-1"
+        )
+
+        assert result == booking
+
+    @pytest.mark.asyncio
+    async def test_user_owner_allowed(self, helpers_module):
+        booking = {"user_email": "owner@ex.com", "handyman_email": "h@ex.com"}
+        helpers_module.get_booking = AsyncMock(return_value=booking)
+
+        result = await helpers_module._booking_owned_or_admin(
+            "b-1", {"sub": "owner@ex.com", "roles": ["user"]}, "req-1"
+        )
+
+        assert result == booking
+
+    @pytest.mark.asyncio
+    async def test_handyman_owner_allowed(self, helpers_module):
+        booking = {"user_email": "u@ex.com", "handyman_email": "hm@ex.com"}
+        helpers_module.get_booking = AsyncMock(return_value=booking)
+
+        result = await helpers_module._booking_owned_or_admin(
+            "b-1", {"sub": "hm@ex.com", "roles": ["handyman"]}, "req-1"
+        )
+
+        assert result == booking
+
+    @pytest.mark.asyncio
+    async def test_non_owner_non_admin_forbidden(self, helpers_module):
+        booking = {"user_email": "a@ex.com", "handyman_email": "b@ex.com"}
+        helpers_module.get_booking = AsyncMock(return_value=booking)
+
+        with pytest.raises(HTTPException) as exc:
+            await helpers_module._booking_owned_or_admin(
+                "b-1", {"sub": "stranger@ex.com", "roles": ["user"]}, "req-1"
+            )
+
+        assert exc.value.status_code == 403
+
+
+@pytest.mark.unit
+class TestGetAuthUserAfterRegister:
+
+    @pytest.mark.asyncio
+    async def test_returns_auth_user_on_success(self, helpers_module):
+        auth_user = {"id": 1, "email": "u@ex.com", "roles": ["user"]}
+        helpers_module.get_auth_user_by_email = AsyncMock(return_value=auth_user)
+
+        result = await helpers_module._get_auth_user_after_register("u@ex.com", "req-1")
+
+        assert result == auth_user
+
+    @pytest.mark.asyncio
+    async def test_wraps_http_error_as_502(self, helpers_module):
+        helpers_module.get_auth_user_by_email = AsyncMock(
+            side_effect=HTTPException(status_code=404, detail="not found")
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            await helpers_module._get_auth_user_after_register("u@ex.com", "req-1")
+
+        assert exc.value.status_code == 502

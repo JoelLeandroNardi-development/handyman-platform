@@ -592,3 +592,62 @@ class TestNormalizeHandymanProjectionFields:
     def test_empty_doc_returns_empty(self, match_services_module):
         result = match_services_module._normalize_handyman({})
         assert result == {}
+
+
+@pytest.mark.unit
+class TestCleanSlots:
+    """Tests for the _clean_slots helper that deduplicates slot-validation logic."""
+
+    def test_valid_slots_pass_through(self, match_services_module):
+        slots = [
+            {"start": "2026-03-17T10:00:00+00:00", "end": "2026-03-17T12:00:00+00:00"},
+        ]
+        result = match_services_module._clean_slots(slots)
+        assert len(result) == 1
+        assert "2026-03-17T10:00:00" in result[0]["start"]
+
+    def test_reversed_start_end_dropped(self, match_services_module):
+        slots = [
+            {"start": "2026-03-17T14:00:00+00:00", "end": "2026-03-17T12:00:00+00:00"},
+        ]
+        result = match_services_module._clean_slots(slots)
+        assert result == []
+
+    def test_equal_start_end_dropped(self, match_services_module):
+        slots = [
+            {"start": "2026-03-17T10:00:00+00:00", "end": "2026-03-17T10:00:00+00:00"},
+        ]
+        result = match_services_module._clean_slots(slots)
+        assert result == []
+
+    def test_missing_start_or_end_dropped(self, match_services_module):
+        slots = [
+            {"start": "2026-03-17T10:00:00+00:00"},
+            {"end": "2026-03-17T12:00:00+00:00"},
+            {},
+        ]
+        result = match_services_module._clean_slots(slots)
+        assert result == []
+
+    def test_non_dict_entries_dropped(self, match_services_module):
+        slots = ["bad", 42, None]
+        result = match_services_module._clean_slots(slots)
+        assert result == []
+
+    def test_unparseable_dates_dropped(self, match_services_module):
+        slots = [{"start": "not-a-date", "end": "2026-03-17T12:00:00+00:00"}]
+        result = match_services_module._clean_slots(slots)
+        assert result == []
+
+    def test_none_input_returns_empty(self, match_services_module):
+        result = match_services_module._clean_slots(None)
+        assert result == []
+
+    def test_mixed_valid_and_invalid(self, match_services_module):
+        slots = [
+            {"start": "2026-03-17T10:00:00+00:00", "end": "2026-03-17T12:00:00+00:00"},
+            {"start": "bad", "end": "worse"},
+            {"start": "2026-03-17T14:00:00+00:00", "end": "2026-03-17T16:00:00+00:00"},
+        ]
+        result = match_services_module._clean_slots(slots)
+        assert len(result) == 2

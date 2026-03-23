@@ -108,6 +108,10 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
                 "years_experience": h.get("years_experience"),
                 "availability_unknown": availability_unknown,
                 "availability_source": source,
+                "avg_rating": h.get("avg_rating", 0),
+                "rating_count": h.get("rating_count", 0),
+                "profile_completeness": h.get("profile_completeness", 0),
+                "completed_jobs_count": h.get("completed_jobs_count", 0),
             }
         )
 
