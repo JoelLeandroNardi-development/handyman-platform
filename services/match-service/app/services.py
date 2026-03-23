@@ -161,6 +161,10 @@ def _normalize_handyman(doc: dict) -> dict:
         "service_radius_km": doc.get("service_radius_km"),
         "latitude": doc.get("latitude"),
         "longitude": doc.get("longitude"),
+        "avg_rating": float(doc.get("avg_rating") or 0),
+        "rating_count": int(doc.get("rating_count") or 0),
+        "profile_completeness": int(doc.get("profile_completeness") or 0),
+        "completed_jobs_count": int(doc.get("completed_jobs_count") or 0),
         "updated_at": utc_now_iso(),
     }
 

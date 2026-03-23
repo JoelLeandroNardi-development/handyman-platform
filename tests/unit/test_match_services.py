@@ -493,3 +493,102 @@ class TestMatchServiceRedisFlows:
         result = await match_services_module.get_cached_result("cache-key")
 
         assert result == "cached"
+
+
+@pytest.mark.unit
+class TestNormalizeHandymanProjectionFields:
+    """Ensure _normalize_handyman preserves trust/reputation fields."""
+
+    def test_full_payload_preserves_all_fields(self, match_services_module):
+        doc = {
+            "email": "pro@example.com",
+            "skills": ["Plumbing"],
+            "years_experience": 10,
+            "service_radius_km": 15,
+            "latitude": 40.71,
+            "longitude": -74.00,
+            "avg_rating": 4.8,
+            "rating_count": 23,
+            "profile_completeness": 88,
+            "completed_jobs_count": 17,
+        }
+        result = match_services_module._normalize_handyman(doc)
+
+        assert result["avg_rating"] == 4.8
+        assert result["rating_count"] == 23
+        assert result["profile_completeness"] == 88
+        assert result["completed_jobs_count"] == 17
+
+    def test_partial_payload_defaults_missing_fields(self, match_services_module):
+        doc = {
+            "email": "pro@example.com",
+            "skills": ["plumbing"],
+            "avg_rating": 3.5,
+        }
+        result = match_services_module._normalize_handyman(doc)
+
+        assert result["avg_rating"] == 3.5
+        assert result["rating_count"] == 0
+        assert result["profile_completeness"] == 0
+        assert result["completed_jobs_count"] == 0
+
+    def test_legacy_payload_without_new_fields(self, match_services_module):
+        """Old events that lack all four new fields should still normalize fine."""
+        doc = {
+            "email": "legacy@example.com",
+            "skills": ["electrical"],
+            "years_experience": 5,
+            "service_radius_km": 10,
+            "latitude": 51.5,
+            "longitude": -0.1,
+        }
+        result = match_services_module._normalize_handyman(doc)
+
+        assert result["email"] == "legacy@example.com"
+        assert result["avg_rating"] == 0
+        assert result["rating_count"] == 0
+        assert result["profile_completeness"] == 0
+        assert result["completed_jobs_count"] == 0
+        assert result["skills"] == ["electrical"]
+        assert result["years_experience"] == 5
+
+    def test_none_values_default_to_zero(self, match_services_module):
+        doc = {
+            "email": "pro@example.com",
+            "skills": [],
+            "avg_rating": None,
+            "rating_count": None,
+            "profile_completeness": None,
+            "completed_jobs_count": None,
+        }
+        result = match_services_module._normalize_handyman(doc)
+
+        assert result["avg_rating"] == 0
+        assert result["rating_count"] == 0
+        assert result["profile_completeness"] == 0
+        assert result["completed_jobs_count"] == 0
+
+    def test_avg_rating_stored_as_float(self, match_services_module):
+        doc = {"email": "pro@example.com", "skills": [], "avg_rating": 4}
+        result = match_services_module._normalize_handyman(doc)
+
+        assert isinstance(result["avg_rating"], float)
+        assert result["avg_rating"] == 4.0
+
+    def test_integer_fields_stored_as_int(self, match_services_module):
+        doc = {
+            "email": "pro@example.com",
+            "skills": [],
+            "rating_count": 5.0,
+            "profile_completeness": 75.0,
+            "completed_jobs_count": 3.0,
+        }
+        result = match_services_module._normalize_handyman(doc)
+
+        assert isinstance(result["rating_count"], int)
+        assert isinstance(result["profile_completeness"], int)
+        assert isinstance(result["completed_jobs_count"], int)
+
+    def test_empty_doc_returns_empty(self, match_services_module):
+        result = match_services_module._normalize_handyman({})
+        assert result == {}
