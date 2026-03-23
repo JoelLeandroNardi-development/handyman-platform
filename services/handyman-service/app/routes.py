@@ -16,6 +16,7 @@ from .schemas import (
     HandymanReviewResponse,
 )
 from .events import build_event
+from .profile_completeness import compute_profile_completeness
 from shared.shared.outbox_helpers import add_outbox_event
 from shared.shared.crud_helpers import fetch_or_404, apply_partial_update
 from .skills_catalog import (
@@ -29,6 +30,22 @@ from .skills_catalog import (
 )
 
 router = APIRouter()
+
+
+def _completeness(h) -> int:
+    """Compute profile_completeness from a Handyman model instance."""
+    return compute_profile_completeness(
+        first_name=h.first_name,
+        last_name=h.last_name,
+        phone=h.phone,
+        city=h.city,
+        country=h.country,
+        skills=h.skills,
+        years_experience=h.years_experience,
+        service_radius_km=h.service_radius_km,
+        latitude=h.latitude,
+        longitude=h.longitude,
+    )
 
 
 def _to_response(h: Handyman) -> HandymanResponse:
@@ -49,6 +66,7 @@ def _to_response(h: Handyman) -> HandymanResponse:
         longitude=h.longitude,
         avg_rating=float(h.avg_rating or 0),
         rating_count=int(h.rating_count or 0),
+        profile_completeness=_completeness(h),
         created_at=h.created_at,
     )
 
@@ -153,6 +171,19 @@ async def create_handyman(data: CreateHandyman):
         )
         db.add(h)
 
+        completeness = compute_profile_completeness(
+            first_name=data.first_name,
+            last_name=data.last_name,
+            phone=data.phone,
+            city=data.city,
+            country=data.country,
+            skills=normalized_skills,
+            years_experience=data.years_experience,
+            service_radius_km=data.service_radius_km,
+            latitude=data.latitude,
+            longitude=data.longitude,
+        )
+
         evt = build_event(
             "handyman.created",
             {
@@ -172,6 +203,7 @@ async def create_handyman(data: CreateHandyman):
                 "longitude": data.longitude,
                 "avg_rating": 0,
                 "rating_count": 0,
+                "profile_completeness": completeness,
             },
         )
 
@@ -269,6 +301,7 @@ async def update_handyman(email: str, data: UpdateHandyman):
                 "longitude": h.longitude,
                 "avg_rating": float(h.avg_rating or 0),
                 "rating_count": int(h.rating_count or 0),
+                "profile_completeness": _completeness(h),
             },
         )
 

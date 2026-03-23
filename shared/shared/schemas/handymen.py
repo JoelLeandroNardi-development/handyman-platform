@@ -58,6 +58,7 @@ class HandymanResponse(BaseModel):
     longitude: Optional[float] = None
     avg_rating: float = 0
     rating_count: int = 0
+    profile_completeness: int = 0
     created_at: datetime
 
 
