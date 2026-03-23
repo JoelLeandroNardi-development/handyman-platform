@@ -27,7 +27,7 @@ from ..schemas import (
     UnreadCountResponse,
     UpdateNotificationPreferencesRequest,
 )
-from ..security import get_current_user
+from ..security import get_current_user, get_current_user_sse
 
 router = APIRouter()
 
@@ -115,7 +115,7 @@ async def delete_push_device(device_id: int, request: Request, user=Depends(get_
         }
     },
 )
-async def stream_notifications(request: Request, user=Depends(get_current_user)):
+async def stream_notifications(request: Request, user=Depends(get_current_user_sse)):
     request_id = getattr(request.state, "request_id", None)
     headers: dict[str, str] = {
         "X-User-Roles": json.dumps(user.get("roles", [])),
