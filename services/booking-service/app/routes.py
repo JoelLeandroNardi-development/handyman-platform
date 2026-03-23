@@ -16,6 +16,9 @@ from .schemas import (
     CompleteBookingResponse,
     RejectBookingRequest,
     RejectBookingResponse,
+    DeleteBookingResponse,
+    CompletedJobsCountResponse,
+    CompletedJobsCountsResponse,
 )
 from .events import build_event
 from .completed_jobs import get_completed_jobs_count, get_completed_jobs_counts
@@ -301,7 +304,7 @@ async def admin_update_booking(booking_id: str, data: UpdateBookingAdmin):
         return _to_response(booking)
 
 
-@router.delete("/bookings/{booking_id}")
+@router.delete("/bookings/{booking_id}", response_model=DeleteBookingResponse)
 async def admin_delete_booking(booking_id: str):
     async with SessionLocal() as db:
         booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
@@ -311,13 +314,13 @@ async def admin_delete_booking(booking_id: str):
         return {"message": "deleted", "booking_id": booking_id}
 
 
-@router.get("/bookings/completed-count/{handyman_email}")
+@router.get("/bookings/completed-count/{handyman_email}", response_model=CompletedJobsCountResponse)
 async def completed_count_for_handyman(handyman_email: str):
     count = await get_completed_jobs_count(handyman_email)
     return {"handyman_email": handyman_email, "completed_jobs_count": count}
 
 
-@router.post("/bookings/completed-counts")
+@router.post("/bookings/completed-counts", response_model=CompletedJobsCountsResponse)
 async def completed_counts_batch(emails: list[str]):
     counts = await get_completed_jobs_counts(emails)
     return {"counts": counts}

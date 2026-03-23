@@ -69,3 +69,17 @@ class UpdateBookingAdmin(BaseModel):
     failure_reason: Optional[str] = None
     cancellation_reason: Optional[str] = None
     job_description: Optional[str] = None
+
+
+class DeleteBookingResponse(BaseModel):
+    message: str
+    booking_id: str
+
+
+class CompletedJobsCountResponse(BaseModel):
+    handyman_email: str
+    completed_jobs_count: int
+
+
+class CompletedJobsCountsResponse(BaseModel):
+    counts: dict[str, int]

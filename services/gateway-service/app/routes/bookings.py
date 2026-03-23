@@ -9,6 +9,9 @@ from ..schemas import (
     RejectBookingRequest,
     RejectBookingResponse,
     UpdateBookingAdmin,
+    DeleteBookingResponse,
+    CompletedJobsCountResponse,
+    CompletedJobsCountsResponse,
     CreateBookingRequest,
     CancelBookingRequest,
     HandymanReviewResponse,
@@ -200,7 +203,7 @@ async def get_my_jobs(
     )
 
 
-@router.get("/bookings", tags=["Bookings"])
+@router.get("/bookings", response_model=List[BookingResponse], tags=["Bookings"])
 async def admin_list_bookings(
     request: Request,
     user=Depends(get_current_user),
@@ -222,7 +225,7 @@ async def admin_list_bookings(
     )
 
 
-@router.put("/bookings/{booking_id}", tags=["Bookings"])
+@router.put("/bookings/{booking_id}", response_model=BookingResponse, tags=["Bookings"])
 async def admin_update_booking_endpoint(
     booking_id: str,
     data: UpdateBookingAdmin,
@@ -233,7 +236,7 @@ async def admin_update_booking_endpoint(
     return await admin_update_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
-@router.delete("/bookings/{booking_id}", tags=["Bookings"])
+@router.delete("/bookings/{booking_id}", response_model=DeleteBookingResponse, tags=["Bookings"])
 async def admin_delete_booking_endpoint(
     booking_id: str,
     request: Request,
@@ -243,13 +246,13 @@ async def admin_delete_booking_endpoint(
     return await admin_delete_booking(booking_id, request_id=request.state.request_id, user_payload=user)
 
 
-@router.get("/bookings/completed-count/{handyman_email}", tags=["Bookings"])
+@router.get("/bookings/completed-count/{handyman_email}", response_model=CompletedJobsCountResponse, tags=["Bookings"])
 async def completed_count_endpoint(handyman_email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "handyman", "admin"])
     return await get_completed_count(handyman_email, request_id=request.state.request_id, user_payload=user)
 
 
-@router.post("/bookings/completed-counts", tags=["Bookings"])
+@router.post("/bookings/completed-counts", response_model=CompletedJobsCountsResponse, tags=["Bookings"])
 async def completed_counts_batch_endpoint(emails: List[str], request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await get_completed_counts_batch(emails, request_id=request.state.request_id, user_payload=user)

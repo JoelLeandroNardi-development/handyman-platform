@@ -14,6 +14,9 @@ from .schemas import (
     InvalidHandymanSkillsResponse,
     CreateHandymanReview,
     HandymanReviewResponse,
+    DeleteHandymanResponse,
+    SkillsCatalogReplaceResponse,
+    SkillsCatalogPatchResponse,
 )
 from .events import build_event
 from .profile_completeness import compute_profile_completeness
@@ -124,7 +127,7 @@ async def _refresh_handyman_rating(db, handyman_email: str) -> None:
     handyman.avg_rating = round(float(avg_value or 0), 2)
 
 
-@router.get("/skills-catalog")
+@router.get("/skills-catalog", response_model=dict[str, list[str]])
 async def get_skills_catalog(
     active_only: bool = Query(True),
 ):
@@ -138,7 +141,7 @@ async def get_skills_catalog_flat(
     return await get_catalog_flat(active_only=active_only)
 
 
-@router.put("/admin/skills-catalog")
+@router.put("/admin/skills-catalog", response_model=SkillsCatalogReplaceResponse)
 async def replace_skills_catalog(data: SkillCatalogReplaceRequest):
     try:
         return await replace_catalog(data.catalog)
@@ -146,7 +149,7 @@ async def replace_skills_catalog(data: SkillCatalogReplaceRequest):
         raise HTTPException(status_code=422, detail=str(e))
 
 
-@router.patch("/admin/skills-catalog")
+@router.patch("/admin/skills-catalog", response_model=SkillsCatalogPatchResponse)
 async def patch_skills_catalog_endpoint(data: SkillCatalogPatchRequest):
     return await patch_catalog(data.model_dump())
 
@@ -280,7 +283,7 @@ async def update_handyman(email: str, data: UpdateHandyman):
         return _to_response(h)
 
 
-@router.delete("/handymen/{email}")
+@router.delete("/handymen/{email}", response_model=DeleteHandymanResponse)
 async def delete_handyman(email: str):
     async with SessionLocal() as db:
         h = await fetch_or_404(db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")

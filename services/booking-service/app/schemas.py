@@ -8,4 +8,7 @@ from shared.shared.schemas.bookings import (
     RejectBookingRequest,
     RejectBookingResponse,
     UpdateBookingAdmin,
+    DeleteBookingResponse,
+    CompletedJobsCountResponse,
+    CompletedJobsCountsResponse,
 )

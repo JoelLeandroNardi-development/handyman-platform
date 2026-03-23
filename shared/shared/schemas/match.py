@@ -38,3 +38,8 @@ class UpdateMatchLog(BaseModel):
     user_longitude: Optional[float] = None
     skill: Optional[str] = None
     job_description: Optional[str] = None
+
+
+class DeleteMatchLogResponse(BaseModel):
+    message: str
+    id: int

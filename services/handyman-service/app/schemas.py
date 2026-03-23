@@ -12,4 +12,7 @@ from shared.shared.schemas.handymen import (
     InvalidHandymanSkillsResponse,
     CreateHandymanReview,
     HandymanReviewResponse,
+    DeleteHandymanResponse,
+    SkillsCatalogReplaceResponse,
+    SkillsCatalogPatchResponse,
 )

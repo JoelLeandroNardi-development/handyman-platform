@@ -15,12 +15,12 @@ from ..helpers import (
 router = APIRouter()
 
 
-@router.get("/health", tags=["System"])
+@router.get("/health", response_model=dict[str, Any], tags=["System"])
 async def health():
     return {"status": "ok", "service": "gateway-service"}
 
 
-@router.get("/system/health", tags=["System"])
+@router.get("/system/health", response_model=dict[str, Any], tags=["System"])
 async def system_health(request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     services = _service_urls("/health")
@@ -37,7 +37,7 @@ async def system_health(request: Request, user=Depends(get_current_user)):
     return {"status": _overall_status(results), "services": results}
 
 
-@router.get("/system/rabbit", tags=["System"])
+@router.get("/system/rabbit", response_model=dict[str, Any], tags=["System"])
 async def system_rabbit(request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     services = _service_urls("/debug/rabbit")
@@ -54,7 +54,7 @@ async def system_rabbit(request: Request, user=Depends(get_current_user)):
     return {"status": _overall_status(results), "services": results}
 
 
-@router.get("/system/outbox", tags=["System"])
+@router.get("/system/outbox", response_model=dict[str, Any], tags=["System"])
 async def system_outbox(request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     services = _service_urls("/health")
@@ -96,7 +96,7 @@ async def system_outbox(request: Request, user=Depends(get_current_user)):
     return {"status": overall, "services": compact}
 
 
-@router.get("/system/breakers", tags=["System"])
+@router.get("/system/breakers", response_model=dict[str, Any], tags=["System"])
 async def breakers_status(user=Depends(get_current_user)):
     require_role(user, ["admin"])
     statuses = await asyncio.gather(*[b.status() for b in _breaker_registry().values()])
@@ -104,7 +104,7 @@ async def breakers_status(user=Depends(get_current_user)):
     return {"breakers": statuses}
 
 
-@router.post("/system/breakers/{name}/close", tags=["System"])
+@router.post("/system/breakers/{name}/close", response_model=dict[str, Any], tags=["System"])
 async def breaker_close(name: str, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     b = _breaker_registry().get(name)
@@ -114,7 +114,7 @@ async def breaker_close(name: str, user=Depends(get_current_user)):
     return {"message": "closed", "breaker": await b.status()}
 
 
-@router.post("/system/breakers/{name}/open", tags=["System"])
+@router.post("/system/breakers/{name}/open", response_model=dict[str, Any], tags=["System"])
 async def breaker_open(name: str, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     b = _breaker_registry().get(name)

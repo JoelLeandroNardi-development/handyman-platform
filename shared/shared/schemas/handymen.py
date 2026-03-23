@@ -122,3 +122,21 @@ class HandymanReviewResponse(BaseModel):
     rating: int
     review_text: Optional[str] = None
     created_at: datetime
+
+
+class DeleteHandymanResponse(BaseModel):
+    message: str
+    email: str
+
+
+class SkillsCatalogReplaceResponse(BaseModel):
+    message: str
+    categories: int
+    skills: int
+
+
+class SkillsCatalogPatchResponse(BaseModel):
+    message: str
+    added_categories: int
+    added_skills: int
+    catalog: SkillCatalogFlatResponse

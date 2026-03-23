@@ -48,3 +48,8 @@ class UserResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     created_at: datetime
+
+
+class DeleteUserResponse(BaseModel):
+    message: str
+    email: str

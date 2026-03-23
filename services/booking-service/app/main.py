@@ -71,7 +71,7 @@ app = FastAPI(title="Booking Service", lifespan=lifespan)
 app.include_router(router)
 
 
-@app.get("/health")
+@app.get("/health", response_model=dict[str, object])
 async def health():
     return {
         "status": "ok",
@@ -83,7 +83,7 @@ async def health():
     }
 
 
-@app.get("/debug/rabbit")
+@app.get("/debug/rabbit", response_model=dict[str, object])
 async def debug_rabbit():
     return {
         "service": "booking-service",

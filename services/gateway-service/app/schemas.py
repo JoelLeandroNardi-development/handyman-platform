@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from shared.shared.schemas.auth import (
     Register,
+    RegisterResponse,
     Login,
     GoogleLoginRequest,
     GoogleLoginResponse,
@@ -16,12 +17,14 @@ from shared.shared.schemas.auth import (
     AuthActionResponse,
     AuthUserResponse,
     UpdateAuthUser,
+    DeleteAuthUserResponse,
 )
 from shared.shared.schemas.users import (
     CreateUser,
     UpdateUserLocation,
     UpdateUser,
     UserResponse,
+    DeleteUserResponse,
 )
 from shared.shared.schemas.handymen import (
     CreateHandyman,
@@ -36,14 +39,22 @@ from shared.shared.schemas.handymen import (
     InvalidHandymanSkillsItem,
     InvalidHandymanSkillsResponse,
     HandymanReviewResponse,
+    DeleteHandymanResponse,
+    SkillsCatalogReplaceResponse,
+    SkillsCatalogPatchResponse,
 )
 from shared.shared.schemas.availability import (
     AvailabilitySlot,
     SetAvailability,
+    AvailabilityMessageResponse,
+    AvailabilityResponse,
+    AvailabilityListResponse,
 )
 from shared.shared.schemas.match import (
     MatchRequest,
     MatchResult,
+    MatchLogResponse,
+    DeleteMatchLogResponse,
 )
 from shared.shared.schemas.bookings import (
     BookingResponse,
@@ -53,6 +64,9 @@ from shared.shared.schemas.bookings import (
     RejectBookingRequest,
     RejectBookingResponse,
     UpdateBookingAdmin,
+    DeleteBookingResponse,
+    CompletedJobsCountResponse,
+    CompletedJobsCountsResponse,
 )
 from shared.shared.schemas.bookings import CreateBooking as CreateBookingRequest
 from shared.shared.schemas.bookings import CancelBooking as CancelBookingRequest

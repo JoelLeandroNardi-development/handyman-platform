@@ -6,6 +6,7 @@ from ..schemas import (
     UpdateUserLocation,
     UpdateUser,
     UserResponse,
+    DeleteUserResponse,
 )
 from ..clients import (
     create_user,
@@ -27,7 +28,7 @@ from ..helpers import (
 router = APIRouter()
 
 
-@router.post("/users", tags=["Users"])
+@router.post("/users", response_model=UserResponse, tags=["Users"])
 async def create_user_endpoint(data: CreateUser, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
 
@@ -44,7 +45,7 @@ async def create_user_endpoint(data: CreateUser, request: Request, user=Depends(
     return await create_user(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
-@router.put("/users/{email}/location", tags=["Users"])
+@router.put("/users/{email}/location", response_model=UserResponse, tags=["Users"])
 async def update_user_location_endpoint(email: str, data: UpdateUserLocation, request: Request, user=Depends(get_current_user)):
     if not _has_role(user, "admin") and _user_email(user) != email:
         raise HTTPException(status_code=403, detail="Cannot update another user's location")
@@ -52,7 +53,7 @@ async def update_user_location_endpoint(email: str, data: UpdateUserLocation, re
     return await update_user_location(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
-@router.get("/users/{email}", tags=["Users"])
+@router.get("/users/{email}", response_model=UserResponse, tags=["Users"])
 async def get_user_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await get_user(email, request_id=request.state.request_id, user_payload=user)
@@ -75,7 +76,7 @@ async def admin_update_user_endpoint(email: str, data: UpdateUser, request: Requ
     return await update_user(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
-@router.delete("/users/{email}", tags=["Users"])
+@router.delete("/users/{email}", response_model=DeleteUserResponse, tags=["Users"])
 async def admin_delete_user_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await delete_user(email, request_id=request.state.request_id, user_payload=user)

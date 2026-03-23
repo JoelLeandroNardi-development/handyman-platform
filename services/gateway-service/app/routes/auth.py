@@ -3,6 +3,7 @@ from typing import List
 
 from ..schemas import (
     Register,
+    RegisterResponse,
     Login,
     GoogleLoginRequest,
     GoogleLoginResponse,
@@ -16,6 +17,7 @@ from ..schemas import (
     AuthActionResponse,
     AuthUserResponse,
     UpdateAuthUser,
+    DeleteAuthUserResponse,
     OnboardingUserRequest,
     OnboardingUserResponse,
     OnboardingHandymanRequest,
@@ -56,7 +58,7 @@ from ..helpers import (
 router = APIRouter()
 
 
-@router.post("/register", tags=["Auth"])
+@router.post("/register", response_model=RegisterResponse, tags=["Auth"])
 async def register(data: Register, request: Request):
     return await register_user(data.model_dump(), request_id=request.state.request_id)
 
@@ -76,7 +78,7 @@ async def refresh(data: RefreshRequest, request: Request):
     return await refresh_user_token(data.model_dump(), request_id=request.state.request_id)
 
 
-@router.post("/logout", tags=["Auth"])
+@router.post("/logout", response_model=AuthActionResponse, tags=["Auth"])
 async def logout(data: LogoutRequest, request: Request):
     return await logout_user(data.model_dump(), request_id=request.state.request_id)
 
@@ -135,7 +137,7 @@ async def admin_update_auth_user(user_id: int, data: UpdateAuthUser, request: Re
     return await update_auth_user(user_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 
-@router.delete("/auth-users/{user_id}", tags=["Auth"])
+@router.delete("/auth-users/{user_id}", response_model=DeleteAuthUserResponse, tags=["Auth"])
 async def admin_delete_auth_user(user_id: int, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await delete_auth_user(user_id, request_id=request.state.request_id, user_payload=user)

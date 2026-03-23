@@ -16,6 +16,11 @@ class Register(BaseModel):
         )
 
 
+class RegisterResponse(BaseModel):
+    message: str
+    roles: List[str]
+
+
 class Login(BaseModel):
     email: str
     password: str
@@ -104,3 +109,8 @@ class UpdateAuthUser(BaseModel):
         if self.roles is None:
             return
         object.__setattr__(self, "roles", normalize_roles(self.roles))
+
+
+class DeleteAuthUserResponse(BaseModel):
+    message: str
+    user_id: int
