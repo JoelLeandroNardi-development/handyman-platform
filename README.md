@@ -212,12 +212,13 @@ shared/shared/
 
 ### `db.py` — Database factory
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `create_db` | `(env_var, *, echo=True) -> (engine, SessionLocal, Base)` | Reads a Postgres URL from the named env var and returns an async engine, session maker, and declarative Base. |
-| `make_get_db` | `(SessionLocal) -> async generator` | Returns a FastAPI-compatible `get_db` dependency that yields an `AsyncSession`. |
+| Symbol        | Signature                                                 | Description                                                                                                   |
+| ------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `create_db`   | `(env_var, *, echo=True) -> (engine, SessionLocal, Base)` | Reads a Postgres URL from the named env var and returns an async engine, session maker, and declarative Base. |
+| `make_get_db` | `(SessionLocal) -> async generator`                       | Returns a FastAPI-compatible `get_db` dependency that yields an `AsyncSession`.                               |
 
 **Usage (per service):**
+
 ```python
 from shared.shared.db import create_db
 engine, SessionLocal, Base = create_db(“BOOKING_DB”)
@@ -225,14 +226,15 @@ engine, SessionLocal, Base = create_db(“BOOKING_DB”)
 
 ### `events.py` — Event envelope builder
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `utc_now_iso` | `() -> str` | Current UTC time as ISO-8601 string. |
-| `build_event` | `(event_type, data, *, source, event_id=None, occurred_at=None) -> dict` | Builds a standard event envelope with `event_id`, `event_type`, `occurred_at`, `source`, `data`. |
-| `build_event_jsonable` | `(event_type, data, *, source, ...) -> dict` | Same as `build_event` but runs the result through FastAPI's `jsonable_encoder`. |
-| `make_event_builder` | `(service_name) -> Callable` | Factory returning a `build_event(event_type, data)` closure pre-bound to the given service name. |
+| Symbol                 | Signature                                                                | Description                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `utc_now_iso`          | `() -> str`                                                              | Current UTC time as ISO-8601 string.                                                             |
+| `build_event`          | `(event_type, data, *, source, event_id=None, occurred_at=None) -> dict` | Builds a standard event envelope with `event_id`, `event_type`, `occurred_at`, `source`, `data`. |
+| `build_event_jsonable` | `(event_type, data, *, source, ...) -> dict`                             | Same as `build_event` but runs the result through FastAPI's `jsonable_encoder`.                  |
+| `make_event_builder`   | `(service_name) -> Callable`                                             | Factory returning a `build_event(event_type, data)` closure pre-bound to the given service name. |
 
 **Usage:**
+
 ```python
 from shared.shared.events import make_event_builder
 build_event = make_event_builder(“booking-service”)
@@ -241,40 +243,41 @@ evt = build_event(“booking.requested”, {“booking_id”: 42})
 
 ### `mq.py` — RabbitMQ publisher
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
-| `RabbitConfig` | Frozen dataclass | Holds `url` and `exchange_name`. `RabbitConfig.from_env(required=False)` reads from `RABBIT_URL` / `EXCHANGE_NAME` env vars. |
-| `RabbitPublisher` | Class | Manages a persistent connection, channel, and TOPIC exchange. Methods: `start()`, `close()`, `publish(*, routing_key, payload, ...)`. Auto-reconnects. No-op when disabled. |
-| `rabbit_connect` | `async (cfg) -> RobustConnection \| None` | Opens a robust RabbitMQ connection from config. |
-| `create_publisher` | `(*, required=True) -> (publisher, config)` | Convenience factory: creates config from env + publisher in one call. |
+| Symbol             | Kind                                        | Description                                                                                                                                                                 |
+| ------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RabbitConfig`     | Frozen dataclass                            | Holds `url` and `exchange_name`. `RabbitConfig.from_env(required=False)` reads from `RABBIT_URL` / `EXCHANGE_NAME` env vars.                                                |
+| `RabbitPublisher`  | Class                                       | Manages a persistent connection, channel, and TOPIC exchange. Methods: `start()`, `close()`, `publish(*, routing_key, payload, ...)`. Auto-reconnects. No-op when disabled. |
+| `rabbit_connect`   | `async (cfg) -> RobustConnection \| None`   | Opens a robust RabbitMQ connection from config.                                                                                                                             |
+| `create_publisher` | `(*, required=True) -> (publisher, config)` | Convenience factory: creates config from env + publisher in one call.                                                                                                       |
 
 ### `consumer.py` — RabbitMQ consumer with retry + DLQ
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `setup_consumer_topology` | `(*, channel, exchange_name, queue_name, retry_queue, dlq_queue, routing_keys, retry_delay_ms, prefetch=50) -> (exchange, queue)` | Declares a TOPIC exchange, main queue, retry queue (with TTL dead-lettering back to main), and DLQ. Binds main queue to the given routing keys. |
-| `run_consumer_with_retry_dlq` | `(*, channel, exchange_name, queue_name, retry_queue, dlq_queue, routing_keys, handler, retry_delay_ms=5000, max_retries=3, ...) -> None` | Starts consuming. On failure retries via the retry queue (with `x-retry-count` header). After `max_retries`, rejects to DLQ. |
+| Symbol                        | Signature                                                                                                                                 | Description                                                                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setup_consumer_topology`     | `(*, channel, exchange_name, queue_name, retry_queue, dlq_queue, routing_keys, retry_delay_ms, prefetch=50) -> (exchange, queue)`         | Declares a TOPIC exchange, main queue, retry queue (with TTL dead-lettering back to main), and DLQ. Binds main queue to the given routing keys. |
+| `run_consumer_with_retry_dlq` | `(*, channel, exchange_name, queue_name, retry_queue, dlq_queue, routing_keys, handler, retry_delay_ms=5000, max_retries=3, ...) -> None` | Starts consuming. On failure retries via the retry queue (with `x-retry-count` header). After `max_retries`, rejects to DLQ.                    |
 
 ### `outbox_model.py` — OutboxEvent model factory
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
+| Symbol                    | Signature               | Description                                                                                                                                                                                                                                      |
+| ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `make_outbox_event_model` | `(Base) -> OutboxEvent` | Given a SQLAlchemy declarative `Base`, returns an `OutboxEvent` ORM class mapped to `outbox_events`. Columns: `id`, `event_id`, `event_type`, `routing_key`, `payload` (JSON), `status`, `attempts`, `last_error`, `created_at`, `published_at`. |
 
 ### `outbox_worker.py` — Background outbox drain loop
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `run_outbox_loop` | `(*, stop_event, SessionLocal, OutboxEvent, publisher, service_label, max_attempts=20, poll_interval=1.0, batch_size=50) -> None` | Claims `PENDING` rows with `SELECT ... FOR UPDATE SKIP LOCKED`, publishes each via the publisher, marks `SENT` on success or increments attempts on failure. |
-| `make_outbox_stats` | `(SessionLocal, OutboxEvent) -> dict` | Returns outbox row counts grouped by status (e.g. `{“type”: “sql”, “pending”: 3, “sent”: 120}`). |
+| Symbol              | Signature                                                                                                                         | Description                                                                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `run_outbox_loop`   | `(*, stop_event, SessionLocal, OutboxEvent, publisher, service_label, max_attempts=20, poll_interval=1.0, batch_size=50) -> None` | Claims `PENDING` rows with `SELECT ... FOR UPDATE SKIP LOCKED`, publishes each via the publisher, marks `SENT` on success or increments attempts on failure. |
+| `make_outbox_stats` | `(SessionLocal, OutboxEvent) -> dict`                                                                                             | Returns outbox row counts grouped by status (e.g. `{“type”: “sql”, “pending”: 3, “sent”: 120}`).                                                             |
 
 ### `outbox_helpers.py` — Insert outbox row
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
+| Symbol             | Signature                                | Description                                                                                        |
+| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `add_outbox_event` | `(db, OutboxEvent, event: dict) -> None` | Adds a `PENDING` outbox row to the session. Extracts `event_id`, `event_type` from the event dict. |
 
 **Usage:**
+
 ```python
 from shared.shared.outbox_helpers import add_outbox_event
 evt = build_event(“booking.requested”, data)
@@ -284,12 +287,13 @@ await db.commit()
 
 ### `crud_helpers.py` — Generic CRUD utilities
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `fetch_or_404` | `async (db, model, *, filter_column, filter_value, detail=”Not found”)` | SELECT for a single row; raises `HTTPException(404)` if missing. |
-| `apply_partial_update` | `(entity, data, fields: list[str]) -> None` | Copies non-`None` fields from a Pydantic model onto an ORM entity. |
+| Symbol                 | Signature                                                               | Description                                                        |
+| ---------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `fetch_or_404`         | `async (db, model, *, filter_column, filter_value, detail=”Not found”)` | SELECT for a single row; raises `HTTPException(404)` if missing.   |
+| `apply_partial_update` | `(entity, data, fields: list[str]) -> None`                             | Copies non-`None` fields from a Pydantic model onto an ORM entity. |
 
 **Usage:**
+
 ```python
 from shared.shared.crud_helpers import fetch_or_404, apply_partial_update
 
@@ -303,39 +307,40 @@ apply_partial_update(user, update_data, [“first_name”, “last_name”, “p
 
 ### `idempotency.py` — Redis-based idempotency
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `IDEMPOTENCY_DEFAULT_TTL_SECONDS` | `3600` | Default TTL (1 hour). |
-| `already_processed` | `async (*, redis_client, event_id, ttl_seconds=3600, prefix=”processed_event”) -> bool` | Atomic `SET NX` on `{prefix}:{event_id}`. Returns `True` if the event was already processed. |
+| Symbol                            | Signature                                                                               | Description                                                                                  |
+| --------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `IDEMPOTENCY_DEFAULT_TTL_SECONDS` | `3600`                                                                                  | Default TTL (1 hour).                                                                        |
+| `already_processed`               | `async (*, redis_client, event_id, ttl_seconds=3600, prefix=”processed_event”) -> bool` | Atomic `SET NX` on `{prefix}:{event_id}`. Returns `True` if the event was already processed. |
 
 ### `roles.py` — Role validation
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `ALLOWED_ROLES` | `frozenset({“user”, “handyman”, “admin”})` | Valid role strings. |
+| Symbol            | Signature                                                  | Description                                                                                               |
+| ----------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `ALLOWED_ROLES`   | `frozenset({“user”, “handyman”, “admin”})`                 | Valid role strings.                                                                                       |
 | `normalize_roles` | `(roles, *, allow_empty=False, default=None) -> list[str]` | Lowercases, trims, deduplicates, validates against `ALLOWED_ROLES`. Raises `ValueError` on invalid roles. |
 
 ### `intervals.py` — Datetime interval math
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `overlaps` | `(a_start, a_end, b_start, b_end) -> bool` | Returns `True` if two time intervals overlap. |
+| Symbol           | Signature                                                  | Description                                                    |
+| ---------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `overlaps`       | `(a_start, a_end, b_start, b_end) -> bool`                 | Returns `True` if two time intervals overlap.                  |
 | `fully_contains` | `(outer_start, outer_end, inner_start, inner_end) -> bool` | Returns `True` if the outer interval fully contains the inner. |
 
 ### `schemas/` — Shared Pydantic schemas
 
 All domain schemas live here so downstream services and the gateway import from one source of truth.
 
-| Module | Key Classes |
-|--------|-------------|
-| `auth.py` | `Register`, `Login`, `TokenResponse`, `AuthUserResponse`, `UpdateAuthUserPassword`, `UpdateAuthUserRoles`, `UpdateAuthUser` |
-| `availability.py` | `AvailabilitySlot`, `SetAvailability`, `OverlapRequest` |
-| `bookings.py` | `CreateBooking`, `BookingResponse`, `CancelBooking`, `ConfirmBookingResponse`, `CancelBookingResponse`, `CompleteBookingResponse`, `RejectBookingRequest`, `RejectBookingResponse`, `UpdateBookingAdmin` |
-| `handymen.py` | `CreateHandyman`, `UpdateLocation`, `UpdateHandyman`, `HandymanResponse`, skill catalog schemas (`SkillCatalogReplaceRequest`, `SkillCatalogPatchRequest`, `SkillCatalogFlatResponse`), review schemas (`CreateHandymanReview`, `HandymanReviewResponse`) |
-| `match.py` | `MatchRequest`, `MatchResult`, `MatchLogResponse`, `UpdateMatchLog` |
-| `users.py` | `CreateUser`, `UpdateUserLocation`, `UpdateUser`, `UserResponse` |
+| Module            | Key Classes                                                                                                                                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth.py`         | `Register`, `Login`, `TokenResponse`, `AuthUserResponse`, `UpdateAuthUserPassword`, `UpdateAuthUserRoles`, `UpdateAuthUser`                                                                                                                               |
+| `availability.py` | `AvailabilitySlot`, `SetAvailability`, `OverlapRequest`                                                                                                                                                                                                   |
+| `bookings.py`     | `CreateBooking`, `BookingResponse`, `CancelBooking`, `ConfirmBookingResponse`, `CancelBookingResponse`, `CompleteBookingResponse`, `RejectBookingRequest`, `RejectBookingResponse`, `UpdateBookingAdmin`                                                  |
+| `handymen.py`     | `CreateHandyman`, `UpdateLocation`, `UpdateHandyman`, `HandymanResponse`, skill catalog schemas (`SkillCatalogReplaceRequest`, `SkillCatalogPatchRequest`, `SkillCatalogFlatResponse`), review schemas (`CreateHandymanReview`, `HandymanReviewResponse`) |
+| `match.py`        | `MatchRequest`, `MatchResult`, `MatchLogResponse`, `UpdateMatchLog`                                                                                                                                                                                       |
+| `users.py`        | `CreateUser`, `UpdateUserLocation`, `UpdateUser`, `UserResponse`                                                                                                                                                                                          |
 
 Each downstream service re-exports from shared in its local `schemas.py` for backward compatibility:
+
 ```python
 # services/booking-service/app/schemas.py
 from shared.shared.schemas.bookings import *
@@ -449,9 +454,15 @@ Planned (Approach A projection path):
 
 1. Normalize skill
 2. Read candidate handymen from local projection
-3. Filter by distance
-4. Check desired window overlaps projected availability slots (no HTTP call)
-5. Return sorted results + cache
+3. Hydrate `completed_jobs_count` from booking-service using batched `POST /bookings/completed-counts`
+4. Filter by distance
+5. Check desired window overlaps projected availability slots (no HTTP call)
+6. Return sorted results + cache
+
+Completed-jobs fallback behavior:
+
+- If booking-service batch counts are partially missing, unmatched handymen keep their existing local value (or `0` if absent).
+- If booking-service is temporarily unavailable, `/match` still succeeds and returns safe defaults.
 
 Degraded behavior:
 

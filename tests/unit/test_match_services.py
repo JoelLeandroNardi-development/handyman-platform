@@ -651,3 +651,108 @@ class TestCleanSlots:
         ]
         result = match_services_module._clean_slots(slots)
         assert len(result) == 2
+
+
+@pytest.mark.unit
+class TestCompletedJobsHydration:
+
+    @pytest.mark.asyncio
+    async def test_fetch_completed_jobs_counts_batch_success(self, match_services_module, monkeypatch):
+        response = MagicMock()
+        response.raise_for_status = MagicMock()
+        response.json.return_value = {
+            "counts": {
+                "a@example.com": 3,
+                "b@example.com": 0,
+            }
+        }
+        client = MagicMock()
+        client.post = AsyncMock(return_value=response)
+
+        class ClientCtx:
+            async def __aenter__(self):
+                return client
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        monkeypatch.setattr(match_services_module.httpx, "AsyncClient", lambda timeout: ClientCtx())
+
+        result = await match_services_module.fetch_completed_jobs_counts_batch(
+            ["a@example.com", "b@example.com"]
+        )
+
+        assert result == {"a@example.com": 3, "b@example.com": 0}
+
+    @pytest.mark.asyncio
+    async def test_fetch_completed_jobs_counts_batch_partial_and_invalid_values(
+        self,
+        match_services_module,
+        monkeypatch,
+    ):
+        response = MagicMock()
+        response.raise_for_status = MagicMock()
+        response.json.return_value = {
+            "counts": {
+                "a@example.com": 9,
+                "b@example.com": "2",
+                "bad@example.com": "not-an-int",
+            }
+        }
+        client = MagicMock()
+        client.post = AsyncMock(return_value=response)
+
+        class ClientCtx:
+            async def __aenter__(self):
+                return client
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        monkeypatch.setattr(match_services_module.httpx, "AsyncClient", lambda timeout: ClientCtx())
+
+        result = await match_services_module.fetch_completed_jobs_counts_batch(
+            ["a@example.com", "b@example.com", "c@example.com"]
+        )
+
+        assert result == {
+            "a@example.com": 9,
+            "b@example.com": 2,
+        }
+
+    @pytest.mark.asyncio
+    async def test_hydrate_completed_jobs_counts_handles_partial_and_zero_counts(self, match_services_module):
+        match_services_module.fetch_completed_jobs_counts_batch = AsyncMock(
+            return_value={
+                "a@example.com": 4,
+                "b@example.com": 0,
+            }
+        )
+
+        handymen = [
+            {"email": "a@example.com", "completed_jobs_count": 1},
+            {"email": "b@example.com", "completed_jobs_count": 7},
+            {"email": "c@example.com", "completed_jobs_count": 5},
+            {"email": "d@example.com"},
+        ]
+
+        hydrated = await match_services_module.hydrate_completed_jobs_counts(handymen)
+
+        assert hydrated[0]["completed_jobs_count"] == 4
+        assert hydrated[1]["completed_jobs_count"] == 0
+        assert hydrated[2]["completed_jobs_count"] == 5
+        assert hydrated[3]["completed_jobs_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_hydrate_completed_jobs_counts_falls_back_on_upstream_failure(self, match_services_module):
+        match_services_module.fetch_completed_jobs_counts_batch = AsyncMock(return_value={})
+
+        handymen = [
+            {"email": "a@example.com", "completed_jobs_count": 6},
+            {"email": "b@example.com", "completed_jobs_count": None},
+        ]
+
+        hydrated = await match_services_module.hydrate_completed_jobs_counts(handymen)
+
+        assert hydrated[0]["completed_jobs_count"] == 6
+        assert hydrated[1]["completed_jobs_count"] == 0

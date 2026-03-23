@@ -14,6 +14,7 @@ from shared.shared.intervals import overlaps
 
 HANDYMAN_SERVICE_URL = os.getenv("HANDYMAN_SERVICE_URL", "http://handyman-service:8000")
 AVAILABILITY_SERVICE_URL = os.getenv("AVAILABILITY_SERVICE_URL", "http://availability-service:8000")
+BOOKING_SERVICE_URL = os.getenv("BOOKING_SERVICE_URL", "http://booking-service:8000")
 
 REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:
@@ -374,6 +375,59 @@ async def fetch_availability_http(email: str) -> list[dict] | None:
 
     slots = data.get("slots") or []
     return _clean_slots(slots)
+
+
+async def fetch_completed_jobs_counts_batch(emails: list[str]) -> dict[str, int]:
+    unique_emails = list(dict.fromkeys([str(e).strip() for e in (emails or []) if str(e).strip()]))
+    if not unique_emails:
+        return {}
+
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            r = await client.post(
+                f"{BOOKING_SERVICE_URL}/bookings/completed-counts",
+                json=unique_emails,
+            )
+            r.raise_for_status()
+            data = r.json() or {}
+    except Exception:
+        return {}
+
+    raw_counts = data.get("counts") if isinstance(data, dict) else {}
+    if not isinstance(raw_counts, dict):
+        return {}
+
+    out: dict[str, int] = {}
+    for email, value in raw_counts.items():
+        if not isinstance(email, str):
+            continue
+        try:
+            out[email] = int(value or 0)
+        except Exception:
+            continue
+    return out
+
+
+async def hydrate_completed_jobs_counts(handymen: list[dict]) -> list[dict]:
+    if not handymen:
+        return handymen
+
+    emails = [str(h.get("email")).strip() for h in handymen if isinstance(h, dict) and h.get("email")]
+    counts = await fetch_completed_jobs_counts_batch(emails)
+
+    for h in handymen:
+        if not isinstance(h, dict):
+            continue
+        email = h.get("email")
+        if isinstance(email, str) and email in counts:
+            h["completed_jobs_count"] = counts[email]
+            continue
+        try:
+            h["completed_jobs_count"] = int(h.get("completed_jobs_count") or 0)
+        except Exception:
+            h["completed_jobs_count"] = 0
+
+    return handymen
 
 
 async def get_effective_availability_slots(email: str) -> tuple[list[dict] | None, str]:

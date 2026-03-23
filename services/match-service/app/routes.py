@@ -12,6 +12,7 @@ from shared.shared.crud_helpers import fetch_or_404
 from .services import (
     haversine,
     get_live_handymen_for_skill,
+    hydrate_completed_jobs_counts,
     get_effective_availability_slots,
     projected_has_overlap,
     projections_have_any_availability,
@@ -70,6 +71,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
             pass
 
     handymen = await get_live_handymen_for_skill(requested_skill)
+    handymen = await hydrate_completed_jobs_counts(handymen)
 
     results: list[dict] = []
 
