@@ -18,6 +18,7 @@ from .schemas import (
     RejectBookingResponse,
 )
 from .events import build_event
+from .completed_jobs import get_completed_jobs_count, get_completed_jobs_counts
 from shared.shared.outbox_helpers import add_outbox_event
 from shared.shared.crud_helpers import fetch_or_404
 
@@ -357,3 +358,15 @@ async def admin_delete_booking(booking_id: str):
         await db.delete(booking)
         await db.commit()
         return {"message": "deleted", "booking_id": booking_id}
+
+
+@router.get("/bookings/completed-count/{handyman_email}")
+async def completed_count_for_handyman(handyman_email: str):
+    count = await get_completed_jobs_count(handyman_email)
+    return {"handyman_email": handyman_email, "completed_jobs_count": count}
+
+
+@router.post("/bookings/completed-counts")
+async def completed_counts_batch(emails: list[str]):
+    counts = await get_completed_jobs_counts(emails)
+    return {"counts": counts}
