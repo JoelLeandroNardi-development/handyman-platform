@@ -756,3 +756,203 @@ class TestCompletedJobsHydration:
 
         assert hydrated[0]["completed_jobs_count"] == 6
         assert hydrated[1]["completed_jobs_count"] == 0
+
+
+@pytest.mark.unit
+class TestWeightedRanking:
+
+    def test_close_unrated_vs_slightly_farther_highly_rated(self, match_services_module):
+        candidates = [
+            {
+                "email": "close@example.com",
+                "distance_km": 1.0,
+                "availability_unknown": False,
+                "avg_rating": 0,
+                "rating_count": 0,
+                "profile_completeness": 40,
+                "completed_jobs_count": 0,
+                "years_experience": 2,
+            },
+            {
+                "email": "rated@example.com",
+                "distance_km": 2.0,
+                "availability_unknown": False,
+                "avg_rating": 4.9,
+                "rating_count": 42,
+                "profile_completeness": 95,
+                "completed_jobs_count": 60,
+                "years_experience": 8,
+            },
+        ]
+
+        ranked = match_services_module.rank_match_candidates(candidates)
+
+        assert ranked[0]["email"] == "rated@example.com"
+
+    def test_profile_completeness_lifts_when_other_signals_equal(self, match_services_module):
+        candidates = [
+            {
+                "email": "incomplete@example.com",
+                "distance_km": 3.0,
+                "availability_unknown": False,
+                "avg_rating": 4.7,
+                "rating_count": 10,
+                "profile_completeness": 25,
+                "completed_jobs_count": 8,
+                "years_experience": 4,
+            },
+            {
+                "email": "complete@example.com",
+                "distance_km": 3.0,
+                "availability_unknown": False,
+                "avg_rating": 4.7,
+                "rating_count": 10,
+                "profile_completeness": 95,
+                "completed_jobs_count": 8,
+                "years_experience": 4,
+            },
+        ]
+
+        ranked = match_services_module.rank_match_candidates(candidates)
+
+        assert ranked[0]["email"] == "complete@example.com"
+
+    def test_zero_review_candidates_rank_below_reviewed_when_otherwise_equal(self, match_services_module):
+        candidates = [
+            {
+                "email": "zero-reviews@example.com",
+                "distance_km": 4.0,
+                "availability_unknown": False,
+                "avg_rating": 4.6,
+                "rating_count": 0,
+                "profile_completeness": 80,
+                "completed_jobs_count": 15,
+                "years_experience": 6,
+            },
+            {
+                "email": "reviewed@example.com",
+                "distance_km": 4.0,
+                "availability_unknown": False,
+                "avg_rating": 4.6,
+                "rating_count": 30,
+                "profile_completeness": 80,
+                "completed_jobs_count": 15,
+                "years_experience": 6,
+            },
+        ]
+
+        ranked = match_services_module.rank_match_candidates(candidates)
+
+        assert ranked[0]["email"] == "reviewed@example.com"
+
+    def test_zero_completed_jobs_rank_below_nonzero_when_otherwise_equal(self, match_services_module):
+        candidates = [
+            {
+                "email": "zero-jobs@example.com",
+                "distance_km": 4.0,
+                "availability_unknown": False,
+                "avg_rating": 4.6,
+                "rating_count": 20,
+                "profile_completeness": 80,
+                "completed_jobs_count": 0,
+                "years_experience": 6,
+            },
+            {
+                "email": "nonzero-jobs@example.com",
+                "distance_km": 4.0,
+                "availability_unknown": False,
+                "avg_rating": 4.6,
+                "rating_count": 20,
+                "profile_completeness": 80,
+                "completed_jobs_count": 25,
+                "years_experience": 6,
+            },
+        ]
+
+        ranked = match_services_module.rank_match_candidates(candidates)
+
+        assert ranked[0]["email"] == "nonzero-jobs@example.com"
+
+    def test_unknown_availability_penalty(self, match_services_module):
+        candidates = [
+            {
+                "email": "unknown@example.com",
+                "distance_km": 2.0,
+                "availability_unknown": True,
+                "avg_rating": 4.8,
+                "rating_count": 25,
+                "profile_completeness": 90,
+                "completed_jobs_count": 40,
+                "years_experience": 7,
+            },
+            {
+                "email": "known@example.com",
+                "distance_km": 2.0,
+                "availability_unknown": False,
+                "avg_rating": 4.8,
+                "rating_count": 25,
+                "profile_completeness": 90,
+                "completed_jobs_count": 40,
+                "years_experience": 7,
+            },
+        ]
+
+        ranked = match_services_module.rank_match_candidates(candidates)
+
+        assert ranked[0]["email"] == "known@example.com"
+
+    def test_deterministic_tie_breakers(self, match_services_module):
+        candidates = [
+            {
+                "email": "zeta@example.com",
+                "distance_km": 2.0,
+                "availability_unknown": False,
+                "avg_rating": 4.5,
+                "rating_count": 10,
+                "profile_completeness": 80,
+                "completed_jobs_count": 5,
+                "years_experience": 5,
+            },
+            {
+                "email": "alpha@example.com",
+                "distance_km": 2.0,
+                "availability_unknown": False,
+                "avg_rating": 4.5,
+                "rating_count": 10,
+                "profile_completeness": 80,
+                "completed_jobs_count": 5,
+                "years_experience": 5,
+            },
+            {
+                "email": "beta-more-reviews@example.com",
+                "distance_km": 2.0,
+                "availability_unknown": False,
+                "avg_rating": 4.5,
+                "rating_count": 12,
+                "profile_completeness": 80,
+                "completed_jobs_count": 5,
+                "years_experience": 5,
+            },
+        ]
+
+        ranked = match_services_module.rank_match_candidates(candidates)
+
+        assert ranked[0]["email"] == "beta-more-reviews@example.com"
+        assert ranked[1]["email"] == "alpha@example.com"
+        assert ranked[2]["email"] == "zeta@example.com"
+
+    def test_score_handles_missing_or_null_values_safely(self, match_services_module):
+        score = match_services_module.compute_match_score(
+            {
+                "email": "nulls@example.com",
+                "distance_km": None,
+                "availability_unknown": None,
+                "avg_rating": None,
+                "rating_count": None,
+                "profile_completeness": None,
+                "completed_jobs_count": None,
+                "years_experience": None,
+            }
+        )
+
+        assert isinstance(score, float)

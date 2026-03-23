@@ -457,7 +457,8 @@ Planned (Approach A projection path):
 3. Hydrate `completed_jobs_count` from booking-service using batched `POST /bookings/completed-counts`
 4. Filter by distance
 5. Check desired window overlaps projected availability slots (no HTTP call)
-6. Return sorted results + cache
+6. Rank with deterministic weighted scoring (distance + trust/profile signals)
+7. Return sorted results + cache
 
 Completed-jobs fallback behavior:
 
@@ -467,6 +468,24 @@ Completed-jobs fallback behavior:
 Degraded behavior:
 
 - If projections are missing (bootstrap or events disabled), return candidates with `availability_unknown=true` and short TTL cache.
+
+Ranking notes (B5):
+
+- Current score weights (sum = 1.00):
+  - distance: 0.42
+  - avg_rating: 0.24
+  - availability_confidence: 0.12
+  - profile_completeness: 0.10
+  - rating_count: 0.06
+  - completed_jobs_count: 0.05
+  - years_experience: 0.01
+- Distance remains the strongest signal.
+- Unknown availability receives a confidence penalty.
+- `avg_rating` has strong influence.
+- `rating_count` and `completed_jobs_count` use dampened/capped influence.
+- `profile_completeness` contributes meaningfully but does not dominate.
+- `years_experience` has a small weight.
+- Deterministic tie-breakers: higher score, shorter distance, higher rating count, then lexicographic email.
 
 ---
 

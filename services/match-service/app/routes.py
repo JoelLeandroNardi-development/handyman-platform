@@ -13,6 +13,7 @@ from .services import (
     haversine,
     get_live_handymen_for_skill,
     hydrate_completed_jobs_counts,
+    rank_match_candidates,
     get_effective_availability_slots,
     projected_has_overlap,
     projections_have_any_availability,
@@ -117,7 +118,7 @@ async def match(data: MatchRequest, db: AsyncSession = Depends(get_db)):
             }
         )
 
-    results.sort(key=lambda x: x["distance_km"])
+    results = rank_match_candidates(results)
 
     mode = "degraded" if degraded else "strict"
     ttl = 15 if degraded else 60
