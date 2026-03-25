@@ -1,268 +1,88 @@
+"""
+Services module for match-service.
+
+This module re-exports everything from focused sub-modules and defines the
+orchestration functions that compose multiple lower-level operations.
+
+Sub-module responsibilities:
+  scoring.py               – ranking weights, norm helpers, datetime utils, scoring math
+  geo.py                   – haversine, bucket grid helpers, km-to-degree conversions
+  cache_keys.py            – cache key and bucket-set key construction
+  projections.py           – Redis client, handyman projection read/list/count/cache ops
+  availability_projection.py – availability projection read/delete/count ops
+  clients.py               – HTTP client calls to handyman-, availability-, booking-service
+"""
 from __future__ import annotations
 
 import json
-import math
-import os
-from datetime import datetime, timezone
-from typing import Any
 
-import httpx
-import redis.asyncio as redis
-from dateutil import parser
-
-from shared.shared.intervals import overlaps
-
-HANDYMAN_SERVICE_URL = os.getenv("HANDYMAN_SERVICE_URL", "http://handyman-service:8000")
-AVAILABILITY_SERVICE_URL = os.getenv("AVAILABILITY_SERVICE_URL", "http://availability-service:8000")
-BOOKING_SERVICE_URL = os.getenv("BOOKING_SERVICE_URL", "http://booking-service:8000")
-
-REDIS_URL = os.getenv("REDIS_URL")
-if not REDIS_URL:
-    raise RuntimeError("REDIS_URL environment variable is not set")
-
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-
-HTTP_TIMEOUT = 2.0
-
-GRID_DEG = float(os.getenv("MATCH_GRID_DEG") or "0.05")
-TIME_BUCKET_SECONDS = int(os.getenv("MATCH_TIME_BUCKET_SECONDS") or "900")
-
-PROJ_HANDYMAN_KEY = "proj:handyman:{email}"
-PROJ_HANDYMEN_INDEX = "proj:handymen:index"
-PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"
-
-PROJ_AVAIL_KEY = "proj:availability:{email}"
-PROJ_AVAIL_INDEX = "proj:availability:index"
-
-# B5 ranking weights: distance remains dominant, trust signals provide meaningful lift.
-RANKING_WEIGHTS = {
-    "distance": 0.42,
-    "avg_rating": 0.24,
-    "availability_confidence": 0.12,
-    "profile_completeness": 0.10,
-    "rating_count": 0.06,
-    "completed_jobs_count": 0.05,
-    "years_experience": 0.01,
-}
-
-RANKING_CAPS = {
-    "rating_count": 50,
-    "completed_jobs_count": 100,
-    "years_experience": 30,
-}
-
-
-def norm(s: str) -> str:
-    return (s or "").strip().lower()
-
-
-def _safe_float(value: Any, *, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return default
-
-
-def _safe_int(value: Any, *, default: int = 0) -> int:
-    try:
-        return int(value)
-    except Exception:
-        return default
-
-
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
-
-
-def _distance_score(distance_km: Any) -> float:
-    km = max(0.0, _safe_float(distance_km, default=1_000_000.0))
-    return 1.0 / (1.0 + (km / 10.0))
-
-
-def _dampened_count_score(value: Any, *, cap: int) -> float:
-    cap = max(1, int(cap))
-    count = max(0, _safe_int(value, default=0))
-    return _clamp01(math.log1p(count) / math.log1p(cap))
-
-
-def compute_match_score(candidate: dict[str, Any]) -> float:
-    """Compute deterministic weighted ranking score for /match candidates."""
-    avg_rating = _clamp01(_safe_float(candidate.get("avg_rating"), default=0.0) / 5.0)
-    availability_confidence = 0.0 if bool(candidate.get("availability_unknown")) else 1.0
-    profile_completeness = _clamp01(_safe_float(candidate.get("profile_completeness"), default=0.0) / 100.0)
-
-    score = 0.0
-    score += RANKING_WEIGHTS["distance"] * _distance_score(candidate.get("distance_km"))
-    score += RANKING_WEIGHTS["avg_rating"] * avg_rating
-    score += RANKING_WEIGHTS["availability_confidence"] * availability_confidence
-    score += RANKING_WEIGHTS["profile_completeness"] * profile_completeness
-    score += RANKING_WEIGHTS["rating_count"] * _dampened_count_score(
-        candidate.get("rating_count"),
-        cap=RANKING_CAPS["rating_count"],
-    )
-    score += RANKING_WEIGHTS["completed_jobs_count"] * _dampened_count_score(
-        candidate.get("completed_jobs_count"),
-        cap=RANKING_CAPS["completed_jobs_count"],
-    )
-    years = _safe_float(candidate.get("years_experience"), default=0.0)
-    score += RANKING_WEIGHTS["years_experience"] * _clamp01(years / float(RANKING_CAPS["years_experience"]))
-    return score
-
-
-def rank_match_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Sort by score desc, then deterministic tie-breakers."""
-
-    def sort_key(c: dict[str, Any]) -> tuple[float, float, int, str]:
-        score = compute_match_score(c)
-        distance = max(0.0, _safe_float(c.get("distance_km"), default=1_000_000.0))
-        rating_count = max(0, _safe_int(c.get("rating_count"), default=0))
-        email = str(c.get("email") or "")
-        return (-score, distance, -rating_count, email)
-
-    return sorted(candidates, key=sort_key)
-
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _as_utc(dt: datetime) -> datetime:
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def parse_dt(x: Any) -> datetime:
-    if isinstance(x, datetime):
-        return _as_utc(x)
-    if isinstance(x, str):
-        return _as_utc(parser.isoparse(x))
-    raise ValueError(f"Unsupported datetime type: {type(x).__name__}")
-
-
-def haversine(lat1, lon1, lat2, lon2):
-    r = 6371.0
-    d_lat = math.radians(lat2 - lat1)
-    d_lon = math.radians(lon2 - lon1)
-    a = (
-        math.sin(d_lat / 2) ** 2
-        + math.cos(math.radians(lat1))
-        * math.cos(math.radians(lat2))
-        * math.sin(d_lon / 2) ** 2
-    )
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return r * c
-
-
-def bucket_id(lat: float, lon: float) -> tuple[int, int]:
-    return int(math.floor(lat / GRID_DEG)), int(math.floor(lon / GRID_DEG))
-
-
-def time_bucket(desired_start: datetime) -> int:
-    epoch = int(_as_utc(desired_start).timestamp())
-    return epoch // TIME_BUCKET_SECONDS
-
-
-def cache_key(lat: float, lon: float, skill: str, degraded: bool, desired_start: datetime) -> str:
-    mode = "degraded" if degraded else "strict"
-    b_lat, b_lon = bucket_id(lat, lon)
-    t = time_bucket(desired_start)
-    return f"match:{mode}:{skill}:lat={b_lat}:lon={b_lon}:t={t}"
-
-
-def bucket_set_key(mode: str, skill: str, b_lat: int, b_lon: int) -> str:
-    return f"matchkeys:{mode}:{skill}:lat={b_lat}:lon={b_lon}"
-
-
-def km_to_deg_lat(km: float) -> float:
-    return km / 111.0
-
-
-def km_to_deg_lon(km: float, lat: float) -> float:
-    c = math.cos(math.radians(lat))
-    if abs(c) < 0.01:
-        c = 0.01
-    return km / (111.0 * c)
-
-
-def buckets_in_radius(lat: float, lon: float, radius_km: float) -> list[tuple[int, int]]:
-    d_lat = km_to_deg_lat(radius_km)
-    d_lon = km_to_deg_lon(radius_km, lat)
-
-    lat_min = lat - d_lat
-    lat_max = lat + d_lat
-    lon_min = lon - d_lon
-    lon_max = lon + d_lon
-
-    b_lat_min = int(math.floor(lat_min / GRID_DEG))
-    b_lat_max = int(math.floor(lat_max / GRID_DEG))
-    b_lon_min = int(math.floor(lon_min / GRID_DEG))
-    b_lon_max = int(math.floor(lon_max / GRID_DEG))
-
-    out = []
-    for bl in range(b_lat_min, b_lat_max + 1):
-        for bo in range(b_lon_min, b_lon_max + 1):
-            out.append((bl, bo))
-    return out
-
-
-async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
-    mode = norm(mode)
-    if mode not in ("strict", "degraded"):
-        mode = "strict"
-
-    skill = norm(skill)
-    set_key = bucket_set_key(mode, skill, b_lat, b_lon)
-
-    keys = await redis_client.smembers(set_key)
-    if not keys:
-        await redis_client.delete(set_key)
-        return 0
-
-    pipe = redis_client.pipeline()
-    pipe.delete(*list(keys))
-    pipe.delete(set_key)
-    res = await pipe.execute()
-
-    deleted = res[0] if res and isinstance(res[0], int) else 0
-    return deleted
-
-
-def _normalize_handyman(doc: dict) -> dict:
-    email = (doc or {}).get("email")
-    if not email:
-        return {}
-
-    skills = doc.get("skills") or []
-    skills_norm = [norm(s) for s in skills if s]
-    seen = set()
-    skills_norm = [s for s in skills_norm if not (s in seen or seen.add(s))]
-
-    return {
-        "email": email,
-        "skills": skills_norm,
-        "years_experience": doc.get("years_experience"),
-        "service_radius_km": doc.get("service_radius_km"),
-        "latitude": doc.get("latitude"),
-        "longitude": doc.get("longitude"),
-        "avg_rating": float(doc.get("avg_rating") or 0),
-        "rating_count": int(doc.get("rating_count") or 0),
-        "profile_completeness": int(doc.get("profile_completeness") or 0),
-        "completed_jobs_count": int(doc.get("completed_jobs_count") or 0),
-        "updated_at": utc_now_iso(),
-    }
-
-
-async def get_handyman_projection(email: str) -> dict | None:
-    if not email:
-        return None
-    raw = await redis_client.get(PROJ_HANDYMAN_KEY.format(email=email))
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except Exception:
-        return None
+import httpx  # re-exported so tests can patch httpx.AsyncClient via this module
+
+from .scoring import (
+    RANKING_WEIGHTS,
+    RANKING_CAPS,
+    norm,
+    _safe_float,
+    _safe_int,
+    _clamp01,
+    utc_now_iso,
+    _as_utc,
+    parse_dt,
+    _distance_score,
+    _dampened_count_score,
+    compute_match_score,
+    rank_match_candidates,
+)
+from .geo import (
+    GRID_DEG,
+    TIME_BUCKET_SECONDS,
+    haversine,
+    bucket_id,
+    time_bucket,
+    km_to_deg_lat,
+    km_to_deg_lon,
+    buckets_in_radius,
+)
+from .cache_keys import cache_key, bucket_set_key
+from .projections import (
+    redis_client,
+    PROJ_HANDYMAN_KEY,
+    PROJ_HANDYMEN_INDEX,
+    PROJ_HANDYMEN_SKILL_INDEX,
+    _normalize_handyman,
+    get_handyman_projection,
+    list_projected_handymen_by_skill,
+    handyman_projection_count,
+    invalidate_bucket,
+    get_cached_result,
+    set_cache_with_index,
+)
+from .availability_projection import (
+    PROJ_AVAIL_KEY,
+    PROJ_AVAIL_INDEX,
+    _clean_slots,
+    get_availability_slots,
+    delete_availability_projection,
+    projected_has_overlap,
+    availability_projection_count,
+)
+from .clients import (
+    HANDYMAN_SERVICE_URL,
+    AVAILABILITY_SERVICE_URL,
+    BOOKING_SERVICE_URL,
+    HTTP_TIMEOUT,
+    fetch_handymen_http,
+    fetch_availability_http,
+    fetch_completed_jobs_counts_batch,
+)
+
+# ---------------------------------------------------------------------------
+# Orchestration functions
+#
+# These functions compose multiple lower-level operations and are defined here
+# (rather than in sub-modules) so that test-level monkeypatching of their
+# dependencies via this module's namespace continues to work correctly.
+# ---------------------------------------------------------------------------
 
 
 async def upsert_handyman_projection(doc: dict) -> None:
@@ -304,59 +124,6 @@ async def delete_handyman_projection(email: str) -> dict | None:
     return old
 
 
-async def list_projected_handymen_by_skill(skill: str) -> list[dict]:
-    skill = norm(skill)
-    if not skill:
-        return []
-
-    emails = await redis_client.smembers(PROJ_HANDYMEN_SKILL_INDEX.format(skill=skill))
-    if not emails:
-        return []
-
-    pipe = redis_client.pipeline()
-    for e in emails:
-        pipe.get(PROJ_HANDYMAN_KEY.format(email=e))
-    raws = await pipe.execute()
-
-    out: list[dict] = []
-    for raw in raws:
-        if not raw:
-            continue
-        try:
-            out.append(json.loads(raw))
-        except Exception:
-            continue
-    return out
-
-
-async def handyman_projection_count() -> int:
-    try:
-        return int(await redis_client.scard(PROJ_HANDYMEN_INDEX))
-    except Exception:
-        return 0
-
-
-def _clean_slots(slots: list[dict] | None) -> list[dict]:
-    """Parse and validate availability slots, dropping malformed entries."""
-    clean: list[dict] = []
-    for s in (slots or []):
-        if not isinstance(s, dict):
-            continue
-        start = s.get("start")
-        end = s.get("end")
-        if not start or not end:
-            continue
-        try:
-            sdt = parse_dt(start)
-            edt = parse_dt(end)
-        except Exception:
-            continue
-        if edt <= sdt:
-            continue
-        clean.append({"start": sdt.isoformat(), "end": edt.isoformat()})
-    return clean
-
-
 async def upsert_availability_projection(*, email: str, slots: list[dict]) -> None:
     if not email:
         return
@@ -373,122 +140,6 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
     pipe.set(PROJ_AVAIL_KEY.format(email=email), json.dumps(payload))
     pipe.sadd(PROJ_AVAIL_INDEX, email)
     await pipe.execute()
-
-
-async def delete_availability_projection(email: str) -> None:
-    if not email:
-        return
-    pipe = redis_client.pipeline()
-    pipe.delete(PROJ_AVAIL_KEY.format(email=email))
-    pipe.srem(PROJ_AVAIL_INDEX, email)
-    await pipe.execute()
-
-
-async def get_availability_slots(email: str) -> list[dict] | None:
-    if not email:
-        return None
-    raw = await redis_client.get(PROJ_AVAIL_KEY.format(email=email))
-    if not raw:
-        return None
-    try:
-        obj = json.loads(raw)
-        return obj.get("slots") or []
-    except Exception:
-        return None
-
-
-def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_end: datetime) -> bool:
-    ds = _as_utc(desired_start)
-    de = _as_utc(desired_end)
-
-    if de <= ds:
-        return False
-
-    for slot in slots or []:
-        try:
-            ss = parse_dt(slot.get("start"))
-            ee = parse_dt(slot.get("end"))
-        except Exception:
-            continue
-
-        if overlaps(ss, ee, ds, de):
-            return True
-
-    return False
-
-
-async def availability_projection_count() -> int:
-    try:
-        return int(await redis_client.scard(PROJ_AVAIL_INDEX))
-    except Exception:
-        return 0
-
-
-async def projections_have_any_availability() -> bool:
-    return (await availability_projection_count()) > 0
-
-
-async def fetch_handymen_http() -> list[dict]:
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-        r = await client.get(f"{HANDYMAN_SERVICE_URL}/handymen")
-        r.raise_for_status()
-        data = r.json()
-
-    out: list[dict] = []
-    for h in data or []:
-        if not isinstance(h, dict):
-            continue
-        normalized = _normalize_handyman(h)
-        if normalized.get("email"):
-            out.append(normalized)
-    return out
-
-
-async def fetch_availability_http(email: str) -> list[dict] | None:
-    if not email:
-        return None
-
-    try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            r = await client.get(f"{AVAILABILITY_SERVICE_URL}/availability/{email}")
-            r.raise_for_status()
-            data = r.json()
-    except Exception:
-        return None
-
-    slots = data.get("slots") or []
-    return _clean_slots(slots)
-
-
-async def fetch_completed_jobs_counts_batch(emails: list[str]) -> dict[str, int]:
-    unique_emails = list(dict.fromkeys([str(e).strip() for e in (emails or []) if str(e).strip()]))
-    if not unique_emails:
-        return {}
-
-    try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            r = await client.post(
-                f"{BOOKING_SERVICE_URL}/bookings/completed-counts",
-                json=unique_emails,
-            )
-            r.raise_for_status()
-            data = r.json() or {}
-    except Exception:
-        return {}
-
-    raw_counts = data.get("counts") if isinstance(data, dict) else {}
-    if not isinstance(raw_counts, dict):
-        return {}
-
-    out: dict[str, int] = {}
-    for email, value in raw_counts.items():
-        if not isinstance(email, str):
-            continue
-        try:
-            out[email] = int(value or 0)
-        except Exception:
-            continue
-    return out
 
 
 async def hydrate_completed_jobs_counts(handymen: list[dict]) -> list[dict]:
@@ -511,6 +162,10 @@ async def hydrate_completed_jobs_counts(handymen: list[dict]) -> list[dict]:
             h["completed_jobs_count"] = 0
 
     return handymen
+
+
+async def projections_have_any_availability() -> bool:
+    return (await availability_projection_count()) > 0
 
 
 async def get_effective_availability_slots(email: str) -> tuple[list[dict] | None, str]:
@@ -578,25 +233,3 @@ async def get_effective_handymen_for_skill(skill: str) -> tuple[list[dict], str]
 
     live = await get_live_handymen_for_skill(skill)
     return live, "live"
-
-
-async def get_cached_result(key: str):
-    return await redis_client.get(key)
-
-
-async def set_cache_with_index(
-    *,
-    cache_key_str: str,
-    value: str,
-    ttl_seconds: int,
-    mode: str,
-    skill: str,
-    b_lat: int,
-    b_lon: int,
-):
-    set_key = bucket_set_key(mode, skill, b_lat, b_lon)
-    pipe = redis_client.pipeline()
-    pipe.set(cache_key_str, value, ex=ttl_seconds)
-    pipe.sadd(set_key, cache_key_str)
-    pipe.expire(set_key, ttl_seconds + 30)
-    await pipe.execute()
