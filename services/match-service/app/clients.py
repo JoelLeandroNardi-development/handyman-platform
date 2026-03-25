@@ -1,4 +1,3 @@
-"""Clients module – HTTP client calls to handyman-service, availability-service, and booking-service."""
 from __future__ import annotations
 
 import os

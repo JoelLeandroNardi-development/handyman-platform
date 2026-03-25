@@ -1,4 +1,3 @@
-"""Geo module – haversine distance, bucket grid helpers, and radius utilities for /match."""
 from __future__ import annotations
 
 import math
@@ -12,7 +11,6 @@ TIME_BUCKET_SECONDS = int(os.getenv("MATCH_TIME_BUCKET_SECONDS") or "900")
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Return great-circle distance in kilometres between two (lat, lon) points."""
     r = 6371.0
     d_lat = math.radians(lat2 - lat1)
     d_lon = math.radians(lon2 - lon1)
@@ -27,12 +25,10 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def bucket_id(lat: float, lon: float) -> tuple[int, int]:
-    """Map (lat, lon) to a grid bucket using GRID_DEG resolution."""
     return int(math.floor(lat / GRID_DEG)), int(math.floor(lon / GRID_DEG))
 
 
 def time_bucket(desired_start: datetime) -> int:
-    """Map a datetime to a coarse time bucket for cache key construction."""
     epoch = int(_as_utc(desired_start).timestamp())
     return epoch // TIME_BUCKET_SECONDS
 
@@ -49,7 +45,6 @@ def km_to_deg_lon(km: float, lat: float) -> float:
 
 
 def buckets_in_radius(lat: float, lon: float, radius_km: float) -> list[tuple[int, int]]:
-    """Return all grid bucket IDs within radius_km of (lat, lon)."""
     d_lat = km_to_deg_lat(radius_km)
     d_lon = km_to_deg_lon(radius_km, lat)
 

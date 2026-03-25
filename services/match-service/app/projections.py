@@ -1,4 +1,3 @@
-"""Projections module – Redis client setup and handyman projection read/list/count/cache operations."""
 from __future__ import annotations
 
 import json
@@ -21,7 +20,6 @@ PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"
 
 
 def _normalize_handyman(doc: dict) -> dict:
-    """Normalize a raw handyman dict into the canonical projection shape."""
     email = (doc or {}).get("email")
     if not email:
         return {}
@@ -91,7 +89,6 @@ async def handyman_projection_count() -> int:
 
 
 async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
-    """Delete all cached /match results for a given mode/skill/bucket combination."""
     mode = norm(mode)
     if mode not in ("strict", "degraded"):
         mode = "strict"
@@ -127,7 +124,6 @@ async def set_cache_with_index(
     b_lat: int,
     b_lon: int,
 ) -> None:
-    """Write a /match result to the cache and register the key in the bucket index."""
     set_key = bucket_set_key(mode, skill, b_lat, b_lon)
     pipe = redis_client.pipeline()
     pipe.set(cache_key_str, value, ex=ttl_seconds)

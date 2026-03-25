@@ -1,4 +1,3 @@
-"""Scoring module – ranking weights, datetime helpers, and scoring functions for /match candidates."""
 from __future__ import annotations
 
 import math
@@ -7,7 +6,7 @@ from typing import Any
 
 from dateutil import parser
 
-# B5 ranking weights: distance remains dominant, trust signals provide meaningful lift.
+
 RANKING_WEIGHTS = {
     "distance": 0.42,
     "avg_rating": 0.24,

@@ -1,22 +1,7 @@
-"""
-Services module for match-service.
-
-This module re-exports everything from focused sub-modules and defines the
-orchestration functions that compose multiple lower-level operations.
-
-Sub-module responsibilities:
-  scoring.py               – ranking weights, norm helpers, datetime utils, scoring math
-  geo.py                   – haversine, bucket grid helpers, km-to-degree conversions
-  cache_keys.py            – cache key and bucket-set key construction
-  projections.py           – Redis client, handyman projection read/list/count/cache ops
-  availability_projection.py – availability projection read/delete/count ops
-  clients.py               – HTTP client calls to handyman-, availability-, booking-service
-"""
 from __future__ import annotations
 
 import json
-
-import httpx  # re-exported so tests can patch httpx.AsyncClient via this module
+import httpx
 
 from .scoring import (
     RANKING_WEIGHTS,
@@ -75,14 +60,6 @@ from .clients import (
     fetch_availability_http,
     fetch_completed_jobs_counts_batch,
 )
-
-# ---------------------------------------------------------------------------
-# Orchestration functions
-#
-# These functions compose multiple lower-level operations and are defined here
-# (rather than in sub-modules) so that test-level monkeypatching of their
-# dependencies via this module's namespace continues to work correctly.
-# ---------------------------------------------------------------------------
 
 
 async def upsert_handyman_projection(doc: dict) -> None:

@@ -1,4 +1,3 @@
-"""Availability projection module – availability slot read/delete/count operations."""
 from __future__ import annotations
 
 import json
@@ -14,7 +13,6 @@ PROJ_AVAIL_INDEX = "proj:availability:index"
 
 
 def _clean_slots(slots: list[dict] | None) -> list[dict]:
-    """Parse and validate availability slots, dropping malformed entries."""
     clean: list[dict] = []
     for s in (slots or []):
         if not isinstance(s, dict):
