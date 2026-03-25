@@ -5,7 +5,7 @@ from datetime import datetime
 
 from .services import (
     haversine,
-    get_live_handymen_for_skill,
+    get_effective_handymen_for_skill,
     hydrate_completed_jobs_counts,
     rank_match_candidates,
     get_effective_availability_slots,
@@ -28,6 +28,16 @@ async def run_match_query(
 ) -> list[dict]:
     """Orchestrate a match query: cache lookup, candidate retrieval, hydration,
     availability filtering, result shaping, ranking, and cache write.
+
+    Query strategy — projection-first:
+      1. Projected handymen are the primary source (Redis, no HTTP call).
+      2. If the projection store is empty, a live HTTP fetch acts as an explicit
+         fallback and its results are written back to the projection store.
+      3. Projected availability is the primary source for each candidate.
+      4. If a candidate's availability projection is missing, a live HTTP fetch
+         acts as an explicit fallback and is cached into the projection store.
+      5. When no availability projections exist at all (degraded mode) candidates
+         are returned with ``availability_unknown=True`` and a shorter TTL.
 
     Returns an ordered list of match result dicts, or an empty list when no
     candidates are found or the skill is unrecognised.
@@ -56,7 +66,8 @@ async def run_match_query(
         except Exception:
             pass
 
-    handymen = await get_live_handymen_for_skill(requested_skill)
+    # --- Projection-first: prefer projected handymen; live fetch is a fallback ---
+    handymen, _handyman_source = await get_effective_handymen_for_skill(requested_skill)
     handymen = await hydrate_completed_jobs_counts(handymen)
 
     results: list[dict] = []

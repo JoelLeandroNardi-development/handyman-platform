@@ -67,7 +67,7 @@ class TestRunMatchQuery:
     async def test_ignores_corrupted_cache_and_computes_fresh(self, match_orchestrator_module):
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value="not-valid-json")
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[])
         match_orchestrator_module.set_cache_with_index = AsyncMock()
 
@@ -80,7 +80,7 @@ class TestRunMatchQuery:
         )
 
         assert result == []
-        match_orchestrator_module.get_live_handymen_for_skill.assert_awaited_once()
+        match_orchestrator_module.get_effective_handymen_for_skill.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_filters_candidates_outside_service_radius(self, match_orchestrator_module):
@@ -92,7 +92,7 @@ class TestRunMatchQuery:
         }
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.set_cache_with_index = AsyncMock()
 
@@ -116,7 +116,7 @@ class TestRunMatchQuery:
         }
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.get_effective_availability_slots = AsyncMock(return_value=(None, "missing"))
         match_orchestrator_module.set_cache_with_index = AsyncMock()
@@ -146,7 +146,7 @@ class TestRunMatchQuery:
         }
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=False)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.get_effective_availability_slots = AsyncMock(return_value=(None, "missing"))
         match_orchestrator_module.set_cache_with_index = AsyncMock()
@@ -176,7 +176,7 @@ class TestRunMatchQuery:
         ]
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.get_effective_availability_slots = AsyncMock(
             return_value=(non_overlapping_slots, "projection")
@@ -211,7 +211,7 @@ class TestRunMatchQuery:
         ]
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.get_effective_availability_slots = AsyncMock(
             return_value=(overlapping_slots, "projection")
@@ -249,7 +249,7 @@ class TestRunMatchQuery:
         ]
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.get_effective_availability_slots = AsyncMock(
             return_value=(overlapping_slots, "projection")
@@ -275,7 +275,7 @@ class TestRunMatchQuery:
     async def test_skips_cache_write_when_no_results(self, match_orchestrator_module):
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[])
         mock_cache_write = AsyncMock()
         match_orchestrator_module.set_cache_with_index = mock_cache_write
@@ -305,7 +305,7 @@ class TestRunMatchQuery:
         }
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=False)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        match_orchestrator_module.get_live_handymen_for_skill = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_handymen_for_skill = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
         match_orchestrator_module.get_effective_availability_slots = AsyncMock(return_value=(None, "missing"))
         mock_cache_write = AsyncMock()
@@ -323,3 +323,83 @@ class TestRunMatchQuery:
         call_kwargs = mock_cache_write.call_args.kwargs
         assert call_kwargs["mode"] == "degraded"
         assert call_kwargs["ttl_seconds"] == 15
+
+    @pytest.mark.asyncio
+    async def test_uses_projected_handymen_when_available(self, match_orchestrator_module):
+        """Projection-first: when projections exist, live fetch must not be called."""
+        handyman = {
+            "email": "proj@example.com",
+            "latitude": 45.001,
+            "longitude": 9.001,
+            "service_radius_km": 50,
+            "avg_rating": 4.0,
+            "rating_count": 5,
+            "profile_completeness": 0.9,
+            "completed_jobs_count": 3,
+            "years_experience": 2,
+        }
+        overlapping_slots = [
+            {"start": "2026-03-17T09:00:00+00:00", "end": "2026-03-17T13:00:00+00:00"}
+        ]
+        match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
+        match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
+        # get_effective_handymen_for_skill returns projection source — no live fetch needed
+        mock_effective = AsyncMock(return_value=([handyman], "projection"))
+        match_orchestrator_module.get_effective_handymen_for_skill = mock_effective
+        match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_availability_slots = AsyncMock(
+            return_value=(overlapping_slots, "projection")
+        )
+        match_orchestrator_module.set_cache_with_index = AsyncMock()
+
+        result = await match_orchestrator_module.run_match_query(
+            latitude=45.0,
+            longitude=9.0,
+            skill="plumbing",
+            desired_start=datetime(2026, 3, 17, 10, 0, tzinfo=timezone.utc),
+            desired_end=datetime(2026, 3, 17, 12, 0, tzinfo=timezone.utc),
+        )
+
+        mock_effective.assert_awaited_once_with("plumbing")
+        assert len(result) == 1
+        assert result[0]["email"] == "proj@example.com"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_live_when_projections_empty(self, match_orchestrator_module):
+        """Fallback path: when projections are empty, live source is used."""
+        handyman = {
+            "email": "live@example.com",
+            "latitude": 45.001,
+            "longitude": 9.001,
+            "service_radius_km": 50,
+            "avg_rating": 3.0,
+            "rating_count": 2,
+            "profile_completeness": 0.5,
+            "completed_jobs_count": 1,
+            "years_experience": 1,
+        }
+        overlapping_slots = [
+            {"start": "2026-03-17T09:00:00+00:00", "end": "2026-03-17T13:00:00+00:00"}
+        ]
+        match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
+        match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
+        # get_effective_handymen_for_skill signals fallback via "live" source label
+        mock_effective = AsyncMock(return_value=([handyman], "live"))
+        match_orchestrator_module.get_effective_handymen_for_skill = mock_effective
+        match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
+        match_orchestrator_module.get_effective_availability_slots = AsyncMock(
+            return_value=(overlapping_slots, "projection")
+        )
+        match_orchestrator_module.set_cache_with_index = AsyncMock()
+
+        result = await match_orchestrator_module.run_match_query(
+            latitude=45.0,
+            longitude=9.0,
+            skill="plumbing",
+            desired_start=datetime(2026, 3, 17, 10, 0, tzinfo=timezone.utc),
+            desired_end=datetime(2026, 3, 17, 12, 0, tzinfo=timezone.utc),
+        )
+
+        mock_effective.assert_awaited_once_with("plumbing")
+        assert len(result) == 1
+        assert result[0]["email"] == "live@example.com"
