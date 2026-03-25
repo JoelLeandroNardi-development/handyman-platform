@@ -26,22 +26,6 @@ async def run_match_query(
     desired_start: datetime,
     desired_end: datetime,
 ) -> list[dict]:
-    """Orchestrate a match query: cache lookup, candidate retrieval, hydration,
-    availability filtering, result shaping, ranking, and cache write.
-
-    Query strategy — projection-first:
-      1. Projected handymen are the primary source (Redis, no HTTP call).
-      2. If the projection store is empty, a live HTTP fetch acts as an explicit
-         fallback and its results are written back to the projection store.
-      3. Projected availability is the primary source for each candidate.
-      4. If a candidate's availability projection is missing, a live HTTP fetch
-         acts as an explicit fallback and is cached into the projection store.
-      5. When no availability projections exist at all (degraded mode) candidates
-         are returned with ``availability_unknown=True`` and a shorter TTL.
-
-    Returns an ordered list of match result dicts, or an empty list when no
-    candidates are found or the skill is unrecognised.
-    """
     requested_skill = norm(skill)
     if not requested_skill:
         return []
