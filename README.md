@@ -32,6 +32,8 @@ It uses:
 - [Planned future functions](#planned-future-functions)
 - [Testing and CI status (March 2026)](#testing-and-ci-status-march-2026)
 
+- [Match Query Orchestration Strategy](#match-query-orchestration-strategy)
+
 ---
 
 ## High-level architecture
@@ -147,6 +149,20 @@ Current direction:
 
 - **Stop calling handyman-service at request time** by maintaining a handyman projection (Redis) fed by `handyman.created` + `handyman.location_updated`.
 - **Approach A**: stop calling availability-service at request time by using availability projection fed by `availability.updated` which includes full slots.
+
+---
+
+### Match Query Orchestration Strategy
+
+The match query process is orchestrated as follows:
+
+1. **Projected handymen are the primary source** (Redis, no HTTP call).
+2. If the projection store is empty, a **live HTTP fetch acts as an explicit fallback** and its results are written back to the projection store.
+3. **Projected availability is the primary source** for each candidate.
+4. If a candidate's availability projection is missing, a **live HTTP fetch acts as an explicit fallback** and is cached into the projection store.
+5. When no availability projections exist at all (**degraded mode**), candidates are returned with `availability_unknown=True` and a shorter TTL.
+
+Returns an ordered list of match result dicts, or an empty list when no candidates are found or the skill is unrecognised.
 
 ### notification-service
 

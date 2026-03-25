@@ -5,7 +5,7 @@ from datetime import datetime
 
 from .services import (
     haversine,
-    get_live_handymen_for_skill,
+    get_effective_handymen_for_skill,
     hydrate_completed_jobs_counts,
     rank_match_candidates,
     get_effective_availability_slots,
@@ -26,12 +26,6 @@ async def run_match_query(
     desired_start: datetime,
     desired_end: datetime,
 ) -> list[dict]:
-    """Orchestrate a match query: cache lookup, candidate retrieval, hydration,
-    availability filtering, result shaping, ranking, and cache write.
-
-    Returns an ordered list of match result dicts, or an empty list when no
-    candidates are found or the skill is unrecognised.
-    """
     requested_skill = norm(skill)
     if not requested_skill:
         return []
@@ -56,7 +50,8 @@ async def run_match_query(
         except Exception:
             pass
 
-    handymen = await get_live_handymen_for_skill(requested_skill)
+    # --- Projection-first: prefer projected handymen; live fetch is a fallback ---
+    handymen, _handyman_source = await get_effective_handymen_for_skill(requested_skill)
     handymen = await hydrate_completed_jobs_counts(handymen)
 
     results: list[dict] = []
