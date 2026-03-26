@@ -1,14 +1,12 @@
 from __future__ import annotations
 
+from app.domain.models import OutboxEvent
+from app.infrastructure.db import SessionLocal
+from app.infrastructure.messaging import publisher
 from shared.shared.outbox_worker import run_outbox_loop, make_outbox_stats
-from .db import SessionLocal
-from .models import OutboxEvent
-from .messaging import publisher
-
 
 async def outbox_stats() -> dict:
     return await make_outbox_stats(SessionLocal, OutboxEvent)
-
 
 async def run_outbox_forever(stop_event):
     await run_outbox_loop(

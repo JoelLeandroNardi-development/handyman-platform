@@ -18,7 +18,7 @@ def pc_module():
     """Load the profile_completeness module from handyman-service."""
     return load_service_app_module(
         "handyman-service",
-        "profile_completeness",
+        "profile_policies",
         package_name="handyman_pc_test_app",
     )
 

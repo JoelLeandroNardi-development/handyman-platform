@@ -1,9 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 
-from .db import Base
+from app.infrastructure.db import Base
 from shared.shared.outbox_model import make_outbox_event_model
-
 
 class Handyman(Base):
     __tablename__ = "handymen"
@@ -34,7 +33,6 @@ class Handyman(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-
 class HandymanReview(Base):
     __tablename__ = "handyman_reviews"
 
@@ -49,7 +47,6 @@ class HandymanReview(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-
 class SkillsCategory(Base):
     __tablename__ = "skills_categories"
 
@@ -62,7 +59,6 @@ class SkillsCategory(Base):
     sort_order = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
 
 class SkillCatalogItem(Base):
     __tablename__ = "skills_catalog_items"
@@ -83,6 +79,5 @@ class SkillCatalogItem(Base):
     sort_order = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
 
 OutboxEvent = make_outbox_event_model(Base)
