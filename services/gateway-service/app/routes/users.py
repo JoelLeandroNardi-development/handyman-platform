@@ -8,15 +8,15 @@ from ..schemas import (
     UserResponse,
     DeleteUserResponse,
 )
-from ..clients import (
+from ..clients.user_client import (
     create_user,
     update_user_location,
     get_user,
     list_users,
     update_user,
     delete_user,
-    get_auth_user_by_email,
 )
+from ..clients.auth_client import get_auth_user_by_email
 from ..security import get_current_user
 from ..rbac import require_role
 from ..helpers import (

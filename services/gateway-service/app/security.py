@@ -13,10 +13,6 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _decode_and_bind(token: str, request: Request) -> dict:
-    """Decode a JWT and bind user info to the request state.
-
-    Raises HTTP 401 on invalid or expired tokens.
-    """
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError:
@@ -33,7 +29,6 @@ def _decode_and_bind(token: str, request: Request) -> dict:
 def _extract_bearer_token(
     creds: HTTPAuthorizationCredentials | None,
 ) -> str | None:
-    """Return the token string from Bearer credentials, or None."""
     if creds and creds.scheme.lower() == "bearer":
         return creds.credentials
     return None
@@ -59,16 +54,6 @@ def get_current_user_sse(
     access_token: str | None = Query(default=None),
     creds: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ):
-    """Authenticate for the SSE stream endpoint.
-
-    EventSource clients cannot set custom HTTP headers, so this dependency
-    also accepts the JWT via an ``access_token`` query parameter.  The query
-    parameter is checked first; if absent the standard Authorization Bearer
-    header is used as a fallback.
-
-    This dependency is intentionally scoped to the SSE route only —
-    all other endpoints continue using ``get_current_user``.
-    """
     token = access_token or _extract_bearer_token(creds)
 
     if not token:

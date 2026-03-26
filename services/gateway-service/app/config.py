@@ -12,10 +12,6 @@ NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notific
 
 
 def SERVICE_BASE_URLS() -> Dict[str, str]:
-    """
-    Single source of truth for service discovery in the gateway.
-    Keys are the canonical service names used in breakers and system endpoints.
-    """
     return {
         "auth-service": AUTH_SERVICE_URL,
         "user-service": USER_SERVICE_URL,

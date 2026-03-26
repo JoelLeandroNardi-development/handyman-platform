@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
-from ..clients import (
+from ..clients.notification_client import (
     archive_my_notification,
     delete_my_push_device,
     get_my_notification_preferences,

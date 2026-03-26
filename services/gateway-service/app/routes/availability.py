@@ -6,7 +6,7 @@ from ..schemas import (
     AvailabilityResponse,
     AvailabilityListResponse,
 )
-from ..clients import (
+from ..clients.availability_client import (
     set_availability,
     get_availability,
     clear_availability,

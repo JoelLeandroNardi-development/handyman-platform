@@ -35,7 +35,7 @@ def security_module(monkeypatch):
 
     load_service_app_module(
         "gateway-service",
-        "redis_client",
+        "clients/redis_client",
         package_name="gateway_sse_test_app",
         reload_modules=True,
     )

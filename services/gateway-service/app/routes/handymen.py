@@ -15,7 +15,7 @@ from ..schemas import (
     SkillsCatalogReplaceResponse,
     SkillsCatalogPatchResponse,
 )
-from ..clients import (
+from ..clients.handyman_client import (
     list_handymen,
     create_handyman,
     get_handyman,
@@ -28,8 +28,8 @@ from ..clients import (
     replace_skills_catalog,
     patch_skills_catalog,
     get_handymen_with_invalid_skills,
-    get_auth_user_by_email,
 )
+from ..clients.auth_client import get_auth_user_by_email
 from ..security import get_current_user
 from ..rbac import require_role
 from ..helpers import (

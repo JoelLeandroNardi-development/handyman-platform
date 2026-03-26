@@ -29,13 +29,13 @@ def gateway_modules(monkeypatch):
 
     load_service_app_module(
         "gateway-service",
-        "redis_client",
+        "clients/redis_client",
         package_name="gateway_service_test_app",
         reload_modules=True,
     )
     breaker_module = load_service_app_module(
         "gateway-service",
-        "breaker",
+        "breakers/breaker",
         package_name="gateway_service_test_app",
     )
     rbac_module = load_service_app_module(
@@ -234,13 +234,13 @@ def helpers_module(monkeypatch):
 
     load_service_app_module(
         "gateway-service",
-        "redis_client",
+        "clients/redis_client",
         package_name="gateway_helpers_test_app",
         reload_modules=True,
     )
     load_service_app_module(
         "gateway-service",
-        "breaker",
+        "breakers/breaker",
         package_name="gateway_helpers_test_app",
     )
     load_service_app_module(

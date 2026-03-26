@@ -17,7 +17,7 @@ from ..schemas import (
     HandymanReviewResponse,
     CreateHandymanReviewRequest,
 )
-from ..clients import (
+from ..clients.booking_client import (
     create_booking,
     get_booking,
     confirm_booking,
@@ -25,13 +25,13 @@ from ..clients import (
     complete_booking_as_user,
     complete_booking_as_handyman,
     reject_booking,
-    create_handyman_review,
     list_bookings,
     admin_update_booking,
     admin_delete_booking,
     get_completed_count,
     get_completed_counts_batch,
 )
+from ..clients.handyman_client import create_handyman_review
 from ..security import get_current_user
 from ..rbac import require_role
 from ..helpers import (
