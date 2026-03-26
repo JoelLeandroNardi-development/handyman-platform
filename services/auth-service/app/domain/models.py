@@ -1,6 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, JSON, func
-from .db import Base
-
+from app.infrastructure.db import Base
 
 class AuthUser(Base):
     __tablename__ = "auth_users"
@@ -13,7 +12,6 @@ class AuthUser(Base):
     auth_provider = Column(String(20), nullable=False, server_default="local")
     google_sub = Column(String(255), nullable=True, unique=True)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
-
 
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
@@ -28,7 +26,6 @@ class AuthSession(Base):
     ip = Column(String(64), nullable=True)
     user_agent = Column(String(512), nullable=True)
 
-
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
@@ -38,7 +35,6 @@ class PasswordResetToken(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     used_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
 
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"

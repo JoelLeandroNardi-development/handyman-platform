@@ -1,10 +1,9 @@
 from fastapi import FastAPI
-from .routes import router
+from app.api.routes import router
 
 app = FastAPI(title="Auth Service")
 
 app.include_router(router)
-
 
 @app.get("/health")
 async def health():
