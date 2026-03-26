@@ -29,9 +29,9 @@ from ..schemas import (
 from ..clients.auth_client import *
 from ..clients.user_client import get_user, create_user
 from ..clients.handyman_client import get_handyman, create_handyman
-from ..security import get_current_user
-from ..rbac import require_role
-from ..helpers import (
+from ..utils.security import get_current_user
+from ..utils.rbac import require_role
+from ..utils.helpers import (
     _user_email,
     _has_role,
     _auth_user_has_any_role,

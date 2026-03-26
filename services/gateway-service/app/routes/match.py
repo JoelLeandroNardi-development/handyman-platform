@@ -3,8 +3,8 @@ from typing import List
 
 from ..schemas import MatchRequest, MatchResult, MatchLogResponse, DeleteMatchLogResponse
 from ..clients.match_client import match_request, list_match_logs, delete_match_log
-from ..security import get_current_user
-from ..rbac import require_role
+from ..utils.security import get_current_user
+from ..utils.rbac import require_role
 
 router = APIRouter()
 

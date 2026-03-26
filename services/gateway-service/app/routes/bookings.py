@@ -32,9 +32,9 @@ from ..clients.booking_client import (
     get_completed_counts_batch,
 )
 from ..clients.handyman_client import create_handyman_review
-from ..security import get_current_user
-from ..rbac import require_role
-from ..helpers import (
+from ..utils.security import get_current_user
+from ..utils.rbac import require_role
+from ..utils.helpers import (
     _user_email,
     _has_role,
     _booking_owned_or_admin,

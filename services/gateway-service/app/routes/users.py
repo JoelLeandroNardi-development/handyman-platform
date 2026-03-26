@@ -17,9 +17,9 @@ from ..clients.user_client import (
     delete_user,
 )
 from ..clients.auth_client import get_auth_user_by_email
-from ..security import get_current_user
-from ..rbac import require_role
-from ..helpers import (
+from ..utils.security import get_current_user
+from ..utils.rbac import require_role
+from ..utils.helpers import (
     _user_email,
     _has_role,
     _auth_user_has_any_role,

@@ -12,9 +12,9 @@ from ..clients.availability_client import (
     clear_availability,
     list_all_availability,
 )
-from ..security import get_current_user
-from ..rbac import require_role
-from ..helpers import _user_email
+from ..utils.security import get_current_user
+from ..utils.rbac import require_role
+from ..utils.helpers import _user_email
 
 router = APIRouter()
 

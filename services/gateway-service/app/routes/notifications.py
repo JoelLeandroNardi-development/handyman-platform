@@ -27,7 +27,7 @@ from ..schemas import (
     UnreadCountResponse,
     UpdateNotificationPreferencesRequest,
 )
-from ..security import get_current_user, get_current_user_sse
+from ..utils.security import get_current_user, get_current_user_sse
 
 router = APIRouter()
 

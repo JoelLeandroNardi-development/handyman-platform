@@ -4,7 +4,7 @@ import httpx
 from fastapi import HTTPException
 from typing import List, Dict, Any
 
-from .breakers.circuit_breakers import (
+from ..breakers.circuit_breakers import (
     cb_auth,
     cb_user,
     cb_handyman,
@@ -13,9 +13,9 @@ from .breakers.circuit_breakers import (
     cb_booking,
     cb_notification,
 )
-from .clients.auth_client import get_auth_user_by_email
-from .clients.booking_client import get_booking
-from .config import SERVICE_BASE_URLS
+from ..clients.auth_client import get_auth_user_by_email
+from ..clients.booking_client import get_booking
+from ..config import SERVICE_BASE_URLS
 
 
 def _breaker_registry():

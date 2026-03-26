@@ -41,7 +41,7 @@ def security_module(monkeypatch):
     )
     security_mod = load_service_app_module(
         "gateway-service",
-        "security",
+        "utils/security",
         package_name="gateway_sse_test_app",
     )
     return security_mod

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .middleware import RequestLoggingMiddleware, RateLimitMiddleware
+from .utils.middleware import RequestLoggingMiddleware, RateLimitMiddleware
 from .routes.system import router as system_router
 from .routes.auth import router as auth_router
 from .routes.users import router as users_router

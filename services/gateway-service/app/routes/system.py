@@ -3,9 +3,9 @@ import httpx
 from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import List, Dict, Any
 
-from ..security import get_current_user
-from ..rbac import require_role
-from ..helpers import (
+from ..utils.security import get_current_user
+from ..utils.rbac import require_role
+from ..utils.helpers import (
     _breaker_registry,
     _service_urls,
     _fetch_json,

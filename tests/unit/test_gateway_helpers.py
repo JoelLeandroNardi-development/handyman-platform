@@ -40,7 +40,7 @@ def gateway_modules(monkeypatch):
     )
     rbac_module = load_service_app_module(
         "gateway-service",
-        "rbac",
+        "utils/rbac",
         package_name="gateway_service_test_app",
     )
     breaker_module.redis_client = fake_redis
@@ -255,7 +255,7 @@ def helpers_module(monkeypatch):
     )
     helpers_mod = load_service_app_module(
         "gateway-service",
-        "helpers",
+        "utils/helpers",
         package_name="gateway_helpers_test_app",
     )
     return helpers_mod
