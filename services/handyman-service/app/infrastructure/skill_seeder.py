@@ -1,7 +1,6 @@
 from sqlalchemy import select
 
 from app.application.helpers import normalize_catalog, _label_from_key
-from app.application.mappers import _label_from_key
 from app.domain.models import SkillsCategory, SkillCatalogItem
 from app.domain.skills_catalog import DEFAULT_SKILLS_CATALOG
 from app.infrastructure.db import SessionLocal

@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.queries.skill_query_service import SkillQueryService
 from app.application.helpers import normalize_catalog, normalize_skills_input, _label_from_key, validate_catalog_shape
-from app.application.mappers import _label_from_key
 from app.domain.models import SkillCatalogItem, SkillsCategory
 from app.domain.schemas import SkillsCatalogPatchResponse, SkillsCatalogReplaceResponse
 

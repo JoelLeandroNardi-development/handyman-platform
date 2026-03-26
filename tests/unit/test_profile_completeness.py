@@ -15,10 +15,10 @@ from tests.service_loader import load_service_app_module
 
 @pytest.fixture(scope="module")
 def pc_module():
-    """Load the profile_completeness module from handyman-service."""
+    """Load the profile_completeness module from handyman-service (domain/)."""
     return load_service_app_module(
         "handyman-service",
-        "profile_policies",
+        "domain/profile_policies",
         package_name="handyman_pc_test_app",
     )
 
