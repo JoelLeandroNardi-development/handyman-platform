@@ -19,6 +19,10 @@ def load_service_app_module(
     app_dir = REPO_ROOT / "services" / service_dir / "app"
     resolved_package = package_name or f"{service_dir.replace('-', '_')}_app"
 
+    app_dir_str = str(app_dir)
+    if app_dir_str not in sys.path:
+        sys.path.insert(0, app_dir_str)
+
     if reload_modules:
         for name in list(sys.modules):
             if name == resolved_package or name.startswith(f"{resolved_package}."):
@@ -26,7 +30,7 @@ def load_service_app_module(
 
     if resolved_package not in sys.modules:
         package = types.ModuleType(resolved_package)
-        package.__path__ = [str(app_dir)]
+        package.__path__ = [app_dir_str]
         sys.modules[resolved_package] = package
 
     full_name = f"{resolved_package}.{module_name}"
@@ -39,7 +43,12 @@ def load_service_app_module(
         raise ImportError(f"Unable to load module from {file_path}")
 
     module = importlib.util.module_from_spec(spec)
-    module.__package__ = resolved_package
+    # Set __package__ for submodules so relative imports work
+    if "/" in module_name:
+        parent_pkg = ".".join([resolved_package] + module_name.split("/")[:-1])
+        module.__package__ = parent_pkg
+    else:
+        module.__package__ = resolved_package
     sys.modules[full_name] = module
     spec.loader.exec_module(module)
     return module
