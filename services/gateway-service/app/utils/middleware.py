@@ -4,8 +4,7 @@ from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
-from ..clients.redis_client import redis_client
-
+from app.clients.redis_client import redis_client
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -32,7 +31,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             f'{{"request_id":"{request_id}","method":"{request.method}","path":"{request.url.path}","status":{response.status_code},"duration_ms":{duration_ms:.2f},"user_sub":"{user_sub}","user_roles":{user_roles}}}'
         )
         return response
-
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, max_per_minute: int = 120):

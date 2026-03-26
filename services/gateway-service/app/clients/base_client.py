@@ -3,11 +3,9 @@ import httpx
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 
-from ..breakers.breaker import CircuitBreaker, CircuitBreakerOpen
-
+from app.breakers.breaker import CircuitBreaker, CircuitBreakerOpen
 
 DEFAULT_TIMEOUT = 3.0
-
 
 def _base_headers(request_id: str | None, user_payload: dict | None):
     headers: dict[str, str] = {}
@@ -23,7 +21,6 @@ def _base_headers(request_id: str | None, user_payload: dict | None):
             headers["X-User-Roles"] = json.dumps(roles)
     return headers
 
-
 def _safe_json(resp: httpx.Response) -> dict:
     if not resp.content:
         return {}
@@ -31,7 +28,6 @@ def _safe_json(resp: httpx.Response) -> dict:
         return resp.json()
     except Exception:
         return {"raw": resp.text}
-
 
 async def _call_with_breaker(
     breaker: CircuitBreaker,

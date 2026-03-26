@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
-from ..clients.notification_client import (
+from app.clients.notification_client import (
     archive_my_notification,
     delete_my_push_device,
     get_my_notification_preferences,
@@ -16,8 +16,8 @@ from ..clients.notification_client import (
     register_my_push_device,
     update_my_notification_preferences,
 )
-from ..config import NOTIFICATION_SERVICE_URL
-from ..schemas import (
+from app.config import NOTIFICATION_SERVICE_URL
+from app.schemas import (
     MarkAllReadResponse,
     NotificationListResponse,
     NotificationPreferencesResponse,
@@ -27,10 +27,9 @@ from ..schemas import (
     UnreadCountResponse,
     UpdateNotificationPreferencesRequest,
 )
-from ..utils.security import get_current_user, get_current_user_sse
+from app.utils.security import get_current_user, get_current_user_sse
 
 router = APIRouter()
-
 
 @router.get("/me/notifications", response_model=NotificationListResponse, tags=["Notifications"])
 async def get_notifications(
@@ -48,11 +47,9 @@ async def get_notifications(
         cursor=cursor,
     )
 
-
 @router.get("/me/notifications/unread-count", response_model=UnreadCountResponse, tags=["Notifications"])
 async def get_unread_count(request: Request, user=Depends(get_current_user)):
     return await get_my_unread_count(request_id=request.state.request_id, user_payload=user)
-
 
 @router.post("/me/notifications/{notification_id}/read", response_model=OkResponse, tags=["Notifications"])
 async def mark_notification_read(notification_id: str, request: Request, user=Depends(get_current_user)):
@@ -62,11 +59,9 @@ async def mark_notification_read(notification_id: str, request: Request, user=De
         user_payload=user,
     )
 
-
 @router.post("/me/notifications/read-all", response_model=MarkAllReadResponse, tags=["Notifications"])
 async def mark_all_read(request: Request, user=Depends(get_current_user)):
     return await mark_all_my_notifications_read(request_id=request.state.request_id, user_payload=user)
-
 
 @router.post("/me/notifications/{notification_id}/archive", response_model=OkResponse, tags=["Notifications"])
 async def archive_notification(notification_id: str, request: Request, user=Depends(get_current_user)):
@@ -76,11 +71,9 @@ async def archive_notification(notification_id: str, request: Request, user=Depe
         user_payload=user,
     )
 
-
 @router.get("/me/notification-preferences", response_model=NotificationPreferencesResponse, tags=["Notifications"])
 async def get_preferences(request: Request, user=Depends(get_current_user)):
     return await get_my_notification_preferences(request_id=request.state.request_id, user_payload=user)
-
 
 @router.put("/me/notification-preferences", response_model=NotificationPreferencesResponse, tags=["Notifications"])
 async def update_preferences(payload: UpdateNotificationPreferencesRequest, request: Request, user=Depends(get_current_user)):
@@ -90,16 +83,13 @@ async def update_preferences(payload: UpdateNotificationPreferencesRequest, requ
         user_payload=user,
     )
 
-
 @router.post("/me/push-devices", response_model=PushDeviceResponse, tags=["Notifications"])
 async def register_push_device(payload: RegisterPushDeviceRequest, request: Request, user=Depends(get_current_user)):
     return await register_my_push_device(payload.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.delete("/me/push-devices/{device_id}", response_model=OkResponse, tags=["Notifications"])
 async def delete_push_device(device_id: int, request: Request, user=Depends(get_current_user)):
     return await delete_my_push_device(device_id, request_id=request.state.request_id, user_payload=user)
-
 
 @router.get(
     "/me/notifications/stream",

@@ -4,7 +4,7 @@ import httpx
 from fastapi import HTTPException
 from typing import List, Dict, Any
 
-from ..breakers.circuit_breakers import (
+from app.breakers.circuit_breakers import (
     cb_auth,
     cb_user,
     cb_handyman,
@@ -13,10 +13,9 @@ from ..breakers.circuit_breakers import (
     cb_booking,
     cb_notification,
 )
-from ..clients.auth_client import get_auth_user_by_email
-from ..clients.booking_client import get_booking
-from ..config import SERVICE_BASE_URLS
-
+from app.clients.auth_client import get_auth_user_by_email
+from app.clients.booking_client import get_booking
+from app.config import SERVICE_BASE_URLS
 
 def _breaker_registry():
     return {
@@ -29,11 +28,9 @@ def _breaker_registry():
         "notification-service": cb_notification,
     }
 
-
 def _service_urls(path: str) -> Dict[str, str]:
     bases = SERVICE_BASE_URLS()
     return {name: f"{base}{path}" for name, base in bases.items()}
-
 
 async def _fetch_json(
     *,
@@ -70,10 +67,8 @@ async def _fetch_json(
             "data": None,
         }
 
-
 def _overall_status(results: List[Dict[str, Any]]) -> str:
     return "up" if all(r.get("status") == "up" for r in results) else "degraded"
-
 
 def _user_email(payload: dict) -> str:
     email = payload.get("sub")
@@ -81,17 +76,14 @@ def _user_email(payload: dict) -> str:
         raise HTTPException(status_code=401, detail="Token missing subject")
     return str(email)
 
-
 def _has_role(payload: dict, role: str) -> bool:
     roles = payload.get("roles") or []
     return role.lower() in {str(r).lower() for r in roles}
-
 
 def _auth_user_has_any_role(auth_user: dict, allowed_roles: list[str]) -> bool:
     roles = {str(r).lower() for r in (auth_user.get("roles") or [])}
     allowed = {str(r).lower() for r in allowed_roles}
     return not roles.isdisjoint(allowed)
-
 
 async def _get_auth_user_after_register(email: str, request_id: str) -> dict:
     try:
@@ -101,7 +93,6 @@ async def _get_auth_user_after_register(email: str, request_id: str) -> dict:
             status_code=502,
             detail=f"Auth user was registered but could not be fetched afterwards. status={e.status_code}"
         )
-
 
 async def _booking_owned_or_admin(booking_id: str, payload: dict, request_id: str) -> dict:
     booking = await get_booking(booking_id, request_id=request_id, user_payload=payload)

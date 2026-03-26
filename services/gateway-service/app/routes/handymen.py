@@ -1,21 +1,8 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from typing import List
 
-from ..schemas import (
-    CreateHandyman,
-    UpdateHandymanLocation,
-    UpdateHandyman,
-    HandymanResponse,
-    HandymanReviewResponse,
-    SkillCatalogReplaceRequest,
-    SkillCatalogPatchRequest,
-    SkillCatalogFlatResponse,
-    InvalidHandymanSkillsResponse,
-    DeleteHandymanResponse,
-    SkillsCatalogReplaceResponse,
-    SkillsCatalogPatchResponse,
-)
-from ..clients.handyman_client import (
+from app.clients.auth_client import get_auth_user_by_email
+from app.clients.handyman_client import (
     list_handymen,
     create_handyman,
     get_handyman,
@@ -29,17 +16,29 @@ from ..clients.handyman_client import (
     patch_skills_catalog,
     get_handymen_with_invalid_skills,
 )
-from ..clients.auth_client import get_auth_user_by_email
-from ..utils.security import get_current_user
-from ..utils.rbac import require_role
-from ..utils.helpers import (
+from app.schemas import (
+    CreateHandyman,
+    UpdateHandymanLocation,
+    UpdateHandyman,
+    HandymanResponse,
+    HandymanReviewResponse,
+    SkillCatalogReplaceRequest,
+    SkillCatalogPatchRequest,
+    SkillCatalogFlatResponse,
+    InvalidHandymanSkillsResponse,
+    DeleteHandymanResponse,
+    SkillsCatalogReplaceResponse,
+    SkillsCatalogPatchResponse,
+)
+from app.utils.helpers import (
     _user_email,
     _has_role,
     _auth_user_has_any_role,
 )
+from app.utils.rbac import require_role
+from app.utils.security import get_current_user
 
 router = APIRouter()
-
 
 @router.get("/handymen", response_model=List[HandymanResponse], tags=["Handymen"])
 async def list_handymen_endpoint(
@@ -50,7 +49,6 @@ async def list_handymen_endpoint(
 ):
     require_role(user, ["user", "handyman", "admin"])
     return await list_handymen(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset)
-
 
 @router.post("/handymen", response_model=HandymanResponse, tags=["Handymen"])
 async def create_handyman_endpoint(data: CreateHandyman, request: Request, user=Depends(get_current_user)):
@@ -68,12 +66,10 @@ async def create_handyman_endpoint(data: CreateHandyman, request: Request, user=
 
     return await create_handyman(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.get("/handymen/{email}", response_model=HandymanResponse, tags=["Handymen"])
 async def get_handyman_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await get_handyman(email, request_id=request.state.request_id, user_payload=user)
-
 
 @router.put("/handymen/{email}/location", response_model=HandymanResponse, tags=["Handymen"])
 async def update_handyman_location_endpoint(email: str, data: UpdateHandymanLocation, request: Request, user=Depends(get_current_user)):
@@ -82,30 +78,25 @@ async def update_handyman_location_endpoint(email: str, data: UpdateHandymanLoca
     require_role(user, ["handyman", "admin"])
     return await update_handyman_location_and_fetch(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.put("/handymen/{email}", response_model=HandymanResponse, tags=["Handymen"])
 async def admin_update_handyman_endpoint(email: str, data: UpdateHandyman, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await update_handyman(email, data.model_dump(), request_id=request.state.request_id, user_payload=user)
-
 
 @router.delete("/handymen/{email}", response_model=DeleteHandymanResponse, tags=["Handymen"])
 async def admin_delete_handyman_endpoint(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await delete_handyman(email, request_id=request.state.request_id, user_payload=user)
 
-
 @router.get("/me/handyman", response_model=HandymanResponse, tags=["Handymen"])
 async def get_me_handyman(request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
     return await get_handyman(_user_email(user), request_id=request.state.request_id, user_payload=user)
 
-
 @router.put("/me/handyman", response_model=HandymanResponse, tags=["Handymen"])
 async def update_me_handyman(data: UpdateHandyman, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
     return await update_handyman(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
-
 
 @router.get("/handymen/{email}/reviews", response_model=List[HandymanReviewResponse], tags=["Handymen"])
 async def list_handyman_reviews_endpoint(
@@ -124,7 +115,6 @@ async def list_handyman_reviews_endpoint(
         offset=offset,
     )
 
-
 @router.get("/skills-catalog", response_model=dict[str, List[str]], tags=["Handymen"])
 async def get_skills_catalog_endpoint(
     request: Request,
@@ -136,7 +126,6 @@ async def get_skills_catalog_endpoint(
         active_only=active_only,
     )
 
-
 @router.get("/skills-catalog/flat", response_model=SkillCatalogFlatResponse, tags=["Handymen"])
 async def get_skills_catalog_flat_endpoint(
     request: Request,
@@ -147,7 +136,6 @@ async def get_skills_catalog_flat_endpoint(
         user_payload=None,
         active_only=active_only,
     )
-
 
 @router.put("/admin/skills-catalog", response_model=SkillsCatalogReplaceResponse, tags=["Handymen"])
 async def replace_skills_catalog_endpoint(
@@ -162,7 +150,6 @@ async def replace_skills_catalog_endpoint(
         user_payload=user,
     )
 
-
 @router.patch("/admin/skills-catalog", response_model=SkillsCatalogPatchResponse, tags=["Handymen"])
 async def patch_skills_catalog_endpoint(
     data: SkillCatalogPatchRequest,
@@ -175,7 +162,6 @@ async def patch_skills_catalog_endpoint(
         request_id=request.state.request_id,
         user_payload=user,
     )
-
 
 @router.get("/admin/handymen/invalid-skills", response_model=InvalidHandymanSkillsResponse, tags=["Handymen"])
 async def invalid_handymen_skills_endpoint(

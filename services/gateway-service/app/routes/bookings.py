@@ -1,7 +1,22 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from typing import List
 
-from ..schemas import (
+from app.clients.booking_client import (
+    create_booking,
+    get_booking,
+    confirm_booking,
+    cancel_booking,
+    complete_booking_as_user,
+    complete_booking_as_handyman,
+    reject_booking,
+    list_bookings,
+    admin_update_booking,
+    admin_delete_booking,
+    get_completed_count,
+    get_completed_counts_batch,
+)
+from app.clients.handyman_client import create_handyman_review
+from app.schemas import (
     BookingResponse,
     ConfirmBookingResponse,
     CancelBookingResponse,
@@ -17,31 +32,15 @@ from ..schemas import (
     HandymanReviewResponse,
     CreateHandymanReviewRequest,
 )
-from ..clients.booking_client import (
-    create_booking,
-    get_booking,
-    confirm_booking,
-    cancel_booking,
-    complete_booking_as_user,
-    complete_booking_as_handyman,
-    reject_booking,
-    list_bookings,
-    admin_update_booking,
-    admin_delete_booking,
-    get_completed_count,
-    get_completed_counts_batch,
-)
-from ..clients.handyman_client import create_handyman_review
-from ..utils.security import get_current_user
-from ..utils.rbac import require_role
-from ..utils.helpers import (
+from app.utils.helpers import (
     _user_email,
     _has_role,
     _booking_owned_or_admin,
 )
+from app.utils.rbac import require_role
+from app.utils.security import get_current_user
 
 router = APIRouter()
-
 
 @router.post("/bookings", response_model=BookingResponse, tags=["Bookings"])
 async def create_booking_endpoint(data: CreateBookingRequest, request: Request, user=Depends(get_current_user)):
@@ -52,13 +51,11 @@ async def create_booking_endpoint(data: CreateBookingRequest, request: Request, 
 
     return await create_booking(data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.get("/bookings/{booking_id}", response_model=BookingResponse, tags=["Bookings"])
 async def get_booking_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "handyman", "admin"])
     booking = await _booking_owned_or_admin(booking_id, user, request.state.request_id)
     return booking
-
 
 @router.post("/bookings/{booking_id}/confirm", response_model=ConfirmBookingResponse, tags=["Bookings"])
 async def confirm_booking_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
@@ -70,7 +67,6 @@ async def confirm_booking_endpoint(booking_id: str, request: Request, user=Depen
         raise HTTPException(status_code=403, detail="Cannot confirm another handyman's booking")
 
     return await confirm_booking(booking_id, request_id=request.state.request_id, user_payload=user)
-
 
 @router.post("/bookings/{booking_id}/cancel", response_model=CancelBookingResponse, tags=["Bookings"])
 async def cancel_booking_endpoint(booking_id: str, data: CancelBookingRequest, request: Request, user=Depends(get_current_user)):
@@ -86,7 +82,6 @@ async def cancel_booking_endpoint(booking_id: str, data: CancelBookingRequest, r
 
     return await cancel_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.post("/bookings/{booking_id}/complete/user", response_model=CompleteBookingResponse, tags=["Bookings"])
 async def complete_booking_user_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
@@ -98,7 +93,6 @@ async def complete_booking_user_endpoint(booking_id: str, request: Request, user
 
     return await complete_booking_as_user(booking_id, request_id=request.state.request_id, user_payload=user)
 
-
 @router.post("/bookings/{booking_id}/complete/handyman", response_model=CompleteBookingResponse, tags=["Bookings"])
 async def complete_booking_handyman_endpoint(booking_id: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
@@ -109,7 +103,6 @@ async def complete_booking_handyman_endpoint(booking_id: str, request: Request, 
         raise HTTPException(status_code=403, detail="Cannot complete another handyman's booking as handyman")
 
     return await complete_booking_as_handyman(booking_id, request_id=request.state.request_id, user_payload=user)
-
 
 @router.post("/bookings/{booking_id}/reject", response_model=RejectBookingResponse, tags=["Bookings"])
 async def reject_booking_completion_endpoint(
@@ -131,7 +124,6 @@ async def reject_booking_completion_endpoint(
         request_id=request.state.request_id,
         user_payload=user,
     )
-
 
 @router.post("/bookings/{booking_id}/review", response_model=HandymanReviewResponse, tags=["Bookings"])
 async def create_booking_review_endpoint(
@@ -162,7 +154,6 @@ async def create_booking_review_endpoint(
         user_payload=user,
     )
 
-
 @router.get("/me/bookings", response_model=List[BookingResponse], tags=["Bookings"])
 async def get_my_bookings(
     request: Request,
@@ -182,7 +173,6 @@ async def get_my_bookings(
         handyman_email=None,
     )
 
-
 @router.get("/me/jobs", response_model=List[BookingResponse], tags=["Bookings"])
 async def get_my_jobs(
     request: Request,
@@ -201,7 +191,6 @@ async def get_my_jobs(
         user_email=None,
         handyman_email=_user_email(user),
     )
-
 
 @router.get("/bookings", response_model=List[BookingResponse], tags=["Bookings"])
 async def admin_list_bookings(
@@ -224,7 +213,6 @@ async def admin_list_bookings(
         handyman_email=handyman_email,
     )
 
-
 @router.put("/bookings/{booking_id}", response_model=BookingResponse, tags=["Bookings"])
 async def admin_update_booking_endpoint(
     booking_id: str,
@@ -235,7 +223,6 @@ async def admin_update_booking_endpoint(
     require_role(user, ["admin"])
     return await admin_update_booking(booking_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.delete("/bookings/{booking_id}", response_model=DeleteBookingResponse, tags=["Bookings"])
 async def admin_delete_booking_endpoint(
     booking_id: str,
@@ -245,12 +232,10 @@ async def admin_delete_booking_endpoint(
     require_role(user, ["admin"])
     return await admin_delete_booking(booking_id, request_id=request.state.request_id, user_payload=user)
 
-
 @router.get("/bookings/completed-count/{handyman_email}", response_model=CompletedJobsCountResponse, tags=["Bookings"])
 async def completed_count_endpoint(handyman_email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "handyman", "admin"])
     return await get_completed_count(handyman_email, request_id=request.state.request_id, user_payload=user)
-
 
 @router.post("/bookings/completed-counts", response_model=CompletedJobsCountsResponse, tags=["Bookings"])
 async def completed_counts_batch_endpoint(emails: List[str], request: Request, user=Depends(get_current_user)):

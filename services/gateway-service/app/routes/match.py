@@ -1,19 +1,17 @@
 from fastapi import APIRouter, Depends, Request, Query
 from typing import List
 
-from ..schemas import MatchRequest, MatchResult, MatchLogResponse, DeleteMatchLogResponse
-from ..clients.match_client import match_request, list_match_logs, delete_match_log
-from ..utils.security import get_current_user
-from ..utils.rbac import require_role
+from app.clients.match_client import match_request, list_match_logs, delete_match_log
+from app.schemas import MatchRequest, MatchResult, MatchLogResponse, DeleteMatchLogResponse
+from app.utils.rbac import require_role
+from app.utils.security import get_current_user
 
 router = APIRouter()
-
 
 @router.post("/match", response_model=List[MatchResult], tags=["Match"])
 async def match_endpoint(data: MatchRequest, request: Request, user=Depends(get_current_user)):
     require_role(user, ["user", "admin"])
     return await match_request(data.model_dump(), request_id=request.state.request_id, user_payload=user)
-
 
 @router.get("/match-logs", response_model=List[MatchLogResponse], tags=["Match"])
 async def admin_list_match_logs(
@@ -25,7 +23,6 @@ async def admin_list_match_logs(
 ):
     require_role(user, ["admin"])
     return await list_match_logs(request_id=request.state.request_id, user_payload=user, limit=limit, offset=offset, skill=skill)
-
 
 @router.delete("/match-logs/{log_id}", response_model=DeleteMatchLogResponse, tags=["Match"])
 async def admin_delete_match_log(

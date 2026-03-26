@@ -3,22 +3,20 @@ import httpx
 from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import List, Dict, Any
 
-from ..utils.security import get_current_user
-from ..utils.rbac import require_role
-from ..utils.helpers import (
+from app.utils.helpers import (
     _breaker_registry,
     _service_urls,
     _fetch_json,
     _overall_status,
 )
+from app.utils.rbac import require_role
+from app.utils.security import get_current_user
 
 router = APIRouter()
-
 
 @router.get("/health", response_model=dict[str, Any], tags=["System"])
 async def health():
     return {"status": "ok", "service": "gateway-service"}
-
 
 @router.get("/system/health", response_model=dict[str, Any], tags=["System"])
 async def system_health(request: Request, user=Depends(get_current_user)):
@@ -36,7 +34,6 @@ async def system_health(request: Request, user=Depends(get_current_user)):
     results.sort(key=lambda x: x["service"])
     return {"status": _overall_status(results), "services": results}
 
-
 @router.get("/system/rabbit", response_model=dict[str, Any], tags=["System"])
 async def system_rabbit(request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
@@ -52,7 +49,6 @@ async def system_rabbit(request: Request, user=Depends(get_current_user)):
 
     results.sort(key=lambda x: x["service"])
     return {"status": _overall_status(results), "services": results}
-
 
 @router.get("/system/outbox", response_model=dict[str, Any], tags=["System"])
 async def system_outbox(request: Request, user=Depends(get_current_user)):
@@ -95,14 +91,12 @@ async def system_outbox(request: Request, user=Depends(get_current_user)):
     overall = "up" if all(x.get("status") == "up" for x in compact) else "degraded"
     return {"status": overall, "services": compact}
 
-
 @router.get("/system/breakers", response_model=dict[str, Any], tags=["System"])
 async def breakers_status(user=Depends(get_current_user)):
     require_role(user, ["admin"])
     statuses = await asyncio.gather(*[b.status() for b in _breaker_registry().values()])
     statuses.sort(key=lambda x: x["name"])
     return {"breakers": statuses}
-
 
 @router.post("/system/breakers/{name}/close", response_model=dict[str, Any], tags=["System"])
 async def breaker_close(name: str, user=Depends(get_current_user)):
@@ -112,7 +106,6 @@ async def breaker_close(name: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Breaker not found")
     await b.close()
     return {"message": "closed", "breaker": await b.status()}
-
 
 @router.post("/system/breakers/{name}/open", response_model=dict[str, Any], tags=["System"])
 async def breaker_open(name: str, user=Depends(get_current_user)):

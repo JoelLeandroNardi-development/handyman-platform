@@ -17,6 +17,11 @@ def load_service_app_module(
     reload_modules: bool = False,
 ):
     app_dir = REPO_ROOT / "services" / service_dir / "app"
+    if service_dir == "gateway-service":
+        parent_dir = str(app_dir.parent)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+
     resolved_package = package_name or f"{service_dir.replace('-', '_')}_app"
 
     app_dir_str = str(app_dir)

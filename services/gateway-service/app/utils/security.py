@@ -11,7 +11,6 @@ if not JWT_SECRET:
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-
 def _decode_and_bind(token: str, request: Request) -> dict:
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -25,14 +24,12 @@ def _decode_and_bind(token: str, request: Request) -> dict:
     request.state.user_roles = payload.get("roles")
     return payload
 
-
 def _extract_bearer_token(
     creds: HTTPAuthorizationCredentials | None,
 ) -> str | None:
     if creds and creds.scheme.lower() == "bearer":
         return creds.credentials
     return None
-
 
 def get_current_user(
     request: Request,
@@ -47,7 +44,6 @@ def get_current_user(
         )
 
     return _decode_and_bind(token, request)
-
 
 def get_current_user_sse(
     request: Request,

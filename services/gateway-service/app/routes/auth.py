@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from typing import List
 
-from ..schemas import (
+from app.clients.auth_client import *
+from app.clients.handyman_client import get_handyman, create_handyman
+from app.clients.user_client import get_user, create_user
+from app.schemas import (
     Register,
     RegisterResponse,
     Login,
@@ -26,65 +29,52 @@ from ..schemas import (
     OnboardingCombinedResponse,
     MeResponse,
 )
-from ..clients.auth_client import *
-from ..clients.user_client import get_user, create_user
-from ..clients.handyman_client import get_handyman, create_handyman
-from ..utils.security import get_current_user
-from ..utils.rbac import require_role
-from ..utils.helpers import (
+from app.utils.helpers import (
     _user_email,
     _has_role,
     _auth_user_has_any_role,
     _get_auth_user_after_register,
 )
+from app.utils.rbac import require_role
+from app.utils.security import get_current_user
 
 router = APIRouter()
-
 
 @router.post("/register", response_model=RegisterResponse, tags=["Auth"])
 async def register(data: Register, request: Request):
     return await register_user(data.model_dump(), request_id=request.state.request_id)
 
-
 @router.post("/login", response_model=TokenPairResponse, tags=["Auth"])
 async def login(data: Login, request: Request):
     return await login_user(data.model_dump(), request_id=request.state.request_id)
-
 
 @router.post("/auth/google", response_model=GoogleLoginResponse, tags=["Auth"])
 async def google_login(data: GoogleLoginRequest, request: Request):
     return await google_login_user(data.model_dump(), request_id=request.state.request_id)
 
-
 @router.post("/refresh", response_model=TokenPairResponse, tags=["Auth"])
 async def refresh(data: RefreshRequest, request: Request):
     return await refresh_user_token(data.model_dump(), request_id=request.state.request_id)
-
 
 @router.post("/logout", response_model=AuthActionResponse, tags=["Auth"])
 async def logout(data: LogoutRequest, request: Request):
     return await logout_user(data.model_dump(), request_id=request.state.request_id)
 
-
 @router.post("/password/forgot", response_model=AuthActionResponse, tags=["Auth"])
 async def forgot_password_endpoint(data: ForgotPasswordRequest, request: Request):
     return await forgot_password(data.model_dump(), request_id=request.state.request_id)
-
 
 @router.post("/password/reset", response_model=AuthActionResponse, tags=["Auth"])
 async def reset_password_endpoint(data: ResetPasswordRequest, request: Request):
     return await reset_password(data.model_dump(), request_id=request.state.request_id)
 
-
 @router.post("/email/verify/request", response_model=AuthActionResponse, tags=["Auth"])
 async def email_verify_request_endpoint(data: EmailVerifyRequest, request: Request):
     return await request_email_verification(data.model_dump(), request_id=request.state.request_id)
 
-
 @router.post("/email/verify/confirm", response_model=AuthActionResponse, tags=["Auth"])
 async def email_verify_confirm_endpoint(data: EmailVerifyConfirmRequest, request: Request):
     return await confirm_email_verification(data.model_dump(), request_id=request.state.request_id)
-
 
 @router.get("/auth-users", response_model=List[AuthUserResponse], tags=["Auth"])
 async def admin_list_auth_users(
@@ -101,30 +91,25 @@ async def admin_list_auth_users(
         offset=offset,
     )
 
-
 @router.get("/auth-users/{user_id}", response_model=AuthUserResponse, tags=["Auth"])
 async def admin_get_auth_user(user_id: int, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await get_auth_user(user_id, request_id=request.state.request_id, user_payload=user)
-
 
 @router.get("/auth-users/by-email/{email}", response_model=AuthUserResponse, tags=["Auth"])
 async def admin_get_auth_user_by_email(email: str, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await get_auth_user_by_email(email, request_id=request.state.request_id, user_payload=user)
 
-
 @router.put("/auth-users/{user_id}", response_model=AuthUserResponse, tags=["Auth"])
 async def admin_update_auth_user(user_id: int, data: UpdateAuthUser, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await update_auth_user(user_id, data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
-
 @router.delete("/auth-users/{user_id}", response_model=DeleteAuthUserResponse, tags=["Auth"])
 async def admin_delete_auth_user(user_id: int, request: Request, user=Depends(get_current_user)):
     require_role(user, ["admin"])
     return await delete_auth_user(user_id, request_id=request.state.request_id, user_payload=user)
-
 
 @router.post("/onboarding/user", response_model=OnboardingUserResponse, tags=["Auth"])
 async def onboarding_user(data: OnboardingUserRequest, request: Request):
@@ -164,7 +149,6 @@ async def onboarding_user(data: OnboardingUserRequest, request: Request):
         "auth_user": auth_user,
         "user_profile": user_profile,
     }
-
 
 @router.post("/onboarding/handyman", response_model=OnboardingHandymanResponse, tags=["Auth"])
 async def onboarding_handyman(data: OnboardingHandymanRequest, request: Request):
@@ -207,7 +191,6 @@ async def onboarding_handyman(data: OnboardingHandymanRequest, request: Request)
         "auth_user": auth_user,
         "handyman_profile": handyman_profile,
     }
-
 
 @router.post("/onboarding/combined", response_model=OnboardingCombinedResponse, tags=["Auth"])
 async def onboarding_combined(data: OnboardingCombinedRequest, request: Request):
@@ -272,7 +255,6 @@ async def onboarding_combined(data: OnboardingCombinedRequest, request: Request)
         "user_profile": user_profile,
         "handyman_profile": handyman_profile,
     }
-
 
 @router.get("/me", response_model=MeResponse, tags=["Auth"])
 async def get_me(request: Request, user=Depends(get_current_user)):

@@ -1,6 +1,5 @@
 from fastapi import HTTPException, status
 
-
 def require_role(payload: dict, allowed_roles: list[str]):
     token_roles = payload.get("roles")
 

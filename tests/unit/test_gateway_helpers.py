@@ -248,11 +248,6 @@ def helpers_module(monkeypatch):
         "config",
         package_name="gateway_helpers_test_app",
     )
-    load_service_app_module(
-        "gateway-service",
-        "clients",
-        package_name="gateway_helpers_test_app",
-    )
     helpers_mod = load_service_app_module(
         "gateway-service",
         "utils/helpers",
