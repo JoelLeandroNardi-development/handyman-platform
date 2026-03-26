@@ -16,7 +16,7 @@ from app.infrastructure.token_service import (
 )
 from shared.shared.schemas.auth import LogoutRequest
 
-class AuthService:
+class AuthCommandService:
     def __init__(self, db: AsyncSession):
         self.db = db
 

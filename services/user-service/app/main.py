@@ -3,10 +3,9 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from .routes import router
-from .messaging import publisher, RABBIT_URL, EXCHANGE_NAME
-from .outbox_worker import worker, outbox_stats
-
+from app.api.routes import router
+from app.infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from app.infrastructure.outbox_worker import worker, outbox_stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,10 +29,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-
 app = FastAPI(title="User Service", lifespan=lifespan)
 app.include_router(router)
-
 
 @app.get("/health")
 async def health():
@@ -45,7 +42,6 @@ async def health():
         "rabbit_url_set": bool(RABBIT_URL),
         "outbox": await outbox_stats(),
     }
-
 
 @app.get("/debug/rabbit")
 async def debug_rabbit():

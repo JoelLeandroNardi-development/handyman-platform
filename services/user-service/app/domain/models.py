@@ -1,9 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
 from sqlalchemy.sql import func
 
-from .db import Base
+from app.infrastructure.db import Base
 from shared.shared.outbox_model import make_outbox_event_model
-
 
 class User(Base):
     __tablename__ = "users"
@@ -25,6 +24,5 @@ class User(Base):
     longitude = Column(Float, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
 
 OutboxEvent = make_outbox_event_model(Base)

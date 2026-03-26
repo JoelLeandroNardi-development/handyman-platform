@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import asyncio
 
+from app.domain.models import OutboxEvent
+from app.infrastructure.db import SessionLocal
+from app.infrastructure.messaging import publisher
 from shared.shared.outbox_worker import run_outbox_loop, make_outbox_stats
-from .db import SessionLocal
-from .models import OutboxEvent
-from .messaging import publisher
-
 
 async def outbox_stats() -> dict:
     return await make_outbox_stats(SessionLocal, OutboxEvent)
-
 
 class OutboxWorker:
     def __init__(self):
@@ -38,6 +36,5 @@ class OutboxWorker:
             service_label="user-service",
             max_attempts=25,
         )
-
 
 worker = OutboxWorker()

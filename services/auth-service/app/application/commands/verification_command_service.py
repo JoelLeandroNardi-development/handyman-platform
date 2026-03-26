@@ -12,7 +12,7 @@ from app.infrastructure.token_service import generate_opaque_token, hash_token
 
 _DEBUG = os.getenv("DEBUG_MODE", "").lower() in ("1", "true", "yes")
 
-class VerificationService:
+class VerificationCommandService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
