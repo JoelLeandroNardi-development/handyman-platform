@@ -4,7 +4,7 @@ import httpx
 from fastapi import HTTPException
 from typing import List, Dict, Any
 
-from .clients import (
+from .breakers.circuit_breakers import (
     cb_auth,
     cb_user,
     cb_handyman,
@@ -12,9 +12,9 @@ from .clients import (
     cb_match,
     cb_booking,
     cb_notification,
-    get_auth_user_by_email,
-    get_booking,
 )
+from .clients.auth_client import get_auth_user_by_email
+from .clients.booking_client import get_booking
 from .config import SERVICE_BASE_URLS
 
 

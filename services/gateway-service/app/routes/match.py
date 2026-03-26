@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Query
 from typing import List
 
 from ..schemas import MatchRequest, MatchResult, MatchLogResponse, DeleteMatchLogResponse
-from ..clients import match_request, list_match_logs, delete_match_log
+from ..clients.match_client import match_request, list_match_logs, delete_match_log
 from ..security import get_current_user
 from ..rbac import require_role
 

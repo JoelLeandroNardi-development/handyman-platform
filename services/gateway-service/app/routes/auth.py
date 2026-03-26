@@ -26,26 +26,9 @@ from ..schemas import (
     OnboardingCombinedResponse,
     MeResponse,
 )
-from ..clients import (
-    register_user,
-    login_user,
-    google_login_user,
-    refresh_user_token,
-    logout_user,
-    forgot_password,
-    reset_password,
-    request_email_verification,
-    confirm_email_verification,
-    list_auth_users,
-    get_auth_user,
-    get_auth_user_by_email,
-    update_auth_user,
-    delete_auth_user,
-    create_user,
-    create_handyman,
-    get_user,
-    get_handyman,
-)
+from ..clients.auth_client import *
+from ..clients.user_client import get_user, create_user
+from ..clients.handyman_client import get_handyman, create_handyman
 from ..security import get_current_user
 from ..rbac import require_role
 from ..helpers import (

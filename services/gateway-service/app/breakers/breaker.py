@@ -1,5 +1,5 @@
 import time
-from .redis_client import redis_client
+from ..clients.redis_client import redis_client
 
 
 class CircuitBreakerOpen(Exception):
@@ -7,15 +7,6 @@ class CircuitBreakerOpen(Exception):
 
 
 class CircuitBreaker:
-    """
-    Redis-backed circuit breaker (shared across gateway instances).
-
-    States:
-      - CLOSED: allow traffic, count failures
-      - OPEN: block traffic for reset_timeout seconds
-      - HALF_OPEN: after timeout, allow a probe request
-    """
-
     def __init__(
         self,
         name: str,
@@ -99,9 +90,6 @@ class CircuitBreaker:
         await pipe.execute()
 
     async def status(self) -> dict:
-        """
-        Returns breaker status for visibility endpoints.
-        """
         state, failures, opened_at = await redis_client.mget(
             self._key_state(),
             self._key_failures(),
