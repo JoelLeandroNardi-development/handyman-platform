@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.mappers import to_auth_user_response
-from app.domain.models import AuthUser
-from app.domain.schemas import AuthUserResponse
+from ..mappers import to_auth_user_response
+from ...domain.models import AuthUser
+from ...domain.schemas import AuthUserResponse
 from shared.shared.crud_helpers import fetch_or_404
 
 class AuthUserQueryService:

@@ -2,7 +2,7 @@ from typing import Iterable
 
 from sqlalchemy import select, func
 
-from app.domain.models import Handyman, HandymanReview, SkillCatalogItem
+from ..domain.models import Handyman, HandymanReview, SkillCatalogItem
 
 async def _refresh_handyman_rating(db, handyman_email: str) -> None:
     res = await db.execute(

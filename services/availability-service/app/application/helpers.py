@@ -3,9 +3,9 @@ import datetime
 
 from dateutil import parser
 
-from app.domain.events import build_event
-from app.domain.schemas import AvailabilitySlot
-from app.infrastructure.outbox_worker import enqueue_domain_event
+from ..domain.events import build_event
+from ..domain.schemas import AvailabilitySlot
+from ..infrastructure.outbox_worker import enqueue_domain_event
 
 def _res_key(booking_id: str) -> str:
     return f"reservation:{booking_id}"

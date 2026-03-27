@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
-from app.domain.models import OutboxEvent
-from app.infrastructure.db import SessionLocal
-from app.infrastructure.messaging import publisher
+from .db import SessionLocal
+from .messaging import publisher
+from ..domain.models import OutboxEvent
 from shared.shared.outbox_worker import run_outbox_loop, make_outbox_stats
 
 async def outbox_stats() -> dict:

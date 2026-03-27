@@ -2,11 +2,11 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from app.api.routes import router
-from app.infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
-from app.infrastructure.event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
-from app.workers.expiry_worker import expiry_loop
-from app.infrastructure.outbox_worker import worker, outbox_stats
+from .api.routes import router
+from .infrastructure.event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
+from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from .infrastructure.outbox_worker import worker, outbox_stats
+from .workers.expiry_worker import expiry_loop
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

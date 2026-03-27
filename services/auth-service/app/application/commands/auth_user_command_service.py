@@ -1,10 +1,10 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.mappers import to_auth_user_response
-from app.domain.models import AuthUser
-from app.domain.schemas import AuthUserResponse, UpdateAuthUser
-from app.infrastructure.password_hasher import password_hasher
+from ..mappers import to_auth_user_response
+from ...domain.models import AuthUser
+from ...domain.schemas import AuthUserResponse, UpdateAuthUser
+from ...infrastructure.password_hasher import password_hasher
 from shared.shared.crud_helpers import fetch_or_404
 
 class AuthUserCommandService:

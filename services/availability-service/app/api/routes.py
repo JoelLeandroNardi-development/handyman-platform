@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from app.application.commands.availability_command_service import AvailabilityCommandService
-from app.application.queries.availability_query_service import AvailabilityQueryService
-from app.domain.schemas import SetAvailability, OverlapRequest
+from ..application.commands.availability_command_service import AvailabilityCommandService
+from ..application.queries.availability_query_service import AvailabilityQueryService
+from ..domain.schemas import SetAvailability, OverlapRequest
 
 router = APIRouter()
 

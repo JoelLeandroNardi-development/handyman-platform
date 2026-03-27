@@ -1,9 +1,9 @@
 from sqlalchemy import select
 
-from app.application.helpers import normalize_catalog, _label_from_key
-from app.domain.models import SkillsCategory, SkillCatalogItem
-from app.domain.skills_catalog import DEFAULT_SKILLS_CATALOG
-from app.infrastructure.db import SessionLocal
+from ..application.helpers import normalize_catalog, _label_from_key
+from ..domain.models import SkillsCategory, SkillCatalogItem
+from ..domain.skills_catalog import DEFAULT_SKILLS_CATALOG
+from ..infrastructure.db import SessionLocal
 
 async def seed_default_catalog_if_empty() -> dict:
     async with SessionLocal() as db:

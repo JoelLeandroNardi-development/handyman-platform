@@ -1,10 +1,10 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.helpers import normalize_skills_input, get_allowed_skill_keys
-from app.application.mappers import _review_to_response, _to_response
-from app.domain.models import Handyman, HandymanReview
-from app.domain.schemas import HandymanResponse, InvalidHandymanSkillsResponse, HandymanReviewResponse
+from ..helpers import normalize_skills_input, get_allowed_skill_keys
+from ..mappers import _review_to_response, _to_response
+from ...domain.models import Handyman, HandymanReview
+from ...domain.schemas import HandymanResponse, InvalidHandymanSkillsResponse, HandymanReviewResponse
 from shared.shared.crud_helpers import fetch_or_404
 
 class HandymanQueryService:

@@ -2,10 +2,10 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.mappers import _to_response
-from app.domain.events import build_event
-from app.domain.models import User, OutboxEvent
-from app.domain.schemas import CreateUser, UpdateUser, UpdateUserLocation, UserResponse
+from ..mappers import _to_response
+from ...domain.events import build_event
+from ...domain.models import User, OutboxEvent
+from ...domain.schemas import CreateUser, UpdateUser, UpdateUserLocation, UserResponse
 from shared.shared.crud_helpers import apply_partial_update, fetch_or_404
 from shared.shared.outbox_helpers import add_outbox_event
 

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.commands.auth_command_service import AuthCommandService
-from app.application.commands.auth_user_command_service import AuthUserCommandService
-from app.application.commands.verification_command_service import VerificationCommandService
-from app.application.queries.auth_user_query_service import AuthUserQueryService
-from app.domain.schemas import (
+from ..application.commands.auth_command_service import AuthCommandService
+from ..application.commands.auth_user_command_service import AuthUserCommandService
+from ..application.commands.verification_command_service import VerificationCommandService
+from ..application.queries.auth_user_query_service import AuthUserQueryService
+from ..domain.schemas import (
     Register,
     Login,
     GoogleLoginRequest,
@@ -21,7 +21,7 @@ from app.domain.schemas import (
     AuthUserResponse,
     UpdateAuthUser,
 )
-from app.infrastructure.db import SessionLocal
+from ..infrastructure.db import SessionLocal
 from shared.shared.db import make_get_db
 
 router = APIRouter()

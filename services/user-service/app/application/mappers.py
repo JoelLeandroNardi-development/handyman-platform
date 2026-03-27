@@ -1,5 +1,5 @@
-from app.domain.models import User
-from app.domain.schemas import UserResponse
+from ..domain.models import User
+from ..domain.schemas import UserResponse
 
 def _to_response(u: User) -> UserResponse:
     return UserResponse(

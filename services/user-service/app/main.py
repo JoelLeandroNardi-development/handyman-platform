@@ -3,9 +3,9 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from app.api.routes import router
-from app.infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
-from app.infrastructure.outbox_worker import worker, outbox_stats
+from .api.routes import router
+from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from .infrastructure.outbox_worker import worker, outbox_stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

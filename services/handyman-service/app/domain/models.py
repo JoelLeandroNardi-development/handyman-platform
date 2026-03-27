@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 
-from app.infrastructure.db import Base
+from ..infrastructure.db import Base
 from shared.shared.outbox_model import make_outbox_event_model
 
 class Handyman(Base):

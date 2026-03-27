@@ -3,13 +3,12 @@ from __future__ import annotations
 from dateutil import parser
 import aio_pika
 
-from app.application.helpers import avail_key, parse_raw_slot
-from app.domain.events import build_event
-from app.infrastructure.messaging import RABBIT_URL, EXCHANGE_NAME
-from app.infrastructure.outbox_worker import enqueue_domain_event
-from app.infrastructure.redis_client import redis_client
-from app.infrastructure.repository import create_reservation, get_reservation, delete_reservation
-
+from .messaging import RABBIT_URL, EXCHANGE_NAME
+from .outbox_worker import enqueue_domain_event
+from .redis_client import redis_client
+from .repository import create_reservation, get_reservation, delete_reservation
+from ..application.helpers import avail_key, parse_raw_slot
+from ..domain.events import build_event
 from shared.shared.consumer import run_consumer_with_retry_dlq
 from shared.shared.idempotency import already_processed
 from shared.shared.intervals import fully_contains as contains_interval, overlaps

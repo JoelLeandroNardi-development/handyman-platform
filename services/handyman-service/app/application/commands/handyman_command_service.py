@@ -2,11 +2,11 @@ from fastapi import HTTPException
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.helpers import find_invalid_skills, normalize_skills_input, _refresh_handyman_rating
-from app.application.mappers import _handyman_event_data, _to_response, _review_to_response
-from app.domain.events import build_event
-from app.domain.models import Handyman, HandymanReview, OutboxEvent
-from app.domain.schemas import CreateHandyman, HandymanResponse, UpdateLocation, UpdateHandyman, CreateHandymanReview, HandymanReviewResponse
+from ..helpers import find_invalid_skills, normalize_skills_input, _refresh_handyman_rating
+from ..mappers import _handyman_event_data, _to_response, _review_to_response
+from ...domain.events import build_event
+from ...domain.models import Handyman, HandymanReview, OutboxEvent
+from ...domain.schemas import CreateHandyman, HandymanResponse, UpdateLocation, UpdateHandyman, CreateHandymanReview, HandymanReviewResponse
 from shared.shared.crud_helpers import apply_partial_update, fetch_or_404
 from shared.shared.outbox_helpers import add_outbox_event
 

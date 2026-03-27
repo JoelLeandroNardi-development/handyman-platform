@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import Query
 
-from app.infrastructure.redis_client import redis_client
-from app.infrastructure.repository import get_reservation, delete_reservation
-from app.application.helpers import avail_key
+from ..helpers import avail_key
+from ...infrastructure.redis_client import redis_client
+from ...infrastructure.repository import get_reservation, delete_reservation
 
 class AvailabilityQueryService:
     async def get_availability(email: str) -> dict:

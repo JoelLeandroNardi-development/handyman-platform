@@ -5,8 +5,8 @@ import time
 
 from shared.shared.intervals import overlaps
 
-from app.application.helpers import _res_key, _res_handyman_set, _parse
-from app.infrastructure.redis_client import redis_client
+from .redis_client import redis_client
+from ..application.helpers import _res_key, _res_handyman_set, _parse
 
 RES_TTL_SECONDS = 300
 EXPIRY_ZSET = "reservation_expiry"

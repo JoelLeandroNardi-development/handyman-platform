@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.mappers import _to_response
-from app.domain.models import User
-from app.domain.schemas import UserResponse
+from ..mappers import _to_response
+from ...domain.models import User
+from ...domain.schemas import UserResponse
 from shared.shared.crud_helpers import fetch_or_404
 
 class UserQueryService:

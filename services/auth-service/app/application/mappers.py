@@ -1,5 +1,5 @@
-from app.domain.models import AuthUser
-from app.domain.schemas import AuthUserResponse
+from ..domain.models import AuthUser
+from ..domain.schemas import AuthUserResponse
 
 def to_auth_user_response(u: AuthUser) -> AuthUserResponse:
     return AuthUserResponse(

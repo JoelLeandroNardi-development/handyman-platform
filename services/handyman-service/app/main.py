@@ -4,10 +4,10 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from app.api.routes import router
-from app.infrastructure.outbox_worker import run_outbox_forever, outbox_stats
-from app.infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
-from app.infrastructure.skill_seeder import seed_default_catalog_if_empty
+from .api.routes import router
+from .infrastructure.outbox_worker import run_outbox_forever, outbox_stats
+from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from .infrastructure.skill_seeder import seed_default_catalog_if_empty
 
 _stop = asyncio.Event()
 _outbox_task: asyncio.Task | None = None

@@ -1,10 +1,10 @@
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.queries.skill_query_service import SkillQueryService
-from app.application.helpers import normalize_catalog, normalize_skills_input, _label_from_key, validate_catalog_shape
-from app.domain.models import SkillCatalogItem, SkillsCategory
-from app.domain.schemas import SkillsCatalogPatchResponse, SkillsCatalogReplaceResponse
+from ..queries.skill_query_service import SkillQueryService
+from ..helpers import normalize_catalog, normalize_skills_input, _label_from_key, validate_catalog_shape
+from ...domain.models import SkillCatalogItem, SkillsCategory
+from ...domain.schemas import SkillsCatalogPatchResponse, SkillsCatalogReplaceResponse
 
 class SkillCommandService:
     def __init__(self, db: AsyncSession):

@@ -1,6 +1,6 @@
-from app.domain.profile_policies import compute_profile_completeness
-from app.domain.models import Handyman, HandymanReview
-from app.domain.schemas import HandymanResponse, HandymanReviewResponse
+from ..domain.profile_policies import compute_profile_completeness
+from ..domain.models import Handyman, HandymanReview
+from ..domain.schemas import HandymanResponse, HandymanReviewResponse
 
 def _completeness(h) -> int:
     return compute_profile_completeness(

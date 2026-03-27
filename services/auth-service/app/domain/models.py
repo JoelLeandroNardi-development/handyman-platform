@@ -1,5 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, JSON, func
-from app.infrastructure.db import Base
+from ..infrastructure.db import Base
 
 class AuthUser(Base):
     __tablename__ = "auth_users"

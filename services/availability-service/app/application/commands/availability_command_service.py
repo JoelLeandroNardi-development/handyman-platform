@@ -5,10 +5,10 @@ from dateutil import parser
 
 from shared.shared.intervals import fully_contains as contains_interval
 
-from app.infrastructure.redis_client import redis_client
-from app.domain.schemas import SetAvailability, OverlapRequest
-from app.infrastructure.repository import delete_reservation
-from app.application.helpers import _slots_payload, avail_key, emit_availability_updated
+from ..helpers import _slots_payload, avail_key, emit_availability_updated
+from ...domain.schemas import SetAvailability, OverlapRequest
+from ...infrastructure.redis_client import redis_client
+from ...infrastructure.repository import delete_reservation
 
 class AvailabilityCommandService:
     async def set_availability(email: str, data: SetAvailability):

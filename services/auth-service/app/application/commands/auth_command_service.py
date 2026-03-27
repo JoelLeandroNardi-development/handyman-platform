@@ -4,10 +4,10 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.models import AuthUser, AuthSession
-from app.domain.schemas import Register, Login, RefreshRequest, GoogleLoginRequest
-from app.infrastructure.password_hasher import password_hasher
-from app.infrastructure.token_service import (
+from ...domain.models import AuthUser, AuthSession
+from ...domain.schemas import Register, Login, RefreshRequest, GoogleLoginRequest
+from ...infrastructure.password_hasher import password_hasher
+from ...infrastructure.token_service import (
     JWTError,
     decode_token,
     generate_opaque_token,

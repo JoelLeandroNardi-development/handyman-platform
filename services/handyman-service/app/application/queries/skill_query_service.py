@@ -4,8 +4,8 @@ from fastapi import Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.models import SkillsCategory, SkillCatalogItem
-from app.domain.schemas import SkillCatalogFlatResponse
+from ...domain.models import SkillsCategory, SkillCatalogItem
+from ...domain.schemas import SkillCatalogFlatResponse
 
 class SkillQueryService:
     def __init__(self, db: AsyncSession):

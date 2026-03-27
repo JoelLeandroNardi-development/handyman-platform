@@ -5,10 +5,10 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.models import AuthUser, PasswordResetToken,  EmailVerificationToken
-from app.domain.schemas import ResetPasswordRequest, EmailVerifyRequest, EmailVerifyConfirmRequest, AuthActionResponse
-from app.infrastructure.password_hasher import password_hasher
-from app.infrastructure.token_service import generate_opaque_token, hash_token
+from ...domain.models import AuthUser, PasswordResetToken,  EmailVerificationToken
+from ...domain.schemas import ResetPasswordRequest, EmailVerifyRequest, EmailVerifyConfirmRequest, AuthActionResponse
+from ...infrastructure.password_hasher import password_hasher
+from ...infrastructure.token_service import generate_opaque_token, hash_token
 
 _DEBUG = os.getenv("DEBUG_MODE", "").lower() in ("1", "true", "yes")
 

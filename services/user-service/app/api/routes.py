@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.commands.user_command_service import UserCommandService
-from app.application.queries.user_query_service import UserQueryService
-from app.domain.schemas import CreateUser, UpdateUserLocation, UpdateUser, UserResponse
-from app.infrastructure.db import SessionLocal
+from ..application.commands.user_command_service import UserCommandService
+from ..application.queries.user_query_service import UserQueryService
+from ..domain.schemas import CreateUser, UpdateUserLocation, UpdateUser, UserResponse
+from ..infrastructure.db import SessionLocal
 from shared.shared.db import make_get_db
 
 router = APIRouter()

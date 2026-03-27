@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.commands.handyman_command_service import HandymanCommandService
-from app.application.commands.skill_command_service import SkillCommandService
-from app.application.queries.handyman_query_service import HandymanQueryService
-from app.application.queries.skill_query_service import SkillQueryService
-from app.domain.schemas import (
+from ..application.commands.handyman_command_service import HandymanCommandService
+from ..application.commands.skill_command_service import SkillCommandService
+from ..application.queries.handyman_query_service import HandymanQueryService
+from ..application.queries.skill_query_service import SkillQueryService
+from ..domain.schemas import (
     CreateHandyman,
     UpdateLocation,
     UpdateHandyman,
@@ -20,7 +20,7 @@ from app.domain.schemas import (
     SkillsCatalogReplaceResponse,
     SkillsCatalogPatchResponse,
 )
-from app.infrastructure.db import SessionLocal
+from ..infrastructure.db import SessionLocal
 from shared.shared.db import make_get_db
 
 router = APIRouter()

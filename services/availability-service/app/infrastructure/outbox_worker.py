@@ -3,8 +3,8 @@ import json
 import time
 from dataclasses import dataclass
 
-from app.infrastructure.messaging import publisher
-from app.infrastructure.redis_client import redis_client
+from .messaging import publisher
+from .redis_client import redis_client
 
 OUTBOX_PENDING = "outbox:availability:pending"
 OUTBOX_PROCESSING = "outbox:availability:processing"
