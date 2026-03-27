@@ -17,6 +17,7 @@ def load_service_app_module(
     reload_modules: bool = False,
 ):
     app_dir = REPO_ROOT / "services" / service_dir / "app"
+
     if service_dir == "gateway-service":
         parent_dir = str(app_dir.parent)
         if parent_dir not in sys.path:
@@ -38,22 +39,34 @@ def load_service_app_module(
         package.__path__ = [app_dir_str]
         sys.modules[resolved_package] = package
 
-    full_name = f"{resolved_package}.{module_name}"
+    module_parts = module_name.split("/")
+    dotted_module_name = ".".join(module_parts)
+    full_name = f"{resolved_package}.{dotted_module_name}"
+
     if full_name in sys.modules:
         return sys.modules[full_name]
 
-    file_path = app_dir / f"{module_name}.py"
+    current_path = app_dir
+    for i in range(1, len(module_parts)):
+        pkg_name = ".".join([resolved_package] + module_parts[:i])
+        current_path = current_path / module_parts[i - 1]
+        if pkg_name not in sys.modules:
+            pkg = types.ModuleType(pkg_name)
+            pkg.__path__ = [str(current_path)]
+            sys.modules[pkg_name] = pkg
+
+    file_path = app_dir / Path(*module_parts).with_suffix(".py")
     spec = importlib.util.spec_from_file_location(full_name, file_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Unable to load module from {file_path}")
 
     module = importlib.util.module_from_spec(spec)
-    # Set __package__ for submodules so relative imports work
-    if "/" in module_name:
-        parent_pkg = ".".join([resolved_package] + module_name.split("/")[:-1])
-        module.__package__ = parent_pkg
+
+    if len(module_parts) > 1:
+        module.__package__ = ".".join([resolved_package] + module_parts[:-1])
     else:
         module.__package__ = resolved_package
+
     sys.modules[full_name] = module
     spec.loader.exec_module(module)
     return module
