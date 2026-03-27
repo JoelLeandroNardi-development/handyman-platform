@@ -4,17 +4,15 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from .routes import router
-from .event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
-from .outbox_worker import run_outbox_forever, outbox_stats
-from .messaging import publisher, RABBIT_URL, EXCHANGE_NAME
-
+from .api.routes import router
+from .infrastructure.event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
+from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from .infrastructure.outbox_worker import run_outbox_forever, outbox_stats
 
 _stop = asyncio.Event()
 _consumer_conn = None
 _outbox_task: asyncio.Task | None = None
 _consumer_task: asyncio.Task | None = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,10 +64,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-
 app = FastAPI(title="Booking Service", lifespan=lifespan)
 app.include_router(router)
-
 
 @app.get("/health", response_model=dict[str, object])
 async def health():
@@ -81,7 +77,6 @@ async def health():
         "rabbit_url_set": bool(RABBIT_URL),
         "outbox": await outbox_stats(),
     }
-
 
 @app.get("/debug/rabbit", response_model=dict[str, object])
 async def debug_rabbit():

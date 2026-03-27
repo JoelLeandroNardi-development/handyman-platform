@@ -1,9 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
 
-from .db import Base
+from ..infrastructure.db import Base
 from shared.shared.outbox_model import make_outbox_event_model
-
 
 class Booking(Base):
     __tablename__ = "bookings"
@@ -33,6 +32,5 @@ class Booking(Base):
     rejection_reason = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
 
 OutboxEvent = make_outbox_event_model(Base)

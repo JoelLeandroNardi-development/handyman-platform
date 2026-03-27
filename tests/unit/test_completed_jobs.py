@@ -28,7 +28,7 @@ os.environ.setdefault("EXCHANGE_NAME", "test_exchange")
 @pytest.fixture(scope="module")
 def booking_db_module():
     return load_service_app_module(
-        "booking-service", "db",
+        "booking-service", "infrastructure/db",
         package_name="booking_cj_test_app",
         reload_modules=True,
     )
@@ -37,7 +37,7 @@ def booking_db_module():
 @pytest.fixture(scope="module")
 def booking_models_module(booking_db_module):
     return load_service_app_module(
-        "booking-service", "models",
+        "booking-service", "domain/models",
         package_name="booking_cj_test_app",
     )
 
@@ -45,7 +45,7 @@ def booking_models_module(booking_db_module):
 @pytest.fixture(scope="module")
 def completed_jobs_module(booking_models_module):
     return load_service_app_module(
-        "booking-service", "completed_jobs",
+        "booking-service", "domain/policies",
         package_name="booking_cj_test_app",
     )
 

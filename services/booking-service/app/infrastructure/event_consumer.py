@@ -3,11 +3,10 @@ from __future__ import annotations
 from sqlalchemy import select
 import aio_pika
 
-from shared.shared.consumer import run_consumer_with_retry_dlq
-
 from .db import SessionLocal
-from .models import Booking
 from .messaging import EXCHANGE_NAME, RABBIT_URL, publisher
+from ..domain.models import Booking
+from shared.shared.consumer import run_consumer_with_retry_dlq
 
 QUEUE_NAME = "booking_service_domain_events"
 RETRY_QUEUE = "booking_service_domain_events_retry"
@@ -20,7 +19,6 @@ ROUTING_KEYS = [
     "slot.expired",
     "slot.released",
 ]
-
 
 async def process_event(payload: dict):
     event_type = payload.get("event_type")
@@ -59,7 +57,6 @@ async def process_event(payload: dict):
                 booking.cancellation_reason = booking.cancellation_reason or "released"
 
         await db.commit()
-
 
 async def start_consumer():
     if not RABBIT_URL:

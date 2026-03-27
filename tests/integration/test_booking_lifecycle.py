@@ -13,18 +13,18 @@ def booking_modules(monkeypatch):
     monkeypatch.setenv("BOOKING_DB", "sqlite+aiosqlite:///:memory:")
     load_service_app_module(
         "booking-service",
-        "db",
+        "infrastructure/db",
         package_name="booking_service_test_app",
         reload_modules=True,
     )
     models_module = load_service_app_module(
         "booking-service",
-        "models",
+        "domain/models",
         package_name="booking_service_test_app",
     )
     events_module = load_service_app_module(
         "booking-service",
-        "events",
+        "domain/events",
         package_name="booking_service_test_app",
     )
     return models_module, events_module
