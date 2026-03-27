@@ -2,28 +2,14 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime
-from dateutil import parser
 
 from shared.shared.intervals import overlaps
 
-from .redis_client import redis_client
+from app.application.helpers import _res_key, _res_handyman_set, _parse
+from app.infrastructure.redis_client import redis_client
 
 RES_TTL_SECONDS = 300
 EXPIRY_ZSET = "reservation_expiry"
-
-
-def _res_key(booking_id: str) -> str:
-    return f"reservation:{booking_id}"
-
-
-def _res_handyman_set(email: str) -> str:
-    return f"reservations_by_handyman:{email}"
-
-
-def _parse(dt_str: str) -> datetime:
-    return parser.isoparse(dt_str)
-
 
 async def create_reservation(
     booking_id: str,
@@ -32,10 +18,6 @@ async def create_reservation(
     desired_start: str,
     desired_end: str,
 ) -> bool:
-    """
-    Idempotent reservation creation.
-    Returns True if reservation stored, False if conflicts with existing reservations.
-    """
     ds = _parse(desired_start)
     de = _parse(desired_end)
 
@@ -71,7 +53,6 @@ async def create_reservation(
     await pipe.execute()
     return True
 
-
 async def get_reservation(booking_id: str) -> dict | None:
     raw = await redis_client.get(_res_key(booking_id))
     if not raw:
@@ -80,7 +61,6 @@ async def get_reservation(booking_id: str) -> dict | None:
         return json.loads(raw)
     except Exception:
         return None
-
 
 async def delete_reservation(booking_id: str) -> None:
     res = await get_reservation(booking_id)

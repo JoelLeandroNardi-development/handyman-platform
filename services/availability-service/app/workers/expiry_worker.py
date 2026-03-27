@@ -1,13 +1,12 @@
 import asyncio
 import time
 
-from .redis_client import redis_client
-from .reservations import delete_reservation, get_reservation
-from .events import build_event
-from .outbox_worker import enqueue_domain_event
+from app.domain.events import build_event
+from app.infrastructure.outbox_worker import enqueue_domain_event
+from app.infrastructure.redis_client import redis_client
+from app.infrastructure.repository import delete_reservation, get_reservation
 
 EXPIRY_ZSET = "reservation_expiry"
-
 
 async def expiry_loop(stop_event: asyncio.Event):
     while not stop_event.is_set():

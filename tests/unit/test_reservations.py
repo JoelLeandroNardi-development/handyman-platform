@@ -21,13 +21,13 @@ def reservations_module(monkeypatch):
 
     load_service_app_module(
         "availability-service",
-        "redis_client",
+        "infrastructure/redis_client",
         package_name="availability_service_test_app",
         reload_modules=True,
     )
     module = load_service_app_module(
         "availability-service",
-        "reservations",
+        "infrastructure/repository",
         package_name="availability_service_test_app",
     )
     module.redis_client = fake_redis

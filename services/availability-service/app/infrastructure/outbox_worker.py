@@ -3,8 +3,8 @@ import json
 import time
 from dataclasses import dataclass
 
-from .redis_client import redis_client
-from .messaging import publisher
+from app.infrastructure.messaging import publisher
+from app.infrastructure.redis_client import redis_client
 
 OUTBOX_PENDING = "outbox:availability:pending"
 OUTBOX_PROCESSING = "outbox:availability:processing"
@@ -12,7 +12,6 @@ OUTBOX_DLQ = "outbox:availability:dlq"
 
 POLL_INTERVAL_SECONDS = 0.5
 MAX_ATTEMPTS = 25
-
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
