@@ -2,12 +2,11 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from .routes import router
-from .messaging import publisher, RABBIT_URL, EXCHANGE_NAME
-from .event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
-from .expiry_worker import expiry_loop
-from .outbox_worker import worker, outbox_stats
-
+from app.api.routes import router
+from app.infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
+from app.infrastructure.event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
+from app.workers.expiry_worker import expiry_loop
+from app.infrastructure.outbox_worker import worker, outbox_stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -77,10 +76,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-
 app = FastAPI(title="Availability Service", lifespan=lifespan)
 app.include_router(router)
-
 
 @app.get("/health")
 async def health():
@@ -92,7 +89,6 @@ async def health():
         "rabbit_url_set": bool(RABBIT_URL),
         "outbox": await outbox_stats(),
     }
-
 
 @app.get("/debug/rabbit")
 async def debug_rabbit():
