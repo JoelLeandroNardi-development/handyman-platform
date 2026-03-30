@@ -3,9 +3,9 @@ from __future__ import annotations
 from dateutil import parser
 import aio_pika
 
+from .cache import redis_client
 from .messaging import RABBIT_URL, EXCHANGE_NAME
 from .outbox_worker import enqueue_domain_event
-from .redis_client import redis_client
 from .repository import create_reservation, get_reservation, delete_reservation
 from ..application.helpers import avail_key, parse_raw_slot
 from ..domain.events import build_event

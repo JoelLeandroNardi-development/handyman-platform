@@ -2,8 +2,8 @@ import asyncio
 import time
 
 from ..domain.events import build_event
+from ..infrastructure.cache import redis_client
 from ..infrastructure.outbox_worker import enqueue_domain_event
-from ..infrastructure.redis_client import redis_client
 from ..infrastructure.repository import delete_reservation, get_reservation
 
 EXPIRY_ZSET = "reservation_expiry"

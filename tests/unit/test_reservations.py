@@ -21,7 +21,7 @@ def reservations_module(monkeypatch):
 
     load_service_app_module(
         "availability-service",
-        "infrastructure/redis_client",
+        "infrastructure/cache",
         package_name="availability_service_test_app",
         reload_modules=True,
     )

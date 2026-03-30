@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import Query
 
 from ..helpers import avail_key
-from ...infrastructure.redis_client import redis_client
+from ...infrastructure.cache import redis_client
 from ...infrastructure.repository import get_reservation, delete_reservation
 
 class AvailabilityQueryService:

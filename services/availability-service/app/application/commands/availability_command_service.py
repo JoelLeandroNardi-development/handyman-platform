@@ -7,7 +7,7 @@ from shared.shared.intervals import fully_contains as contains_interval
 
 from ..helpers import _slots_payload, avail_key, emit_availability_updated
 from ...domain.schemas import SetAvailability, OverlapRequest
-from ...infrastructure.redis_client import redis_client
+from ...infrastructure.cache import redis_client
 from ...infrastructure.repository import delete_reservation
 
 class AvailabilityCommandService:

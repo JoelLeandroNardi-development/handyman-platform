@@ -5,21 +5,7 @@ from ..application.commands.handyman_command_service import HandymanCommandServi
 from ..application.commands.skill_command_service import SkillCommandService
 from ..application.queries.handyman_query_service import HandymanQueryService
 from ..application.queries.skill_query_service import SkillQueryService
-from ..domain.schemas import (
-    CreateHandyman,
-    UpdateLocation,
-    UpdateHandyman,
-    HandymanResponse,
-    SkillCatalogReplaceRequest,
-    SkillCatalogPatchRequest,
-    SkillCatalogFlatResponse,
-    InvalidHandymanSkillsResponse,
-    CreateHandymanReview,
-    HandymanReviewResponse,
-    DeleteHandymanResponse,
-    SkillsCatalogReplaceResponse,
-    SkillsCatalogPatchResponse,
-)
+from ..domain.schemas import *
 from ..infrastructure.db import SessionLocal
 from shared.shared.db import make_get_db
 

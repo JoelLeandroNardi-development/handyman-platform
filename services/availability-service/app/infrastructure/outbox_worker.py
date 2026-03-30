@@ -3,8 +3,8 @@ import json
 import time
 from dataclasses import dataclass
 
+from .cache import redis_client
 from .messaging import publisher
-from .redis_client import redis_client
 
 OUTBOX_PENDING = "outbox:availability:pending"
 OUTBOX_PROCESSING = "outbox:availability:processing"
@@ -16,7 +16,6 @@ MAX_ATTEMPTS = 25
 def _now_ms() -> int:
     return int(time.time() * 1000)
 
-
 def _envelope(routing_key: str, payload: dict) -> dict:
     return {
         "routing_key": routing_key,
@@ -25,7 +24,6 @@ def _envelope(routing_key: str, payload: dict) -> dict:
         "created_at_ms": _now_ms(),
         "last_error": None,
     }
-
 
 async def enqueue_domain_event(event: dict) -> None:
     """
@@ -46,11 +44,7 @@ async def enqueue_domain_event(event: dict) -> None:
 
     await redis_client.rpush(OUTBOX_PENDING, json.dumps(_envelope(rk, event)))
 
-
 async def outbox_stats() -> dict:
-    """
-    Lightweight stats for /health and debugging.
-    """
     pending = await redis_client.llen(OUTBOX_PENDING)
     processing = await redis_client.llen(OUTBOX_PROCESSING)
     dlq = await redis_client.llen(OUTBOX_DLQ)
@@ -60,7 +54,6 @@ async def outbox_stats() -> dict:
         "processing": int(processing or 0),
         "dlq": int(dlq or 0),
     }
-
 
 @dataclass
 class OutboxWorker:
@@ -133,6 +126,5 @@ class OutboxWorker:
                 await redis_client.rpush(OUTBOX_PENDING, json.dumps(env))
 
             return True
-
 
 worker = OutboxWorker()
