@@ -5,7 +5,6 @@ from ..application.commands.booking_command_service import BookingCommandService
 from ..application.queries.booking_query_service import BookingQueryService
 from ..domain.schemas import *
 from ..infrastructure.db import SessionLocal
-from shared.shared.crud_helpers import fetch_or_404
 from shared.shared.db import make_get_db
 
 router = APIRouter()

@@ -4,18 +4,16 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from .routes import router
-from .event_consumer import start_consumer_with_retry, QUEUE_NAME, ROUTING_KEYS
-from .outbox_worker import worker
-from .messaging import RABBIT_URL, EXCHANGE_NAME
-from .services import (
-    seed_handyman_projection_if_empty,
-    handyman_projection_count,
-    availability_projection_count,
-)
+from .api.routes import router
+from .application.services import seed_handyman_projection_if_empty
+from .domain.constants import QUEUE_NAME, ROUTING_KEYS
+from .infrastructure.availability_projection import availability_projection_count
+from .infrastructure.event_consumer import start_consumer_with_retry
+from .infrastructure.messaging import RABBIT_URL, EXCHANGE_NAME
+from .infrastructure.outbox_worker import worker
+from .infrastructure.projections import handyman_projection_count
 
 _last_seed_status: dict | None = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -58,10 +56,8 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
-
 app = FastAPI(title="Match Service", lifespan=lifespan)
 app.include_router(router)
-
 
 @app.get("/health")
 async def health():
@@ -79,7 +75,6 @@ async def health():
             "last_seed": _last_seed_status,
         },
     }
-
 
 @app.get("/debug/rabbit")
 async def debug_rabbit():

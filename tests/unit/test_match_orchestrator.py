@@ -9,7 +9,6 @@ import redis.asyncio as redis_async
 
 from tests.service_loader import load_service_app_module
 
-
 @pytest.fixture
 def match_orchestrator_module(monkeypatch):
     fake_redis = MagicMock()
@@ -18,16 +17,16 @@ def match_orchestrator_module(monkeypatch):
     fake_redis.pipeline = MagicMock()
 
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("MATCH_DB", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
 
     module = load_service_app_module(
         "match-service",
-        "match_orchestrator",
+        "application/match_orchestrator",
         package_name="match_orchestrator_test_app",
         reload_modules=True,
     )
     return module
-
 
 @pytest.mark.unit
 class TestRunMatchQuery:

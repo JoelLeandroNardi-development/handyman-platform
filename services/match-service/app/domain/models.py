@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, Float, String
-from .db import Base
-
+from ..infrastructure.db import Base
 
 class MatchLog(Base):
     __tablename__ = "match_logs"

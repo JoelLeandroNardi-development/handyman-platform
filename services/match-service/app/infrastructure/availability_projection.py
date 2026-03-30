@@ -3,14 +3,10 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from shared.shared.intervals import overlaps
-
-from .scoring import _as_utc, parse_dt
 from .projections import redis_client
-
-PROJ_AVAIL_KEY = "proj:availability:{email}"
-PROJ_AVAIL_INDEX = "proj:availability:index"
-
+from ..application.mappers import _as_utc, parse_dt
+from ..domain.constants import PROJ_AVAIL_KEY, PROJ_AVAIL_INDEX
+from shared.shared.intervals import overlaps
 
 def _clean_slots(slots: list[dict] | None) -> list[dict]:
     clean: list[dict] = []
@@ -31,7 +27,6 @@ def _clean_slots(slots: list[dict] | None) -> list[dict]:
         clean.append({"start": sdt.isoformat(), "end": edt.isoformat()})
     return clean
 
-
 async def get_availability_slots(email: str) -> list[dict] | None:
     if not email:
         return None
@@ -44,7 +39,6 @@ async def get_availability_slots(email: str) -> list[dict] | None:
     except Exception:
         return None
 
-
 async def delete_availability_projection(email: str) -> None:
     if not email:
         return
@@ -52,7 +46,6 @@ async def delete_availability_projection(email: str) -> None:
     pipe.delete(PROJ_AVAIL_KEY.format(email=email))
     pipe.srem(PROJ_AVAIL_INDEX, email)
     await pipe.execute()
-
 
 def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_end: datetime) -> bool:
     ds = _as_utc(desired_start)
@@ -72,7 +65,6 @@ def projected_has_overlap(slots: list[dict], desired_start: datetime, desired_en
             return True
 
     return False
-
 
 async def availability_projection_count() -> int:
     try:

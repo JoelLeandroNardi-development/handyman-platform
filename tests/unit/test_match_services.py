@@ -8,7 +8,6 @@ import redis.asyncio as redis_async
 
 from tests.service_loader import load_service_app_module
 
-
 @pytest.fixture
 def match_services_module(monkeypatch):
     fake_redis = MagicMock()
@@ -17,17 +16,49 @@ def match_services_module(monkeypatch):
     fake_redis.pipeline = MagicMock()
 
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("MATCH_DB", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
 
     module = load_service_app_module(
         "match-service",
-        "services",
+        "application/services",
         package_name="match_service_test_app",
         reload_modules=True,
     )
-    module.redis_client = fake_redis
-    return module
+    # Attach required helpers from their real locations
+    from match_service_test_app.application.mappers import parse_dt, _normalize_handyman, norm, _as_utc
+    from match_service_test_app.domain.geo import haversine, bucket_id, time_bucket, km_to_deg_lon, buckets_in_radius
+    from match_service_test_app.infrastructure.cache_keys import cache_key
+    from match_service_test_app.infrastructure.availability_projection import projected_has_overlap
+    from match_service_test_app.infrastructure.projections import get_handyman_projection, invalidate_bucket, get_cached_result, set_cache_with_index
+    from match_service_test_app.domain.scoring import rank_match_candidates
+    from match_service_test_app.domain.constants import TIME_BUCKET_SECONDS
+    from match_service_test_app.domain.scoring import compute_match_score
+    import types
 
+    # Attach as attributes for test compatibility
+    module.parse_dt = parse_dt
+    module._normalize_handyman = _normalize_handyman
+    module.norm = norm
+    module._as_utc = _as_utc
+    module.haversine = haversine
+    module.bucket_id = bucket_id
+    module.time_bucket = time_bucket
+    module.km_to_deg_lon = km_to_deg_lon
+    module.buckets_in_radius = buckets_in_radius
+    module.cache_key = cache_key
+    module.projected_has_overlap = projected_has_overlap
+    module.get_handyman_projection = get_handyman_projection
+    module.invalidate_bucket = invalidate_bucket
+    module.get_cached_result = get_cached_result
+    module.set_cache_with_index = set_cache_with_index
+    module.rank_match_candidates = rank_match_candidates
+    module.redis_client = fake_redis
+    # Attach missing constants and functions for test compatibility
+
+    module.TIME_BUCKET_SECONDS = TIME_BUCKET_SECONDS
+    module.compute_match_score = compute_match_score
+    return module
 
 @pytest.mark.unit
 class TestMatchServiceHelpers:

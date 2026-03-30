@@ -1,66 +1,19 @@
 from __future__ import annotations
 
-import json
 import httpx
+import json
 
-from .scoring import (
-    RANKING_WEIGHTS,
-    RANKING_CAPS,
-    norm,
-    _safe_float,
-    _safe_int,
-    _clamp01,
-    utc_now_iso,
-    _as_utc,
-    parse_dt,
-    _distance_score,
-    _dampened_count_score,
-    compute_match_score,
-    rank_match_candidates,
-)
-from .geo import (
-    GRID_DEG,
-    TIME_BUCKET_SECONDS,
-    haversine,
-    bucket_id,
-    time_bucket,
-    km_to_deg_lat,
-    km_to_deg_lon,
-    buckets_in_radius,
-)
-from .cache_keys import cache_key, bucket_set_key
-from .projections import (
-    redis_client,
+from ..application.mappers import norm, utc_now_iso, _normalize_handyman
+from ..domain.constants import (
     PROJ_HANDYMAN_KEY,
     PROJ_HANDYMEN_INDEX,
     PROJ_HANDYMEN_SKILL_INDEX,
-    _normalize_handyman,
-    get_handyman_projection,
-    list_projected_handymen_by_skill,
-    handyman_projection_count,
-    invalidate_bucket,
-    get_cached_result,
-    set_cache_with_index,
-)
-from .availability_projection import (
     PROJ_AVAIL_KEY,
-    PROJ_AVAIL_INDEX,
-    _clean_slots,
-    get_availability_slots,
-    delete_availability_projection,
-    projected_has_overlap,
-    availability_projection_count,
+    PROJ_AVAIL_INDEX
 )
-from .clients import (
-    HANDYMAN_SERVICE_URL,
-    AVAILABILITY_SERVICE_URL,
-    BOOKING_SERVICE_URL,
-    HTTP_TIMEOUT,
-    fetch_handymen_http,
-    fetch_availability_http,
-    fetch_completed_jobs_counts_batch,
-)
-
+from ..infrastructure.availability_projection import _clean_slots, get_availability_slots, delete_availability_projection, availability_projection_count
+from ..infrastructure.clients import fetch_handymen_http, fetch_completed_jobs_counts_batch, fetch_availability_http
+from ..infrastructure.projections import get_handyman_projection, handyman_projection_count, list_projected_handymen_by_skill, redis_client
 
 async def upsert_handyman_projection(doc: dict) -> None:
     normalized = _normalize_handyman(doc)
@@ -84,7 +37,6 @@ async def upsert_handyman_projection(doc: dict) -> None:
 
     await pipe.execute()
 
-
 async def delete_handyman_projection(email: str) -> dict | None:
     if not email:
         return None
@@ -99,7 +51,6 @@ async def delete_handyman_projection(email: str) -> dict | None:
         pipe.srem(PROJ_HANDYMEN_SKILL_INDEX.format(skill=s), email)
     await pipe.execute()
     return old
-
 
 async def upsert_availability_projection(*, email: str, slots: list[dict]) -> None:
     if not email:
@@ -117,7 +68,6 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
     pipe.set(PROJ_AVAIL_KEY.format(email=email), json.dumps(payload))
     pipe.sadd(PROJ_AVAIL_INDEX, email)
     await pipe.execute()
-
 
 async def hydrate_completed_jobs_counts(handymen: list[dict]) -> list[dict]:
     if not handymen:
@@ -140,10 +90,8 @@ async def hydrate_completed_jobs_counts(handymen: list[dict]) -> list[dict]:
 
     return handymen
 
-
 async def projections_have_any_availability() -> bool:
     return (await availability_projection_count()) > 0
-
 
 async def get_effective_availability_slots(email: str) -> tuple[list[dict] | None, str]:
     projected = await get_availability_slots(email)
@@ -156,7 +104,6 @@ async def get_effective_availability_slots(email: str) -> tuple[list[dict] | Non
 
     await upsert_availability_projection(email=email, slots=live)
     return live, "live"
-
 
 async def seed_handyman_projection_if_empty() -> dict:
     existing = await handyman_projection_count()
@@ -178,7 +125,6 @@ async def seed_handyman_projection_if_empty() -> dict:
 
     return {"seeded": True, "reason": "bootstrapped", "count": ok}
 
-
 async def get_live_handymen_for_skill(skill: str) -> list[dict]:
     skill = norm(skill)
     if not skill:
@@ -197,7 +143,6 @@ async def get_live_handymen_for_skill(skill: str) -> list[dict]:
                 pass
 
     return matched
-
 
 async def get_effective_handymen_for_skill(skill: str) -> tuple[list[dict], str]:
     skill = norm(skill)

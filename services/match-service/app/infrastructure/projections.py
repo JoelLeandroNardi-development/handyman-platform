@@ -2,47 +2,17 @@ from __future__ import annotations
 
 import json
 import os
-
 import redis.asyncio as redis
 
-from .scoring import norm, utc_now_iso
 from .cache_keys import bucket_set_key
+from ..application.mappers import norm, utc_now_iso
+from ..domain.constants import PROJ_HANDYMAN_KEY, PROJ_HANDYMEN_INDEX, PROJ_HANDYMEN_SKILL_INDEX
 
 REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:
     raise RuntimeError("REDIS_URL environment variable is not set")
 
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-
-PROJ_HANDYMAN_KEY = "proj:handyman:{email}"
-PROJ_HANDYMEN_INDEX = "proj:handymen:index"
-PROJ_HANDYMEN_SKILL_INDEX = "proj:handymen:skill:{skill}"
-
-
-def _normalize_handyman(doc: dict) -> dict:
-    email = (doc or {}).get("email")
-    if not email:
-        return {}
-
-    skills = doc.get("skills") or []
-    skills_norm = [norm(s) for s in skills if s]
-    seen = set()
-    skills_norm = [s for s in skills_norm if not (s in seen or seen.add(s))]
-
-    return {
-        "email": email,
-        "skills": skills_norm,
-        "years_experience": doc.get("years_experience"),
-        "service_radius_km": doc.get("service_radius_km"),
-        "latitude": doc.get("latitude"),
-        "longitude": doc.get("longitude"),
-        "avg_rating": float(doc.get("avg_rating") or 0),
-        "rating_count": int(doc.get("rating_count") or 0),
-        "profile_completeness": int(doc.get("profile_completeness") or 0),
-        "completed_jobs_count": int(doc.get("completed_jobs_count") or 0),
-        "updated_at": utc_now_iso(),
-    }
-
 
 async def get_handyman_projection(email: str) -> dict | None:
     if not email:
@@ -54,7 +24,6 @@ async def get_handyman_projection(email: str) -> dict | None:
         return json.loads(raw)
     except Exception:
         return None
-
 
 async def list_projected_handymen_by_skill(skill: str) -> list[dict]:
     skill = norm(skill)
@@ -80,13 +49,11 @@ async def list_projected_handymen_by_skill(skill: str) -> list[dict]:
             continue
     return out
 
-
 async def handyman_projection_count() -> int:
     try:
         return int(await redis_client.scard(PROJ_HANDYMEN_INDEX))
     except Exception:
         return 0
-
 
 async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
     mode = norm(mode)
@@ -109,10 +76,8 @@ async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> in
     deleted = res[0] if res and isinstance(res[0], int) else 0
     return deleted
 
-
 async def get_cached_result(key: str):
     return await redis_client.get(key)
-
 
 async def set_cache_with_index(
     *,

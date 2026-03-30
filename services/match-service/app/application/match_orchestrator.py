@@ -4,20 +4,17 @@ import json
 from datetime import datetime
 
 from .services import (
-    haversine,
     get_effective_handymen_for_skill,
     hydrate_completed_jobs_counts,
-    rank_match_candidates,
     get_effective_availability_slots,
-    projected_has_overlap,
     projections_have_any_availability,
-    cache_key,
-    get_cached_result,
-    set_cache_with_index,
-    norm,
-    bucket_id,
 )
-
+from ..application.mappers import norm
+from ..domain.geo import haversine, bucket_id
+from ..domain.scoring import rank_match_candidates
+from ..infrastructure.availability_projection import projected_has_overlap
+from ..infrastructure.cache_keys import cache_key
+from ..infrastructure.projections import get_cached_result, set_cache_with_index
 
 async def run_match_query(
     latitude: float,

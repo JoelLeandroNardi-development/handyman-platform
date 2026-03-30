@@ -1,79 +1,19 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
 from typing import Any
 
-from dateutil import parser
-
-
-RANKING_WEIGHTS = {
-    "distance": 0.42,
-    "avg_rating": 0.24,
-    "availability_confidence": 0.12,
-    "profile_completeness": 0.10,
-    "rating_count": 0.06,
-    "completed_jobs_count": 0.05,
-    "years_experience": 0.01,
-}
-
-RANKING_CAPS = {
-    "rating_count": 50,
-    "completed_jobs_count": 100,
-    "years_experience": 30,
-}
-
-
-def norm(s: str) -> str:
-    return (s or "").strip().lower()
-
-
-def _safe_float(value: Any, *, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return default
-
-
-def _safe_int(value: Any, *, default: int = 0) -> int:
-    try:
-        return int(value)
-    except Exception:
-        return default
-
-
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
-
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _as_utc(dt: datetime) -> datetime:
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def parse_dt(x: Any) -> datetime:
-    if isinstance(x, datetime):
-        return _as_utc(x)
-    if isinstance(x, str):
-        return _as_utc(parser.isoparse(x))
-    raise ValueError(f"Unsupported datetime type: {type(x).__name__}")
-
+from .constants import RANKING_WEIGHTS, RANKING_CAPS
+from ..application.mappers import _clamp01, _safe_float, _safe_int
 
 def _distance_score(distance_km: Any) -> float:
     km = max(0.0, _safe_float(distance_km, default=1_000_000.0))
     return 1.0 / (1.0 + (km / 10.0))
 
-
 def _dampened_count_score(value: Any, *, cap: int) -> float:
     cap = max(1, int(cap))
     count = max(0, _safe_int(value, default=0))
     return _clamp01(math.log1p(count) / math.log1p(cap))
-
 
 def compute_match_score(candidate: dict[str, Any]) -> float:
     """Compute deterministic weighted ranking score for /match candidates."""
@@ -97,7 +37,6 @@ def compute_match_score(candidate: dict[str, Any]) -> float:
     years = _safe_float(candidate.get("years_experience"), default=0.0)
     score += RANKING_WEIGHTS["years_experience"] * _clamp01(years / float(RANKING_CAPS["years_experience"]))
     return score
-
 
 def rank_match_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Sort by score desc, then deterministic tie-breakers."""

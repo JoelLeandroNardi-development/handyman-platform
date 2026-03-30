@@ -5,37 +5,26 @@ import asyncio
 from shared.shared.consumer import run_consumer_with_retry_dlq
 from shared.shared.idempotency import already_processed
 
-from .services import (
-    redis_client,
-    invalidate_bucket,
-    buckets_in_radius,
-    norm,
+from ..application.services import (
     upsert_handyman_projection,
-    get_handyman_projection,
     upsert_availability_projection,
     delete_handyman_projection,
-    delete_availability_projection,
 )
-
+from .availability_projection import delete_availability_projection
 from .messaging import connect, EXCHANGE_NAME
-
-QUEUE_NAME = "match_service_domain_events"
-RETRY_QUEUE = "match_service_domain_events_retry"
-DLQ_QUEUE = "match_service_domain_events_dlq"
-
-ROUTING_KEYS = [
-    "availability.updated",
-    "handyman.created",
-    "handyman.location_updated",
-    "handyman.updated",
-    "handyman.deleted",
-]
-
-MAX_RETRIES = 3
-RETRY_DELAY_MS = 5000
-IDEMPOTENCY_TTL_SECONDS = 3600
-RETRY_SECONDS = 5
-
+from .projections import invalidate_bucket, get_handyman_projection, redis_client
+from ..application.mappers import norm
+from ..domain.constants import (
+    QUEUE_NAME,
+    RETRY_QUEUE,
+    DLQ_QUEUE,
+    ROUTING_KEYS,
+    MAX_RETRIES,
+    RETRY_DELAY_MS,
+    IDEMPOTENCY_TTL_SECONDS,
+    RETRY_SECONDS
+)
+from ..domain.geo import buckets_in_radius
 
 async def _invalidate_for_handyman_profile(profile: dict | None):
     if not profile:
