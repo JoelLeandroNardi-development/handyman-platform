@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .models import NotificationPreference
-
+from ..domain.models import NotificationPreference
 
 def category_enabled(pref: NotificationPreference, category: str) -> bool:
     if category == "booking":

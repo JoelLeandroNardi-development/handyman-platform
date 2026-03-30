@@ -6,14 +6,13 @@ import os
 import aio_pika
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.shared.consumer import run_consumer_with_retry_dlq
-
 from .db import SessionLocal
-from .mapper import map_event_to_notifications
-from .preferences import category_enabled
 from .repository import create_notification_if_absent, get_preferences, unread_count
-from .sse import hub
-from .schemas import NotificationItem
+from ..api.sse import hub
+from ..application.mappers import map_event_to_notifications
+from ..application.preferences import category_enabled
+from ..domain.schemas import NotificationItem
+from shared.shared.consumer import run_consumer_with_retry_dlq
 
 RABBIT_URL = os.getenv("RABBIT_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE_NAME = os.getenv("DOMAIN_EVENTS_EXCHANGE", "domain_events")
@@ -34,7 +33,6 @@ ROUTING_KEYS = [
     "booking.completed_by_user",
     "booking.completed_by_handyman",
 ]
-
 
 async def handle_event(db: AsyncSession, event: dict) -> None:
     intents = map_event_to_notifications(event)
@@ -59,11 +57,9 @@ async def handle_event(db: AsyncSession, event: dict) -> None:
             },
         )
 
-
 async def _process_event(payload: dict) -> None:
     async with SessionLocal() as db:
         await handle_event(db, payload)
-
 
 async def start_consumer() -> aio_pika.abc.AbstractRobustConnection:
     connection = await aio_pika.connect_robust(RABBIT_URL)
@@ -85,7 +81,6 @@ async def start_consumer() -> aio_pika.abc.AbstractRobustConnection:
 
     print("[notification-service] consumer started")
     return connection
-
 
 async def consume_forever(stop_event: asyncio.Event) -> None:
     while not stop_event.is_set():

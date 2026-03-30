@@ -4,7 +4,6 @@ import asyncio
 from collections import defaultdict
 from typing import Any
 
-
 class NotificationHub:
     def __init__(self) -> None:
         self._queues: dict[str, set[asyncio.Queue]] = defaultdict(set)
@@ -25,6 +24,5 @@ class NotificationHub:
     async def publish(self, user_email: str, payload: dict[str, Any]) -> None:
         for queue in list(self._queues.get(user_email, set())):
             await queue.put(payload)
-
 
 hub = NotificationHub()

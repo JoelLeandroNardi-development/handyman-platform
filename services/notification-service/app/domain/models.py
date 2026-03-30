@@ -6,8 +6,7 @@ import uuid
 from sqlalchemy import Boolean, DateTime, Index, Integer, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .db import Base
-
+from ..infrastructure.db import Base
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -40,7 +39,6 @@ class Notification(Base):
         ),
     )
 
-
 class NotificationPreference(Base):
     __tablename__ = "notification_preferences"
 
@@ -58,7 +56,6 @@ class NotificationPreference(Base):
     quiet_hours_end: Mapped[str | None] = mapped_column(String(5), nullable=True)
     timezone: Mapped[str | None] = mapped_column(String(100), nullable=True)
     locale: Mapped[str | None] = mapped_column(String(20), nullable=True)
-
 
 class PushDevice(Base):
     __tablename__ = "push_devices"

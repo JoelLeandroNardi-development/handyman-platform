@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-
 class NotificationIntent(dict):
     pass
-
 
 def _intent(
     *,
@@ -33,7 +31,6 @@ def _intent(
         payload=payload,
     )
 
-
 def _booking_requested(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
     handyman_email = data.get("handyman_email")
@@ -57,7 +54,6 @@ def _booking_requested(event_id: str, data: dict[str, Any]) -> list[Notification
         )
     ]
 
-
 def _slot_reserved(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
     user_email = data.get("user_email")
@@ -79,7 +75,6 @@ def _slot_reserved(event_id: str, data: dict[str, Any]) -> list[NotificationInte
             },
         )
     ]
-
 
 def _slot_confirmed(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
@@ -126,7 +121,6 @@ def _slot_confirmed(event_id: str, data: dict[str, Any]) -> list[NotificationInt
         )
     return intents
 
-
 def _slot_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
     user_email = data.get("user_email")
@@ -146,7 +140,6 @@ def _slot_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationInte
         )
     ]
 
-
 def _slot_expired(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
     user_email = data.get("user_email")
@@ -165,7 +158,6 @@ def _slot_expired(event_id: str, data: dict[str, Any]) -> list[NotificationInten
             payload={"booking_id": booking_id},
         )
     ]
-
 
 def _booking_released(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
@@ -250,7 +242,6 @@ def _booking_completed(event_id: str, data: dict[str, Any]) -> list[Notification
         )
     return intents
 
-
 def _booking_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
     user_email = data.get("user_email")
@@ -270,7 +261,6 @@ def _booking_rejected(event_id: str, data: dict[str, Any]) -> list[NotificationI
             payload={"booking_id": booking_id, "reason": reason},
         )
     ]
-
 
 def _booking_completed_by_user(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
@@ -292,7 +282,6 @@ def _booking_completed_by_user(event_id: str, data: dict[str, Any]) -> list[Noti
         )
     ]
 
-
 def _booking_completed_by_handyman(event_id: str, data: dict[str, Any]) -> list[NotificationIntent]:
     booking_id = data.get("booking_id")
     user_email = data.get("user_email")
@@ -313,7 +302,6 @@ def _booking_completed_by_handyman(event_id: str, data: dict[str, Any]) -> list[
         )
     ]
 
-
 EVENT_MAPPERS: dict[str, Any] = {
     "booking.requested": _booking_requested,
     "slot.reserved": _slot_reserved,
@@ -327,7 +315,6 @@ EVENT_MAPPERS: dict[str, Any] = {
     "booking.completed_by_user": _booking_completed_by_user,
     "booking.completed_by_handyman": _booking_completed_by_handyman,
 }
-
 
 def map_event_to_notifications(event: dict[str, Any]) -> list[NotificationIntent]:
     event_type = event.get("event_type")

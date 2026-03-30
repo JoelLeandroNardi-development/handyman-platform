@@ -7,8 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Notification, NotificationPreference, PushDevice
-
+from ..domain.models import Notification, NotificationPreference, PushDevice
 
 async def create_notification_if_absent(
     db: AsyncSession,
@@ -54,7 +53,6 @@ async def create_notification_if_absent(
     await db.rollback()
     return None
 
-
 async def list_notifications(
     db: AsyncSession,
     *,
@@ -87,14 +85,12 @@ async def list_notifications(
 
     return rows, next_cursor
 
-
 async def unread_count(db: AsyncSession, *, user_email: str) -> int:
     stmt = select(func.count()).select_from(Notification).where(
         Notification.user_email == user_email,
         Notification.status == "unread",
     )
     return int((await db.execute(stmt)).scalar_one())
-
 
 async def mark_read(db: AsyncSession, *, user_email: str, notification_id: str) -> bool:
     stmt = (
@@ -106,7 +102,6 @@ async def mark_read(db: AsyncSession, *, user_email: str, notification_id: str) 
     await db.commit()
     return (result.rowcount or 0) > 0
 
-
 async def mark_all_read(db: AsyncSession, *, user_email: str) -> int:
     stmt = (
         update(Notification)
@@ -117,7 +112,6 @@ async def mark_all_read(db: AsyncSession, *, user_email: str) -> int:
     await db.commit()
     return int(result.rowcount or 0)
 
-
 async def archive_notification(db: AsyncSession, *, user_email: str, notification_id: str) -> bool:
     stmt = (
         update(Notification)
@@ -127,7 +121,6 @@ async def archive_notification(db: AsyncSession, *, user_email: str, notificatio
     result = await db.execute(stmt)
     await db.commit()
     return (result.rowcount or 0) > 0
-
 
 async def get_preferences(db: AsyncSession, *, user_email: str) -> NotificationPreference:
     existing = await db.get(NotificationPreference, user_email)
@@ -140,7 +133,6 @@ async def get_preferences(db: AsyncSession, *, user_email: str) -> NotificationP
     await db.refresh(pref)
     return pref
 
-
 async def update_preferences(db: AsyncSession, *, user_email: str, patch: dict) -> NotificationPreference:
     pref = await get_preferences(db, user_email=user_email)
     for key, value in patch.items():
@@ -149,7 +141,6 @@ async def update_preferences(db: AsyncSession, *, user_email: str, patch: dict) 
     await db.commit()
     await db.refresh(pref)
     return pref
-
 
 async def upsert_push_device(
     db: AsyncSession,
@@ -184,7 +175,6 @@ async def upsert_push_device(
     await db.commit()
     await db.refresh(existing)
     return existing
-
 
 async def deactivate_push_device(db: AsyncSession, *, user_email: str, device_id: int) -> bool:
     stmt = (

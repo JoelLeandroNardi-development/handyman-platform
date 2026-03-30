@@ -6,10 +6,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .consumer import consume_forever
-from .db import Base, engine
-from .routes import router
-
+from .infrastructure.consumer import consume_forever
+from .infrastructure.db import Base, engine
+from .api.routes import router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +31,6 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
         await engine.dispose()
-
 
 app = FastAPI(title="notification-service", version="0.1.0", lifespan=lifespan)
 app.include_router(router)

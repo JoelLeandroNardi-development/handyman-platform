@@ -4,7 +4,6 @@ import json
 
 from fastapi import Header, HTTPException, status
 
-
 async def get_current_email(x_user_email: str | None = Header(default=None)) -> str:
     if not x_user_email:
         raise HTTPException(

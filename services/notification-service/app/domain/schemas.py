@@ -10,14 +10,3 @@ from shared.shared.schemas.notifications import (
     UnreadCountResponse,
     UpdateNotificationPreferencesRequest,
 )
-
-__all__ = [
-    "MarkAllReadResponse",
-    "NotificationItem",
-    "NotificationListResponse",
-    "NotificationPreferencesResponse",
-    "PushDeviceResponse",
-    "RegisterPushDeviceRequest",
-    "UnreadCountResponse",
-    "UpdateNotificationPreferencesRequest",
-]

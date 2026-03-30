@@ -11,8 +11,8 @@ from tests.service_loader import load_service_app_module
 os.environ.setdefault("NOTIFICATION_DB", "postgresql+asyncpg://admin:admin@localhost:5432/notification_db")
 
 
-mapper_module = load_service_app_module("notification-service", "mapper", package_name="notification_service_app", reload_modules=True)
-consumer_module = load_service_app_module("notification-service", "consumer", package_name="notification_service_app", reload_modules=True)
+mapper_module = load_service_app_module("notification-service", "application/mappers", package_name="notification_service_app", reload_modules=True)
+consumer_module = load_service_app_module("notification-service", "infrastructure/consumer", package_name="notification_service_app", reload_modules=True)
 
 
 @pytest.mark.unit
