@@ -45,7 +45,7 @@ def booking_models_module(booking_db_module):
 @pytest.fixture(scope="module")
 def completed_jobs_module(booking_models_module):
     return load_service_app_module(
-        "booking-service", "domain/policies",
+        "booking-service", "infrastructure/repository",
         package_name="booking_cj_test_app",
     )
 
