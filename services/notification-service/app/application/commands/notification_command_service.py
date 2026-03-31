@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...domain.schemas import *
-from ...infrastructure.auth import get_current_email
+from ...domain.schemas import (
+    MarkAllReadResponse, 
+    NotificationPreferencesResponse, 
+    PushDeviceResponse, 
+    UpdateNotificationPreferencesRequest, 
+    RegisterPushDeviceRequest
+)
 from ...infrastructure.repository import (
     archive_notification,
     deactivate_push_device,
@@ -21,7 +26,7 @@ class NotificationCommandService:
     async def mark_notification_read(
         self,
         notification_id: str,
-        email: str = Depends(get_current_email),
+        email: str,
     ) -> dict:
         ok = await mark_read(self.db, user_email=email, notification_id=notification_id)
         if not ok:
@@ -30,7 +35,7 @@ class NotificationCommandService:
 
     async def mark_my_notifications_read(
         self,
-        email: str = Depends(get_current_email),
+        email: str,
     ) -> MarkAllReadResponse:
         updated = await mark_all_read(self.db, user_email=email)
         return MarkAllReadResponse(updated=updated)
@@ -38,7 +43,7 @@ class NotificationCommandService:
     async def archive_my_notification(
         self,
         notification_id: str,
-        email: str = Depends(get_current_email),
+        email: str,
     ) -> dict:
         ok = await archive_notification(self.db, user_email=email, notification_id=notification_id)
         if not ok:
@@ -48,7 +53,7 @@ class NotificationCommandService:
     async def update_my_preferences(
         self,
         payload: UpdateNotificationPreferencesRequest,
-        email: str = Depends(get_current_email),
+        email: str,
     ) -> NotificationPreferencesResponse:
         pref = await update_preferences(self.db, user_email=email, patch=payload.model_dump())
         return NotificationPreferencesResponse.model_validate(pref)
@@ -56,7 +61,7 @@ class NotificationCommandService:
     async def register_push_device(
         self,
         payload: RegisterPushDeviceRequest,
-        email: str = Depends(get_current_email),
+        email: str,
     ) -> PushDeviceResponse:
         device = await upsert_push_device(
             self.db,
@@ -71,7 +76,7 @@ class NotificationCommandService:
     async def delete_push_device(
         self,
         device_id: int,
-        email: str = Depends(get_current_email),
+        email: str,
     ) -> dict:
         ok = await deactivate_push_device(self.db, user_email=email, device_id=device_id)
         if not ok:

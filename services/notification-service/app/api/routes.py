@@ -23,7 +23,7 @@ async def get_my_notifications(
     email: str = Depends(get_current_email),
     db: AsyncSession = Depends(get_db),
 ) -> NotificationListResponse:
-    return await NotificationQueryService(db).get_my_notifications(status_filter, limit, cursor, email)
+    return await NotificationQueryService(db).get_my_notifications(email, status_filter, limit, cursor)
 
 @router.get("/me/notifications/unread-count", response_model=UnreadCountResponse)
 async def get_unread_count(

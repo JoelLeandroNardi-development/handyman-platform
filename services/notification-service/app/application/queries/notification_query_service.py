@@ -3,13 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import Depends, Query
+from fastapi import Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.sse import hub
-from ...domain.schemas import *
-from ...infrastructure.auth import get_current_email
+from ...domain.schemas import NotificationListResponse, NotificationPreferencesResponse, UnreadCountResponse
 from ...infrastructure.repository import (
     get_preferences,
     list_notifications,
@@ -22,10 +21,10 @@ class NotificationQueryService:
 
     async def get_my_notifications(
         self,
+        email: str,
         status_filter: str | None = Query(default=None, alias="status"),
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None),
-        email: str = Depends(get_current_email),
     ) -> NotificationListResponse:
         items, next_cursor = await list_notifications(
             self.db,
@@ -38,18 +37,18 @@ class NotificationQueryService:
 
     async def get_unread_count(
         self,
-        email: str = Depends(get_current_email),
+        email: str
     ) -> UnreadCountResponse:
         return UnreadCountResponse(count=await unread_count(self.db, user_email=email))
 
     async def get_my_preferences(
         self,
-        email: str = Depends(get_current_email),
+        email: str
     ) -> NotificationPreferencesResponse:
         pref = await get_preferences(self.db, user_email=email)
         return NotificationPreferencesResponse.model_validate(pref)
 
-    async def stream_notifications(email: str = Depends(get_current_email)):
+    async def stream_notifications(email: str):
         async def event_generator():
             queue = await hub.subscribe(email)
             try:
