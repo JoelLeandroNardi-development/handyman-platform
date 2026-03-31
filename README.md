@@ -1,420 +1,340 @@
 # Smart Handyman Marketplace — Microservices Backend
 
-This repo is a microservices backend for a TaskRabbit/Uber-style “find a handyman + reserve a time slot + confirm/cancel” workflow.
+This repository contains the backend for a handyman marketplace: users search for nearby handymen, inspect availability, create bookings, confirm or cancel them, and receive event-driven updates as the booking lifecycle progresses.
 
-For the frontend app of it, see: https://github.com/JoelLeandroNardi-development/handyman-frontend (this is even on an earlier stage than this one!)
+The frontend app lives here:
 
-It uses:
+- [handyman-frontend](https://github.com/JoelLeandroNardi-development/handyman-frontend)
 
-- **FastAPI** services (Python)
-- **Postgres** (SQL state + SQL outbox pattern) via **SQLAlchemy async**
-- **Redis** (availability state + reservations + Redis outbox; also match cache/projections)
-- **RabbitMQ** (domain event bus) via **aio-pika**
-- **Gateway service** (API façade, auth + RBAC, health checks, circuit breakers)
+## What this project uses
 
-> Current milestone: **Backend eventing and reservation lifecycle works end-to-end** (Booking ↔ Availability via RabbitMQ), and we are documenting/cleaning before starting the frontend and adding tests.
-
----
-
-## Table of contents
-
-- [High-level architecture](#high-level-architecture)
-- [Services](#services)
-- [Shared library (`shared/shared/`)](#shared-library-sharedshared)
-- [Domain model](#domain-model)
-- [Event bus contract](#event-bus-contract)
-- [Core workflows](#core-workflows)
-- [How to run](#how-to-run)
-- [Configuration](#configuration)
-- [Observability & debugging](#observability--debugging)
-- [Failure scenarios to test](#failure-scenarios-to-test)
-- [Pending architectural items](#pending-architectural-items)
-- [Planned future functions](#planned-future-functions)
-- [Testing and CI status (March 2026)](#testing-and-ci-status-march-2026)
-
-- [Match Query Orchestration Strategy](#match-query-orchestration-strategy)
+- **FastAPI** for HTTP services
+- **PostgreSQL** for relational service state
+- **Redis** for availability state, reservations, projections, caches, and idempotency
+- **RabbitMQ** for inter-service domain events
+- **SQLAlchemy async** for database access
+- **aio-pika** for RabbitMQ publishing and consumption
+- **Docker Compose** for local orchestration
+- **Pytest + GitHub Actions** for test automation
 
 ---
 
-## High-level architecture
-
-```
-   Client
-     |
-     v
-  Gateway  --------------------->  Booking Service (DB: bookings + outbox)
-     |                                   |
-     | HTTP /match                       | publish booking.* via outbox
-     v                                   v
-  Match Service (Redis cache/projections) RabbitMQ exchange: domain_events
-     |                                   ^
-     | (Approach A removes HTTP calls)   |
-     v                                   |
-Availability Service (Redis: slots + reservations + Redis outbox)
-     |
-     | publish slot.* + availability.updated via outbox
-     v
-RabbitMQ exchange: domain_events  ---> Booking Service consumes slot.*
-```
-
-**Key principles**
-
-- **Outbox everywhere** (SQL outbox for DB-backed services; Redis outbox for Availability).
-- **Best-effort startup**: services should not crash if RabbitMQ is temporarily down.
-- **Mandatory publish**: publishers use `mandatory=True` to fail on unroutable messages (prevents outbox marking SENT incorrectly).
-- **Idempotent consumers**: Redis idempotency markers (`processed_event:{event_id}`) to avoid double-processing.
-
----
-
-## Services
-
-### gateway-service
-
-**Role:** API façade + RBAC + circuit breakers + system health.
-
-Key endpoints:
-
-- `GET /health`
-- `GET /system/health` (admin)
-- `GET /system/breakers` (admin)
-- `POST /system/breakers/{name}/open|close` (admin)
-- Proxies business endpoints: `/users`, `/handymen`, `/availability`, `/match`, `/bookings`, plus auth.
-
-### auth-service
-
-**Role:** authentication (JWT issuance). (Implementation not fully detailed here but wired in compose.)
-
-### user-service
-
-**State:** Postgres (`users` + `outbox_events`)  
-**Publishes:** `user.created`, `user.location_updated` via SQL outbox
-
-### handyman-service
-
-**State:** Postgres (`handymen` + `outbox_events`)  
-**Publishes:** `handyman.created`, `handyman.location_updated` via SQL outbox
-
-### availability-service
-
-**State:** Redis (availability slots + reservations + expiry index) + Redis outbox
-
-**Consumes**
-
-- `booking.requested`
-- `booking.confirm_requested`
-- `booking.cancel_requested`
-
-**Publishes (via Redis outbox)**
-
-- `slot.reserved`
-- `slot.rejected`
-- `slot.confirmed`
-- `slot.released`
-- `slot.expired`
-- `availability.updated` **(Approach A: includes full slots payload)**
-
-Background loops:
-
-- **outbox worker** (publish from Redis outbox to RabbitMQ)
-- **expiry worker** (reservation TTL cleanup → emits `slot.expired`)
-- **consumer** (booking._ events → updates reservations/slots and emits slot._ events)
-
-### booking-service
-
-**State:** Postgres (`bookings` + `outbox_events`)
-
-**Publishes (via SQL outbox)**
-
-- `booking.requested`
-- `booking.confirm_requested`
-- `booking.cancel_requested`
-
-**Consumes**
-
-- `slot.reserved`
-- `slot.rejected`
-- `slot.confirmed`
-- `slot.expired`
-- `slot.released` (optional acknowledgement)
-
-Background loop:
-
-- **outbox worker** (drains SQL outbox → publishes domain events)
-
-### match-service
-
-**Role:** returns nearby candidate handymen for a skill/time window, with caching and (in the newer design) **local projections**.
-
-Current direction:
-
-- **Stop calling handyman-service at request time** by maintaining a handyman projection (Redis) fed by `handyman.created` + `handyman.location_updated`.
-- **Approach A**: stop calling availability-service at request time by using availability projection fed by `availability.updated` which includes full slots.
-
----
-
-### Match Query Orchestration Strategy
-
-The match query process is orchestrated as follows:
-
-1. **Projected handymen are the primary source** (Redis, no HTTP call).
-2. If the projection store is empty, a **live HTTP fetch acts as an explicit fallback** and its results are written back to the projection store.
-3. **Projected availability is the primary source** for each candidate.
-4. If a candidate's availability projection is missing, a **live HTTP fetch acts as an explicit fallback** and is cached into the projection store.
-5. When no availability projections exist at all (**degraded mode**), candidates are returned with `availability_unknown=True` and a shorter TTL.
-
-Returns an ordered list of match result dicts, or an empty list when no candidates are found or the skill is unrecognised.
-
-### notification-service
-
-**Role:** event-driven fanout for customer and handyman notifications.
-
-**Consumes**
-
-- `booking.requested`
-- `slot.reserved`
-- `slot.confirmed`
-- `slot.rejected`
-- `slot.expired`
-- `booking.cancel_requested`
-
-**Fanout channels (current)**
-
-- email
-- push
-
-Provider implementation (open-source/self-hosted):
-
-- Email via SMTP (default local target: MailHog)
-- Push via ntfy (`binwiederhier/ntfy`)
-
-Notification target fields expected in event `data`:
-
-- email targets: `user_email`, `handyman_email`, `email`
-- push targets: `user_push_topic`, `handyman_push_topic`, `push_topic`
-
-**Planned later**
-
-- SMS
-
----
-
-## Shared library (`shared/shared/`)
-
-All cross-cutting code lives in the `shared` Python package so each microservice stays thin. Services install it as a local dependency and import what they need.
-
-### Module overview
-
-```
-shared/shared/
-├── consumer.py        # RabbitMQ consumer with retry + DLQ
-├── crud_helpers.py    # fetch_or_404, apply_partial_update
-├── db.py              # SQLAlchemy async engine/session factory
-├── events.py          # Domain event envelope builder
-├── idempotency.py     # Redis-based idempotency (SET NX)
-├── intervals.py       # Datetime interval math (overlaps, fully_contains)
-├── mq.py              # RabbitMQ publisher + config
-├── outbox_helpers.py  # Insert outbox row helper
-├── outbox_model.py    # OutboxEvent model factory
-├── outbox_worker.py   # Background outbox drain loop
-├── roles.py           # Role validation + normalization
-└── schemas/           # Pydantic schemas shared across services
-    ├── auth.py
-    ├── availability.py
-    ├── bookings.py
-    ├── handymen.py
-    ├── match.py
-    └── users.py
-```
-
-### `db.py` — Database factory
-
-| Symbol        | Signature                                                 | Description                                                                                                   |
-| ------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `create_db`   | `(env_var, *, echo=True) -> (engine, SessionLocal, Base)` | Reads a Postgres URL from the named env var and returns an async engine, session maker, and declarative Base. |
-| `make_get_db` | `(SessionLocal) -> async generator`                       | Returns a FastAPI-compatible `get_db` dependency that yields an `AsyncSession`.                               |
-
-**Usage (per service):**
-
-```python
-from shared.shared.db import create_db
-engine, SessionLocal, Base = create_db(“BOOKING_DB”)
-```
-
-### `events.py` — Event envelope builder
-
-| Symbol                 | Signature                                                                | Description                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `utc_now_iso`          | `() -> str`                                                              | Current UTC time as ISO-8601 string.                                                             |
-| `build_event`          | `(event_type, data, *, source, event_id=None, occurred_at=None) -> dict` | Builds a standard event envelope with `event_id`, `event_type`, `occurred_at`, `source`, `data`. |
-| `build_event_jsonable` | `(event_type, data, *, source, ...) -> dict`                             | Same as `build_event` but runs the result through FastAPI's `jsonable_encoder`.                  |
-| `make_event_builder`   | `(service_name) -> Callable`                                             | Factory returning a `build_event(event_type, data)` closure pre-bound to the given service name. |
-
-**Usage:**
-
-```python
-from shared.shared.events import make_event_builder
-build_event = make_event_builder(“booking-service”)
-evt = build_event(“booking.requested”, {“booking_id”: 42})
-```
-
-### `mq.py` — RabbitMQ publisher
-
-| Symbol             | Kind                                        | Description                                                                                                                                                                 |
-| ------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RabbitConfig`     | Frozen dataclass                            | Holds `url` and `exchange_name`. `RabbitConfig.from_env(required=False)` reads from `RABBIT_URL` / `EXCHANGE_NAME` env vars.                                                |
-| `RabbitPublisher`  | Class                                       | Manages a persistent connection, channel, and TOPIC exchange. Methods: `start()`, `close()`, `publish(*, routing_key, payload, ...)`. Auto-reconnects. No-op when disabled. |
-| `rabbit_connect`   | `async (cfg) -> RobustConnection \| None`   | Opens a robust RabbitMQ connection from config.                                                                                                                             |
-| `create_publisher` | `(*, required=True) -> (publisher, config)` | Convenience factory: creates config from env + publisher in one call.                                                                                                       |
-
-### `consumer.py` — RabbitMQ consumer with retry + DLQ
-
-| Symbol                        | Signature                                                                                                                                 | Description                                                                                                                                     |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setup_consumer_topology`     | `(*, channel, exchange_name, queue_name, retry_queue, dlq_queue, routing_keys, retry_delay_ms, prefetch=50) -> (exchange, queue)`         | Declares a TOPIC exchange, main queue, retry queue (with TTL dead-lettering back to main), and DLQ. Binds main queue to the given routing keys. |
-| `run_consumer_with_retry_dlq` | `(*, channel, exchange_name, queue_name, retry_queue, dlq_queue, routing_keys, handler, retry_delay_ms=5000, max_retries=3, ...) -> None` | Starts consuming. On failure retries via the retry queue (with `x-retry-count` header). After `max_retries`, rejects to DLQ.                    |
-
-### `outbox_model.py` — OutboxEvent model factory
-
-| Symbol                    | Signature               | Description                                                                                                                                                                                                                                      |
-| ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `make_outbox_event_model` | `(Base) -> OutboxEvent` | Given a SQLAlchemy declarative `Base`, returns an `OutboxEvent` ORM class mapped to `outbox_events`. Columns: `id`, `event_id`, `event_type`, `routing_key`, `payload` (JSON), `status`, `attempts`, `last_error`, `created_at`, `published_at`. |
-
-### `outbox_worker.py` — Background outbox drain loop
-
-| Symbol              | Signature                                                                                                                         | Description                                                                                                                                                  |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `run_outbox_loop`   | `(*, stop_event, SessionLocal, OutboxEvent, publisher, service_label, max_attempts=20, poll_interval=1.0, batch_size=50) -> None` | Claims `PENDING` rows with `SELECT ... FOR UPDATE SKIP LOCKED`, publishes each via the publisher, marks `SENT` on success or increments attempts on failure. |
-| `make_outbox_stats` | `(SessionLocal, OutboxEvent) -> dict`                                                                                             | Returns outbox row counts grouped by status (e.g. `{“type”: “sql”, “pending”: 3, “sent”: 120}`).                                                             |
-
-### `outbox_helpers.py` — Insert outbox row
-
-| Symbol             | Signature                                | Description                                                                                        |
-| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `add_outbox_event` | `(db, OutboxEvent, event: dict) -> None` | Adds a `PENDING` outbox row to the session. Extracts `event_id`, `event_type` from the event dict. |
-
-**Usage:**
-
-```python
-from shared.shared.outbox_helpers import add_outbox_event
-evt = build_event(“booking.requested”, data)
-add_outbox_event(db, OutboxEvent, evt)
-await db.commit()
-```
-
-### `crud_helpers.py` — Generic CRUD utilities
-
-| Symbol                 | Signature                                                               | Description                                                        |
-| ---------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `fetch_or_404`         | `async (db, model, *, filter_column, filter_value, detail=”Not found”)` | SELECT for a single row; raises `HTTPException(404)` if missing.   |
-| `apply_partial_update` | `(entity, data, fields: list[str]) -> None`                             | Copies non-`None` fields from a Pydantic model onto an ORM entity. |
-
-**Usage:**
-
-```python
-from shared.shared.crud_helpers import fetch_or_404, apply_partial_update
-
-booking = await fetch_or_404(
-    db, Booking,
-    filter_column=Booking.booking_id, filter_value=bid,
-    detail=”Booking not found”,
-)
-apply_partial_update(user, update_data, [“first_name”, “last_name”, “phone”])
-```
-
-### `idempotency.py` — Redis-based idempotency
-
-| Symbol                            | Signature                                                                               | Description                                                                                  |
-| --------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `IDEMPOTENCY_DEFAULT_TTL_SECONDS` | `3600`                                                                                  | Default TTL (1 hour).                                                                        |
-| `already_processed`               | `async (*, redis_client, event_id, ttl_seconds=3600, prefix=”processed_event”) -> bool` | Atomic `SET NX` on `{prefix}:{event_id}`. Returns `True` if the event was already processed. |
-
-### `roles.py` — Role validation
-
-| Symbol            | Signature                                                  | Description                                                                                               |
-| ----------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `ALLOWED_ROLES`   | `frozenset({“user”, “handyman”, “admin”})`                 | Valid role strings.                                                                                       |
-| `normalize_roles` | `(roles, *, allow_empty=False, default=None) -> list[str]` | Lowercases, trims, deduplicates, validates against `ALLOWED_ROLES`. Raises `ValueError` on invalid roles. |
-
-### `intervals.py` — Datetime interval math
-
-| Symbol           | Signature                                                  | Description                                                    |
-| ---------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| `overlaps`       | `(a_start, a_end, b_start, b_end) -> bool`                 | Returns `True` if two time intervals overlap.                  |
-| `fully_contains` | `(outer_start, outer_end, inner_start, inner_end) -> bool` | Returns `True` if the outer interval fully contains the inner. |
-
-### `schemas/` — Shared Pydantic schemas
-
-All domain schemas live here so downstream services and the gateway import from one source of truth.
-
-| Module            | Key Classes                                                                                                                                                                                                                                               |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth.py`         | `Register`, `Login`, `TokenResponse`, `AuthUserResponse`, `UpdateAuthUserPassword`, `UpdateAuthUserRoles`, `UpdateAuthUser`                                                                                                                               |
-| `availability.py` | `AvailabilitySlot`, `SetAvailability`, `OverlapRequest`                                                                                                                                                                                                   |
-| `bookings.py`     | `CreateBooking`, `BookingResponse`, `CancelBooking`, `ConfirmBookingResponse`, `CancelBookingResponse`, `CompleteBookingResponse`, `RejectBookingRequest`, `RejectBookingResponse`, `UpdateBookingAdmin`                                                  |
-| `handymen.py`     | `CreateHandyman`, `UpdateLocation`, `UpdateHandyman`, `HandymanResponse`, skill catalog schemas (`SkillCatalogReplaceRequest`, `SkillCatalogPatchRequest`, `SkillCatalogFlatResponse`), review schemas (`CreateHandymanReview`, `HandymanReviewResponse`) |
-| `match.py`        | `MatchRequest`, `MatchResult`, `MatchLogResponse`, `UpdateMatchLog`                                                                                                                                                                                       |
-| `users.py`        | `CreateUser`, `UpdateUserLocation`, `UpdateUser`, `UserResponse`                                                                                                                                                                                          |
-
-Each downstream service re-exports from shared in its local `schemas.py` for backward compatibility:
-
-```python
-# services/booking-service/app/schemas.py
-from shared.shared.schemas.bookings import *
+## Repository overview
+
+```text
+.
+├── services/
+│   ├── auth-service
+│   ├── availability-service
+│   ├── booking-service
+│   ├── gateway-service
+│   ├── handyman-service
+│   ├── match-service
+│   ├── notification-service
+│   ├── search-service
+│   └── user-service
+├── shared/
+│   ├── core/
+│   ├── schemas/
+│   ├── __init__.py
+│   └── pyproject.toml
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── failure_mode/
+│   └── service_loader.py
+├── docker-compose.yml
+├── pytest.ini
+├── requirements-test.txt
+└── .github/workflows/tests.yml
 ```
 
 ---
 
-## Domain model
+## Architecture at a glance
 
-### Availability “slots” (Availability service)
+This backend uses a **service-per-domain** approach.
 
-Raw calendar windows a handyman is available.
+### Main ideas
 
-Example:
+- Each service owns its own write model and persistence.
+- Cross-service communication happens primarily through **domain events** on RabbitMQ.
+- Database-backed services publish through a **SQL outbox**.
+- Redis-backed flows use Redis for fast state and transient booking/availability coordination.
+- Read-heavy flows, especially matching, rely on **caches and projections** instead of synchronous fan-out wherever possible.
+- Services follow a mostly consistent internal layout:
+  - `api/`
+  - `application/`
+  - `domain/`
+  - `infrastructure/`
 
-- 10:00–14:00
-- 15:00–18:00
+### High-level flow
 
-Stored per handyman key:
+```text
+Client
+  |
+  v
+Gateway
+  |
+  +--> Auth
+  +--> User
+  +--> Handyman
+  +--> Match
+  +--> Availability
+  +--> Booking
+  +--> Notification
 
-- `availability:{email}` → Redis list entries like `start|end`.
-
-### Reservation (Availability service)
-
-Temporary hold for a specific booking request; prevents double booking between requested and confirmed.
-
-- TTL (e.g., 5 minutes)
-- Stored as:
-  - `reservation:{booking_id}` (payload includes handyman_email and window)
-  - `reservations_by_handyman:{email}` set
-  - `reservation_expiry` zset for expiry scanning
-
-### Booking (Booking service)
-
-Represents the user’s booking request lifecycle.
-
-Statuses:
-
-- `PENDING` → initial
-- `RESERVED` → availability reserved
-- `CONFIRMED` → confirmed
-- `FAILED` → slot rejected
-- `EXPIRED` → reservation expired before confirmation
-- `CANCELED` → canceled
+Booking <----events----> Availability
+   |                         |
+   +------events------------> Notification
+   |
+   +------events------------> Match projections
+Handyman/User ----events----> Match projections
+```
 
 ---
 
-## Event bus contract
+## Service summary
 
-RabbitMQ:
+## gateway-service
 
-- Exchange: **topic** exchange, durable
-- Name: `domain_events` (default)
-- Routing key == `event_type` (strict contract)
+The public entrypoint and façade for the rest of the system.
 
-### Standard event envelope (shared)
+Responsibilities:
 
-All services should build events using `shared/shared/events.py`:
+- route aggregation
+- auth propagation
+- RBAC-aware administrative endpoints
+- breaker and health aggregation
+- service-to-service façade for frontend clients
+
+The gateway has a slightly different internal structure from the domain services and includes dedicated folders for:
+
+- `breakers/`
+- `clients/`
+- `routes/`
+- `utils/`
+
+---
+
+## auth-service
+
+Authentication and token lifecycle service.
+
+Responsibilities:
+
+- registration/login flows
+- token issuance and refresh
+- password reset / verification flows
+- auth-user management
+
+This service is currently simpler and flatter internally than the other domain services.
+
+---
+
+## user-service
+
+User profile service.
+
+Responsibilities:
+
+- user creation and updates
+- location updates
+- event emission for downstream consumers
+
+Typical events:
+
+- `user.created`
+- `user.updated`
+- `user.location_updated`
+- `user.deleted`
+
+---
+
+## handyman-service
+
+Handyman profile and skill service.
+
+Responsibilities:
+
+- handyman profiles
+- location updates
+- skills / catalog integration
+- handyman-side profile data used downstream by matching
+
+Typical events include handyman profile and location changes.
+
+---
+
+## availability-service
+
+Availability and reservation coordination service.
+
+Responsibilities:
+
+- store handyman availability slots
+- check interval overlap
+- create temporary reservations
+- confirm/release/expire reservations
+- emit availability and slot lifecycle events
+
+Key traits:
+
+- Redis-backed
+- worker-driven cleanup for expired reservations
+- event-driven coordination with booking-service
+
+This service includes a `workers/` folder because it runs background loops in addition to HTTP endpoints.
+
+---
+
+## booking-service
+
+Booking lifecycle service.
+
+Responsibilities:
+
+- create booking requests
+- manage booking status transitions
+- emit booking commands/events
+- react to slot lifecycle events from availability-service
+
+Typical booking lifecycle states include:
+
+- pending/requested
+- reserved
+- confirmed
+- failed/rejected
+- canceled
+- expired
+- completed
+
+---
+
+## match-service
+
+Candidate selection and ranking service.
+
+Responsibilities:
+
+- find matching handymen for a skill, location, and time window
+- use cached/projection-friendly read paths
+- combine availability and handyman signals
+- score and rank candidate results
+
+This service is read-heavy by nature and is the best example of projection-oriented behavior in the repo.
+
+---
+
+## notification-service
+
+Event-driven notification fanout service.
+
+Responsibilities:
+
+- consume booking/slot lifecycle events
+- map domain events into notification intents
+- persist and expose notifications
+- manage read/unread state and notification preferences
+
+The application layer was split so notification mapping is now more modular instead of being one oversized mapper module.
+
+---
+
+## search-service
+
+A smaller service placeholder / future expansion point for search-specific concerns.
+
+Right now the platform’s practical search/match behavior is centered more heavily in `match-service`.
+
+---
+
+## Shared package
+
+The shared library has been refactored away from the old `shared/shared/...` layout into a cleaner package root:
+
+```text
+shared/
+├── core/
+└── schemas/
+```
+
+## `shared.core`
+
+Cross-cutting infrastructure and utility code used by multiple services.
+
+Current areas include:
+
+- `auth/`
+- `db/`
+- `messaging/`
+- `outbox/`
+- `utils/`
+
+Examples of what lives there:
+
+- DB session/dependency helpers
+- CRUD helpers
+- RabbitMQ helpers
+- consumer helpers
+- outbox helpers and workers
+- interval utilities
+- role helpers
+
+## `shared.schemas`
+
+Shared request/response/domain schemas imported across services.
+
+Current schema modules include:
+
+- `auth.py`
+- `availability.py`
+- `bookings.py`
+- `handymen.py`
+- `match.py`
+- `notifications.py`
+- `users.py`
+
+The goal of the shared package is simple:
+
+- keep service code thin
+- centralize generic infrastructure
+- keep domain-specific business logic inside the owning service
+
+---
+
+## Internal service layout
+
+Most services now follow this shape:
+
+```text
+app/
+├── api/
+├── application/
+├── domain/
+├── infrastructure/
+├── __init__.py
+└── main.py
+```
+
+### What goes where
+
+- `api/`: FastAPI routers, dependencies, transport concerns
+- `application/`: use cases, command/query services, mappers
+- `domain/`: models, schemas, policies, domain concepts
+- `infrastructure/`: DB, cache, MQ, repositories, external adapters
+
+This keeps route handlers thin and pushes orchestration into application services.
+
+---
+
+## Event-driven design
+
+RabbitMQ is used as the domain event bus.
+
+### Event shape
+
+Events follow a common envelope shape across services:
 
 ```json
 {
@@ -426,190 +346,118 @@ All services should build events using `shared/shared/events.py`:
 }
 ```
 
-- `event_id`: globally unique id, used for downstream idempotency
-- `event_type`: also used as routing key
-- `occurred_at`: ISO-8601 UTC string
-- `source`: producing service name
-- `data`: payload
+### Eventing principles used in this repo
 
-### Important publishing behavior
-
-- `mandatory=True` publishing is enabled in shared publisher.
-- If no queue is bound to the routing key, publish fails and the outbox retries (prevents false “SENT”).
+- services publish events after local state changes
+- database-backed services use an **outbox pattern**
+- consumers are designed to be **idempotent**
+- services aim for **best-effort startup** when dependencies are temporarily unavailable
+- read-side services can update projections or invalidate caches based on events
 
 ---
 
-## Core workflows
+## Core business workflows
 
-### Flow A — Handyman updates availability slots (Approach A)
+## 1. Availability update
 
-A1. Set/clear slots (HTTP)
+A handyman sets or clears availability.
 
-- `POST /availability/{email}` with slots
-- `DELETE /availability/{email}` clears
+Flow:
 
-A2. Emit domain event (via Redis outbox)
-
-- `availability.updated` (routing key: `availability.updated`)
-- **data includes full slots**:
-  ```json
-  { "email": "handyman@test.com", "slots": [{ "start": "...", "end": "..." }] }
-  ```
-
-A3. Match reacts
-
-- Match consumes `availability.updated` and invalidates cached match buckets (and/or stores availability projection for “no HTTP calls” mode).
+1. availability-service stores slot state in Redis
+2. availability-service emits an `availability.updated` event
+3. downstream readers such as match-service can refresh projections or invalidate caches
 
 ---
 
-### Flow B — User searches for a handyman (Match)
+## 2. Booking request
 
-User → Gateway → Match service `POST /match`
+A user requests a booking.
 
-Planned (Approach A projection path):
+Flow:
 
-1. Normalize skill
-2. Read candidate handymen from local projection
-3. Hydrate `completed_jobs_count` from booking-service using batched `POST /bookings/completed-counts`
-4. Filter by distance
-5. Check desired window overlaps projected availability slots (no HTTP call)
-6. Rank with deterministic weighted scoring (distance + trust/profile signals)
-7. Return sorted results + cache
-
-Completed-jobs fallback behavior:
-
-- If booking-service batch counts are partially missing, unmatched handymen keep their existing local value (or `0` if absent).
-- If booking-service is temporarily unavailable, `/match` still succeeds and returns safe defaults.
-
-Degraded behavior:
-
-- If projections are missing (bootstrap or events disabled), return candidates with `availability_unknown=true` and short TTL cache.
-
-Ranking notes (B5):
-
-- Current score weights (sum = 1.00):
-  - distance: 0.42
-  - avg_rating: 0.24
-  - availability_confidence: 0.12
-  - profile_completeness: 0.10
-  - rating_count: 0.06
-  - completed_jobs_count: 0.05
-  - years_experience: 0.01
-- Distance remains the strongest signal.
-- Unknown availability receives a confidence penalty.
-- `avg_rating` has strong influence.
-- `rating_count` and `completed_jobs_count` use dampened/capped influence.
-- `profile_completeness` contributes meaningfully but does not dominate.
-- `years_experience` has a small weight.
-- Deterministic tie-breakers: higher score, shorter distance, higher rating count, then lexicographic email.
+1. booking-service creates the booking locally
+2. booking-service writes an outbox event such as `booking.requested`
+3. availability-service consumes the event
+4. availability-service either reserves the slot or rejects it
+5. booking-service reacts to the resulting slot event and updates booking state
 
 ---
 
-### Flow C — Booking + reservation lifecycle (critical path)
+## 3. Booking confirmation
 
-C1. Booking created
+Once a reservation exists, the booking can be confirmed.
 
-- Client → Gateway → Booking `POST /bookings`
-- Booking writes:
-  - booking row (`PENDING`)
-  - outbox row `booking.requested`
-- Booking outbox publishes `booking.requested`
+Flow:
 
-C2. Availability reserves or rejects
-Availability consumes `booking.requested`:
-
-1. Check handyman has overlapping slot
-2. Create reservation (TTL) if no reservation conflict
-3. Emit:
-   - `slot.reserved` or `slot.rejected`
-
-C3. Booking updates status
-Booking consumes slot events:
-
-- `slot.reserved` → booking `RESERVED`
-- `slot.rejected` → booking `FAILED` + reason
+1. booking-service emits a confirmation request event
+2. availability-service finalizes the slot mutation
+3. availability-service emits a confirmation event
+4. booking-service marks the booking confirmed
 
 ---
 
-### Flow D — Confirm booking
+## 4. Booking cancel / release
 
-D1. Confirm requested
+If a booking is canceled or released:
 
-- Client → Gateway → Booking `POST /bookings/{id}/confirm`
-- Booking emits `booking.confirm_requested` via outbox
-
-D2. Availability finalizes slot
-Availability consumes `booking.confirm_requested`:
-
-1. Verify reservation exists
-2. Remove/split overlapping slot(s) from availability slots list
-3. Delete reservation
-4. Emit `slot.confirmed`
-
-D3. Booking marks confirmed
-Booking consumes `slot.confirmed` → `CONFIRMED`
+1. booking-service emits the appropriate cancel/request event
+2. availability-service releases the reservation or slot hold
+3. downstream services update state as needed
+4. notification-service can fan out customer/handyman notifications
 
 ---
 
-### Flow E — Cancel booking
+## 5. Reservation expiry
 
-E1. Cancel requested
+Availability-side temporary reservations can expire.
 
-- Client → Gateway → Booking `POST /bookings/{id}/cancel`
-- Booking sets status `CANCELED`
-- Emits `booking.cancel_requested` via outbox
+Flow:
 
-E2. Availability releases reservation
-Consumes cancel request:
-
-1. Delete reservation if exists (idempotent)
-2. Emit `slot.released`
+1. worker detects expired reservations
+2. reservation is removed
+3. expiry/release event is emitted
+4. booking-service reconciles booking state accordingly
 
 ---
 
-### Flow F — Reservation expiry (auto cleanup)
+## 6. Matching
 
-Availability expiry worker:
+The client queries for candidate handymen.
 
-1. Detect expired reservations in zset
-2. Delete reservation
-3. Emit `slot.expired`
+Flow:
 
-Booking consumes `slot.expired`:
-
-- If booking still `PENDING` or `RESERVED` → mark `EXPIRED`
+1. match-service normalizes inputs
+2. handymen are sourced from local data/projections/caches
+3. availability and trust signals are combined
+4. candidates are scored and ranked
+5. the result is returned as a read-model-style response
 
 ---
 
-## How to run
+## Running locally
 
-### Prerequisites
+## Prerequisites
 
-- Docker + Docker Compose v2+
-- (Optional for local non-docker runs) Python 3.11
+- Docker
+- Docker Compose v2+
+- Python 3.11+ for local non-Docker work
 
-### Start everything
+## Start everything
 
-From repo root:
+From the repository root:
 
 ```bash
 docker compose up --build
 ```
 
-Services:
-
-- Gateway: `http://localhost:8000`
-- RabbitMQ UI: `http://localhost:15672` (guest/guest)
-- Postgres: `localhost:5432`
-- Redis: `localhost:6379`
-
-### Stop
+## Stop everything
 
 ```bash
 docker compose down
 ```
 
-Reset state (drops volumes):
+## Reset volumes
 
 ```bash
 docker compose down -v
@@ -617,203 +465,85 @@ docker compose down -v
 
 ---
 
+## Runtime services in Docker Compose
+
+The Compose setup currently includes:
+
+- `postgres`
+- `notification-db`
+- `redis`
+- `rabbitmq`
+- `auth-service`
+- `user-service`
+- `handyman-service`
+- `availability-service`
+- `match-service`
+- `booking-service`
+- `notification-service`
+- `gateway-service`
+
+Gateway is exposed on:
+
+- `http://localhost:8000`
+
+RabbitMQ management UI is exposed on:
+
+- `http://localhost:15672`
+
+---
+
 ## Configuration
 
-### RabbitMQ
+Configuration is mostly environment-variable driven.
 
-In compose, each service that uses RabbitMQ is passed:
+Common examples:
 
-- `RABBIT_URL=amqp://guest:guest@rabbitmq:5672/`
-- `EXCHANGE_NAME=domain_events`
+### Databases
 
-**Recommendation:** also add these to `.env` for local `uvicorn` runs outside Docker.
+- `AUTH_DB`
+- `USER_DB`
+- `HANDYMAN_DB`
+- `BOOKING_DB`
+- `MATCH_DB`
+- `NOTIFICATION_DB`
 
-### Postgres connection env vars
+### Messaging
 
-Each DB-backed service sets its own `*_DB` env var, e.g.:
+- `RABBIT_URL`
+- `EXCHANGE_NAME`
+- `DOMAIN_EVENTS_EXCHANGE`
+- `NOTIFICATION_QUEUE`
 
-- `BOOKING_DB=postgresql+asyncpg://admin:admin@postgres:5432/booking_db`
+### Redis
 
-### Redis URL
+- `REDIS_URL`
 
-- `REDIS_URL=redis://redis:6379/0`
+### Auth
 
----
+- `JWT_SECRET`
+- `JWT_ALGORITHM`
 
-## Observability & debugging
-
-### Health endpoints
-
-Each service exposes a basic `/health`.
-
-Gateway (admin):
-
-- `GET /system/health` → checks each service `/health` and reports latency.
-
-Recommended additions (some already implemented in match-service):
-
-- include `events_enabled`, `exchange_name`, `rabbit_url_set`
-- Outbox stats:
-  - SQL outbox: counts of `PENDING`, `FAILED`
-  - Redis outbox: lengths of pending/processing/dlq lists
-
-### Debug Rabbit endpoints (optional)
-
-Per consumer service:
-
-- `GET /debug/rabbit` returning queue name, exchange, routing keys bound.
-
-Match-service already includes:
-
-- `/debug/rabbit` (queue/routing keys + exchange)
-
-### RabbitMQ UI checks
-
-Use RabbitMQ management to confirm:
-
-- Exchange `domain_events` exists
-- Queues exist and bindings are correct:
-  - `availability_service_booking_events` bound to `booking.*`
-  - `booking_service_domain_events` bound to `slot.*`
-  - `match_service_domain_events` bound to `availability.updated`, `handyman.*`
+For local Docker runs, most of these are already wired through `docker-compose.yml`.
 
 ---
 
-## Failure scenarios to test
+## Testing
 
-1. **Rabbit down on startup**
-   - Start stack with Rabbit stopped or slow.
-   - Services should still come up; publishers are “enabled but not ready”.
-   - Outboxes retry until Rabbit returns.
+The repository includes:
 
-2. **Kill availability-service**
-   - Create a booking (Booking publishes `booking.requested`).
-   - Restart availability.
-   - Availability should consume and emit slot results; booking should converge.
+- `tests/unit`
+- `tests/integration`
+- `tests/failure_mode`
 
-3. **Unroutable message**
-   - Temporarily remove consumer binding for a routing key.
-   - Publish event with that routing key.
-   - Outbox should **NOT mark SENT** (mandatory publish fails) and should keep retrying.
+There is also a custom `tests/service_loader.py` to support service module loading in tests, which matters because services now use nested internal packages instead of older flat module layouts.
 
-4. **Poison messages**
-   - Force handler exceptions.
-   - Consumer should retry up to max retries then send to DLQ.
-
----
-
-## Planned future functions
-
-### Search / geo improvements
-
-Originally search was meant to find nearby handymen by geo radius.
-
-Options:
-
-1. **Redis GEO index** in Match (fast):
-   - `GEOADD`, `GEORADIUS`
-   - Combine with skill sets
-2. **Materialized geo index** in Match:
-   - Maintain buckets / precomputed grids (already present as cache buckets)
-3. **Dedicated search-service revival**
-   - If you need advanced ranking, full-text, or multi-criteria search:
-     - geo + skill + ratings + availability signals
-     - ranking/scoring model
-
-### Booking enhancements
-
-- richer cancellation rules (fees/deadlines)
-- handyman-initiated confirm/cancel flows
-- multi-slot booking or rescheduling
-
-### Availability enhancements
-
-- timezone normalization + validation
-- “busy blocks” and calendar integrations
-- reservation renewal/extension policies
-
-### Operational maturity
-
-- structured logging
-- metrics (Prometheus) + tracing (OpenTelemetry)
-- dashboards/alerts
-
----
-
-## Testing and CI status (March 2026)
-
-This section replaces the previous testing plan and serves as the consolidated testing reference for this repository.
-
-### Current baseline
-
-- 217 passing tests
-- 96% combined coverage over `shared` and `services`
-- Test tracks: unit, integration, and failure-mode
-
-### Test structure
-
-```text
-tests/
-   unit/
-      test_consumer.py
-      test_gateway_helpers.py
-      test_idempotency.py
-      test_intervals.py
-      test_match_services.py
-      test_mq.py
-      test_outbox_worker.py
-      test_reservations.py
-      test_schemas.py
-      test_shared_helpers.py
-      test_shared_models.py
-   integration/
-      test_booking_lifecycle.py
-   failure_mode/
-      test_consumer_failures.py
-```
-
-Key test/config support files:
-
-- `pytest.ini`
-- `conftest.py`
-- `requirements-test.txt`
-- `Makefile`
-- `run_tests.py`
-- `.github/workflows/tests.yml`
-
-### What is covered
-
-Unit coverage includes:
-
-- interval overlap and containment logic
-- Redis idempotency behavior
-- RabbitMQ consumer topology/retry/DLQ behavior
-- shared event, role, DB, and CRUD helper behavior
-- outbox worker claim/send/failure/retry loops
-- match helper and projection/caching behavior
-- availability reservation helpers
-- gateway RBAC and circuit-breaker behavior
-- shared schema validation across auth/users/handymen/bookings/availability/match
-
-Integration coverage includes:
-
-- booking lifecycle transitions with event-driven progression
-
-Failure-mode coverage includes:
-
-- retry and DLQ handling
-- malformed payload handling
-- consumer error path behavior
-
-### Quick start
-
-Install test dependencies:
+## Install test dependencies
 
 ```bash
 pip install -r requirements-test.txt
 ```
 
-Optional editable shared install:
+## Install the shared package in editable mode
 
 ```bash
 cd shared
@@ -821,126 +551,115 @@ pip install -e ".[test]"
 cd ..
 ```
 
-Run tests:
+## Run all tests
 
 ```bash
 pytest tests/ -v
+```
+
+## Run by group
+
+```bash
 pytest tests/unit/ -v
 pytest tests/integration/ -v
 pytest tests/failure_mode/ -v
 ```
 
-Run by marker:
+## Useful markers
 
-```bash
-pytest -m unit
-pytest -m integration
-pytest -m failure_mode
-pytest -m intervals
-pytest -m idempotency
-pytest -m rabbit
-pytest -m booking_lifecycle
-```
+The repo currently registers markers such as:
 
-Coverage commands:
-
-```bash
-pytest tests --cov=shared --cov=services --cov-report=term-missing --cov-report=xml
-python -m coverage report
-python -m coverage html
-```
-
-### CI workflow summary
-
-Workflow file: `.github/workflows/tests.yml`
-
-- Triggers: push/pull_request for `main` and `develop`
-- Matrix: Python `3.11` and `3.12`
-- Service containers: Postgres, RabbitMQ, Redis
-- Stages: dependency install, unit tests, integration tests, failure-mode tests, Codecov upload, HTML coverage artifact
-
-### Recent fixes applied
-
-1. GitHub Actions/runtime updates
-
-- `actions/checkout@v5`
-- `actions/setup-python@v5`
-- `actions/upload-artifact@v4`
-- `codecov/codecov-action@v5`
-- `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`
-
-2. Dependency conflict fixes
-
-- removed invalid `unittest-mock==1.5`
-- centralized test dependencies in `requirements-test.txt`
-- kept service `requirements.txt` files runtime-only to avoid duplicate/conflicting test pins
-
-3. Import and coverage execution fixes
-
-- CI `PYTHONPATH` set to repo root to resolve `shared.shared.*` imports
-- coverage invoked with `python -m coverage` to avoid shell path issues
-
-### Troubleshooting
-
-Missing pytest:
-
-```bash
-pip install pytest pytest-asyncio
-```
-
-`ModuleNotFoundError: No module named shared.shared`:
-
-- Ensure `PYTHONPATH` points to repository root
-- Do not set only the `shared` subdirectory as top-level path
-
-Linux/macOS:
-
-```bash
-export PYTHONPATH="$(pwd)"
-```
-
-Windows PowerShell:
-
-```powershell
-$env:PYTHONPATH = (Get-Location).Path
-```
-
-Dependency resolver conflicts:
-
-- keep test-only dependencies in `requirements-test.txt`
-- keep service requirement files runtime-only
-
-### Remaining optional improvements
-
-- close remaining uncovered branches in `shared/shared/events.py`, `shared/shared/mq.py`, `shared/shared/outbox_worker.py`, and `services/match-service/app/services.py`
+- `unit`
+- `integration`
+- `failure_mode`
+- `rabbit`
+- `idempotency`
+- `intervals`
+- `booking_lifecycle`
+- `slow`
+- `asyncio`
 
 ---
 
-## Appendix: docker-compose summary
+## CI
 
-RabbitMQ:
+GitHub Actions runs automated tests on:
 
-- `rabbitmq:3-management`
-- ports: `5672`, `15672`
+- Python 3.11
+- Python 3.12
 
-Postgres:
+The test workflow also provisions:
 
-- `postgis/postgis:15-3.3`
-- port `5432`
+- PostgreSQL
+- RabbitMQ
+- Redis
 
-Redis:
+The CI pipeline currently installs:
 
-- `redis:7`
-- port `6379`
+- test dependencies
+- the shared package in editable mode
+- each service’s runtime requirements
 
-Gateway exposed:
+Then it runs:
 
-- `8000:8000`
+- unit tests
+- integration tests
+- failure-mode tests
+- coverage reporting
 
 ---
 
-## Notes
+## Design goals
 
-- The system is designed so **writes** are local/transactional and **reads** can be cached/projection-driven.
-- Outbox + mandatory publish + idempotency are the reliability backbone.
-- Next major milestone: **projection-driven Match** + **frontend** + **tests**.
+This codebase is optimized around a few practical backend goals:
+
+- keep service ownership clear
+- keep API routes thin
+- centralize orchestration in application services
+- use shared code for infrastructure, not for domain leakage
+- use eventing for cross-service state transitions
+- keep read paths cache/projection friendly
+- favor straightforward patterns over framework-heavy abstractions
+
+In practice, the current codebase leans toward:
+
+- lightweight CQRS-style separation in services
+- outbox-backed event publishing
+- idempotent consumers
+- shared schemas and shared infrastructure utilities
+- Docker-first local development
+- pragmatic, testable service boundaries
+
+---
+
+## Current status
+
+This backend is no longer just a rough prototype. It now has:
+
+- a consistent service layout across the main services
+- a cleaned-up shared package structure
+- event-driven booking/availability coordination
+- test automation and CI coverage
+- a gateway façade for client access
+- modularized notification mapping and cleaner service boundaries
+
+The project is still evolving, but the current codebase is already a solid backend foundation for the marketplace workflow.
+
+---
+
+## Suggested next areas of work
+
+Some likely next steps for the platform:
+
+- continue hardening projections and read models
+- improve observability and metrics
+- expand notification delivery options
+- enrich booking/business-rule workflows
+- push more match/search behavior into production-grade ranking and filtering
+- grow the frontend against the now-cleaner backend contracts
+
+---
+
+## License
+
+This repository is licensed under the GPL-3.0 license.
