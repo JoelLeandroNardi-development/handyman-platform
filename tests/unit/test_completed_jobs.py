@@ -98,7 +98,8 @@ class TestCompletedJobsCount:
             booking_db_module, booking_models_module,
             booking_id="b-1", handyman_email="h@test.com", status="COMPLETED",
         )
-        count = await completed_jobs_module.get_completed_jobs_count("h@test.com")
+        async with booking_db_module.SessionLocal() as db:
+            count = await completed_jobs_module.get_completed_jobs_count(db, "h@test.com")
         assert count == 1
 
     @pytest.mark.asyncio
@@ -110,7 +111,8 @@ class TestCompletedJobsCount:
                 booking_db_module, booking_models_module,
                 booking_id=f"b-{i}", handyman_email="h@test.com", status="COMPLETED",
             )
-        count = await completed_jobs_module.get_completed_jobs_count(booking_db_module,"h@test.com")
+        async with booking_db_module.SessionLocal() as db:
+            count = await completed_jobs_module.get_completed_jobs_count(db, "h@test.com")
         assert count == 3
 
     @pytest.mark.asyncio
@@ -124,7 +126,8 @@ class TestCompletedJobsCount:
                 booking_db_module, booking_models_module,
                 booking_id=f"b-{i}", handyman_email="h@test.com", status=status,
             )
-        count = await completed_jobs_module.get_completed_jobs_count(booking_db_module, "h@test.com")
+        async with booking_db_module.SessionLocal() as db:
+            count = await completed_jobs_module.get_completed_jobs_count(db, "h@test.com")
         assert count == 0
 
     @pytest.mark.asyncio
@@ -143,14 +146,16 @@ class TestCompletedJobsCount:
             booking_db_module, booking_models_module,
             booking_id="b-3", handyman_email="h@test.com", status="COMPLETED",
         )
-        count = await completed_jobs_module.get_completed_jobs_count(booking_db_module, "h@test.com")
+        async with booking_db_module.SessionLocal() as db:
+            count = await completed_jobs_module.get_completed_jobs_count(db, "h@test.com")
         assert count == 2
 
     @pytest.mark.asyncio
     async def test_unknown_handyman_returns_zero(
         self, booking_db_module, booking_models_module, completed_jobs_module,
     ):
-        count = await completed_jobs_module.get_completed_jobs_count(booking_db_module, "nobody@test.com")
+        async with booking_db_module.SessionLocal() as db:
+            count = await completed_jobs_module.get_completed_jobs_count(db, "nobody@test.com")
         assert count == 0
 
     @pytest.mark.asyncio
@@ -165,7 +170,8 @@ class TestCompletedJobsCount:
             booking_id="b-dup", handyman_email="h@test.com", status="COMPLETED",
         )
         # Simulate replayed event: status is already COMPLETED, no new row
-        count = await completed_jobs_module.get_completed_jobs_count(booking_db_module, "h@test.com")
+        async with booking_db_module.SessionLocal() as db:
+            count = await completed_jobs_module.get_completed_jobs_count(db, "h@test.com")
         assert count == 1
 
     @pytest.mark.asyncio
@@ -184,8 +190,9 @@ class TestCompletedJobsCount:
             booking_db_module, booking_models_module,
             booking_id="b-b1", handyman_email="bob@test.com", status="COMPLETED",
         )
-        assert await completed_jobs_module.get_completed_jobs_count(booking_db_module, "alice@test.com") == 2
-        assert await completed_jobs_module.get_completed_jobs_count(booking_db_module, "bob@test.com") == 1
+        async with booking_db_module.SessionLocal() as db:
+            assert await completed_jobs_module.get_completed_jobs_count(db, "alice@test.com") == 2
+            assert await completed_jobs_module.get_completed_jobs_count(db, "bob@test.com") == 1
 
 
 @pytest.mark.unit
@@ -212,27 +219,29 @@ class TestCompletedJobsCountsBatch:
             booking_db_module, booking_models_module,
             booking_id="b-4", handyman_email="bob@test.com", status="CANCELED",
         )
-
-        result = await completed_jobs_module.get_completed_jobs_counts(
-            booking_db_module, ["alice@test.com", "bob@test.com"]
-        )
+        async with booking_db_module.SessionLocal() as db:
+            result = await completed_jobs_module.get_completed_jobs_counts(
+                db, ["alice@test.com", "bob@test.com"]
+            )
         assert result == {"alice@test.com": 2, "bob@test.com": 1}
 
     @pytest.mark.asyncio
     async def test_batch_missing_handyman_returns_zero(
         self, booking_db_module, booking_models_module, completed_jobs_module,
     ):
-        result = await completed_jobs_module.get_completed_jobs_counts(
-            booking_db_module,
-            ["nobody@test.com"]
-        )
+        async with booking_db_module.SessionLocal() as db:
+            result = await completed_jobs_module.get_completed_jobs_counts(
+                db,
+                ["nobody@test.com"]
+            )
         assert result == {"nobody@test.com": 0}
 
     @pytest.mark.asyncio
     async def test_empty_batch_returns_empty_dict(
         self, booking_db_module, booking_models_module, completed_jobs_module,
     ):
-        result = await completed_jobs_module.get_completed_jobs_counts(booking_db_module, [])
+        async with booking_db_module.SessionLocal() as db:
+            result = await completed_jobs_module.get_completed_jobs_counts(db, [])
         assert result == {}
 
     @pytest.mark.asyncio
@@ -243,8 +252,9 @@ class TestCompletedJobsCountsBatch:
             booking_db_module, booking_models_module,
             booking_id="b-1", handyman_email="h@test.com", status="COMPLETED",
         )
-        result = await completed_jobs_module.get_completed_jobs_counts(
-            booking_db_module,
-            ["h@test.com", "h@test.com"]
-        )
+        async with booking_db_module.SessionLocal() as db:
+            result = await completed_jobs_module.get_completed_jobs_counts(
+                db,
+                ["h@test.com", "h@test.com"]
+            )
         assert result["h@test.com"] == 1
