@@ -9,7 +9,7 @@ from ..domain.schemas import CompleteBookingResponse
 from shared.shared.outbox_helpers import add_outbox_event
 from shared.shared.crud_helpers import fetch_or_404
 
-async def _complete_booking_side(db: AsyncSession, booking_id: str, *, side: str) -> CompleteBookingResponse:
+async def complete_booking_side(db: AsyncSession, booking_id: str, *, side: str) -> CompleteBookingResponse:
     booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
 
     if booking.status != "CONFIRMED":

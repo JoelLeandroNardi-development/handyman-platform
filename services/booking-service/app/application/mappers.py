@@ -1,7 +1,7 @@
 from ..domain.models import Booking
 from ..domain.schemas import BookingResponse
 
-def _to_response(booking: Booking) -> BookingResponse:
+def to_response(booking: Booking) -> BookingResponse:
     return BookingResponse(
         booking_id=booking.booking_id,
         status=booking.status,

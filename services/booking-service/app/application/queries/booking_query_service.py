@@ -2,10 +2,10 @@ from fastapi import Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..mappers import _to_response
+from ..mappers import to_response
 from ...domain.models import Booking
-from ...domain.policies import get_completed_jobs_count
 from ...domain.schemas import BookingResponse, CompletedJobsCountResponse
+from ...infrastructure.repository import get_completed_jobs_count
 from shared.shared.crud_helpers import fetch_or_404
 
 class BookingQueryService:
@@ -14,7 +14,7 @@ class BookingQueryService:
 
     async def get_booking(self, booking_id: str) -> BookingResponse:
         booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
-        return _to_response(booking)
+        return to_response(booking)
 
     async def list_bookings(
         self,
@@ -35,8 +35,8 @@ class BookingQueryService:
 
         res = await self.db.execute(stmt)
         rows = res.scalars().all()
-        return [_to_response(b) for b in rows]
+        return [to_response(b) for b in rows]
 
     async def completed_count_for_handyman(self, handyman_email: str) -> CompletedJobsCountResponse:
-        count = await get_completed_jobs_count(handyman_email)
+        count = await get_completed_jobs_count(self.db, handyman_email)
         return {"handyman_email": handyman_email, "completed_jobs_count": count}

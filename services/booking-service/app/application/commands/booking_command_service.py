@@ -4,14 +4,13 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..helpers import _complete_booking_side
-from ..mappers import _to_response
-
+from ..helpers import complete_booking_side
+from ..mappers import to_response
 from ...domain.constants import VALID_BOOKING_STATUSES
 from ...domain.events import build_event
 from ...domain.models import Booking, OutboxEvent
-from ...domain.policies import get_completed_jobs_counts
 from ...domain.schemas import *
+from ...infrastructure.repository import get_completed_jobs_counts
 from shared.shared.outbox_helpers import add_outbox_event
 from shared.shared.crud_helpers import fetch_or_404
 
@@ -53,7 +52,7 @@ class BookingCommandService:
         await self.db.commit()
         await self.db.refresh(booking)
 
-        return _to_response(booking)
+        return to_response(booking)
 
     async def confirm_booking(self, booking_id: str) -> ConfirmBookingResponse:
         booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
@@ -116,10 +115,10 @@ class BookingCommandService:
         )
 
     async def complete_booking_as_user(self, booking_id: str) -> CompleteBookingResponse:
-        return await _complete_booking_side(self.db, booking_id, side="user")
+        return await complete_booking_side(self.db, booking_id, side="user")
 
     async def complete_booking_as_handyman(self, booking_id: str) -> CompleteBookingResponse:
-        return await _complete_booking_side(self.db, booking_id, side="handyman")
+        return await complete_booking_side(self.db, booking_id, side="handyman")
 
     async def reject_booking(self, booking_id: str, data: RejectBookingRequest) -> RejectBookingResponse:
         booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
@@ -159,7 +158,7 @@ class BookingCommandService:
         )
 
     async def completed_counts_batch(self, emails: list[str]) -> CompletedJobsCountsResponse:
-        counts = await get_completed_jobs_counts(emails)
+        counts = await get_completed_jobs_counts(self.db, emails)
         return {"counts": counts}
     
     async def admin_update_booking(self, booking_id: str, data: UpdateBookingAdmin) -> BookingResponse:
@@ -181,7 +180,7 @@ class BookingCommandService:
 
         await self.db.commit()
         await self.db.refresh(booking)
-        return _to_response(booking)
+        return to_response(booking)
 
     async def admin_delete_booking(self, booking_id: str) -> DeleteBookingResponse:
         booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
