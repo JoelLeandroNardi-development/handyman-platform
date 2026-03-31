@@ -1,4 +1,3 @@
-from fastapi import Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,11 +17,11 @@ class BookingQueryService:
 
     async def list_bookings(
         self,
-        limit: int = Query(50, ge=1, le=500),
-        offset: int = Query(0, ge=0),
-        status: str | None = Query(default=None),
-        user_email: str | None = Query(default=None),
-        handyman_email: str | None = Query(default=None),
+        limit: int,
+        offset: int = 0,
+        status: str | None = None,
+        user_email: str | None = None,
+        handyman_email: str | None = None,
     ) -> list[BookingResponse]:
         stmt = select(Booking).order_by(Booking.created_at.desc()).limit(limit).offset(offset)
 

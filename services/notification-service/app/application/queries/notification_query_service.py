@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-
-from fastapi import Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,9 +20,9 @@ class NotificationQueryService:
     async def get_my_notifications(
         self,
         email: str,
-        status_filter: str | None = Query(default=None, alias="status"),
-        limit: int = Query(default=20, ge=1, le=100),
-        cursor: str | None = Query(default=None),
+        status_filter: str | None,
+        limit: int,
+        cursor: str | None,
     ) -> NotificationListResponse:
         items, next_cursor = await list_notifications(
             self.db,
