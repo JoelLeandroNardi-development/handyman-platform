@@ -1,7 +1,7 @@
 from ..domain.models import User
 from ..domain.schemas import UserResponse
 
-def _to_response(u: User) -> UserResponse:
+def to_response(u: User) -> UserResponse:
     return UserResponse(
         email=u.email,
         first_name=u.first_name,

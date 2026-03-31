@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 
 from ..domain.models import Handyman, HandymanReview, SkillCatalogItem
 
-async def _refresh_handyman_rating(db, handyman_email: str) -> None:
+async def refresh_handyman_rating(db, handyman_email: str) -> None:
     res = await db.execute(
         select(
             func.count(HandymanReview.id),
@@ -21,7 +21,7 @@ async def _refresh_handyman_rating(db, handyman_email: str) -> None:
     handyman.rating_count = int(count_value or 0)
     handyman.avg_rating = round(float(avg_value or 0), 2)
 
-def _label_from_key(key: str) -> str:
+def label_from_key(key: str) -> str:
     return (key or "").replace("_", " ").strip().title()
 
 def normalize_skill_key(value: str) -> str:

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from ..application.helpers import normalize_catalog, _label_from_key
+from ..application.helpers import normalize_catalog, label_from_key
 from ..domain.models import SkillsCategory, SkillCatalogItem
 from ..domain.skills_catalog import DEFAULT_SKILLS_CATALOG
 from ..infrastructure.db import SessionLocal
@@ -24,7 +24,7 @@ async def seed_default_catalog_if_empty() -> dict:
             db.add(
                 SkillsCategory(
                     key=category_key,
-                    label=_label_from_key(category_key),
+                    label=label_from_key(category_key),
                     is_active=True,
                     sort_order=cat_order,
                 )
@@ -35,8 +35,8 @@ async def seed_default_catalog_if_empty() -> dict:
                     SkillCatalogItem(
                         category_key=category_key,
                         skill_key=skill_key,
-                        category_label=_label_from_key(category_key),
-                        skill_label=_label_from_key(skill_key),
+                        category_label=label_from_key(category_key),
+                        skill_label=label_from_key(skill_key),
                         is_active=True,
                         sort_order=skill_order,
                     )

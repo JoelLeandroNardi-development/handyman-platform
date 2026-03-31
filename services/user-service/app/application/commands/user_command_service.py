@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..mappers import _to_response
+from ..mappers import to_response
 from ...domain.events import build_event
 from ...domain.models import User, OutboxEvent
 from ...domain.schemas import CreateUser, UpdateUser, UpdateUserLocation, UserResponse
@@ -37,7 +37,7 @@ class UserCommandService:
 
         await self.db.commit()
         await self.db.refresh(u)
-        return _to_response(u)
+        return to_response(u)
     
     async def update_user_location(self, email: str, data: UpdateUserLocation) -> UserResponse:
         u = await fetch_or_404(self.db, User, filter_column=User.email, filter_value=email, detail="User not found")
@@ -58,7 +58,7 @@ class UserCommandService:
 
         await self.db.commit()
         await self.db.refresh(u)
-        return _to_response(u)
+        return to_response(u)
 
     async def update_user(self, email: str, data: UpdateUser) -> UserResponse:
         u = await fetch_or_404(self.db, User, filter_column=User.email, filter_value=email, detail="User not found")
@@ -90,7 +90,7 @@ class UserCommandService:
 
         await self.db.commit()
         await self.db.refresh(u)
-        return _to_response(u)
+        return to_response(u)
 
     async def delete_user(self,email: str):
         u = await fetch_or_404(self.db, User, filter_column=User.email, filter_value=email, detail="User not found")

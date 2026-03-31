@@ -5,7 +5,7 @@ from dateutil import parser
 
 from shared.shared.intervals import fully_contains as contains_interval
 
-from ..helpers import _slots_payload, avail_key, emit_availability_updated
+from ..helpers import slots_payload, avail_key, emit_availability_updated
 from ...domain.schemas import SetAvailability, OverlapRequest
 from ...infrastructure.cache import redis_client
 from ...infrastructure.repository import delete_reservation
@@ -18,7 +18,7 @@ class AvailabilityCommandService:
         if data.slots:
             await redis_client.rpush(key, *[f"{slot.start}|{slot.end}" for slot in data.slots])
 
-        await emit_availability_updated(email, _slots_payload(data.slots))
+        await emit_availability_updated(email, slots_payload(data.slots))
         return {"message": "Availability updated"}
 
     async def clear_availability(email: str):

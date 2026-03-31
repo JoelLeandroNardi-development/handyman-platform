@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import httpx
 
-from .availability_projection import _clean_slots
-from ..application.mappers import _normalize_handyman
+from .availability_projection import clean_slots
+from ..application.mappers import normalize_handyman
 from ..domain.constants import HANDYMAN_SERVICE_URL, AVAILABILITY_SERVICE_URL, BOOKING_SERVICE_URL, HTTP_TIMEOUT
 
 async def fetch_handymen_http() -> list[dict]:
@@ -16,7 +16,7 @@ async def fetch_handymen_http() -> list[dict]:
     for h in data or []:
         if not isinstance(h, dict):
             continue
-        normalized = _normalize_handyman(h)
+        normalized = normalize_handyman(h)
         if normalized.get("email"):
             out.append(normalized)
     return out
@@ -34,7 +34,7 @@ async def fetch_availability_http(email: str) -> list[dict] | None:
         return None
 
     slots = data.get("slots") or []
-    return _clean_slots(slots)
+    return clean_slots(slots)
 
 async def fetch_completed_jobs_counts_batch(emails: list[str]) -> dict[str, int]:
     unique_emails = list(dict.fromkeys([str(e).strip() for e in (emails or []) if str(e).strip()]))

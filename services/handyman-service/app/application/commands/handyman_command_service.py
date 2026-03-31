@@ -2,11 +2,14 @@ from fastapi import HTTPException
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..helpers import find_invalid_skills, normalize_skills_input, _refresh_handyman_rating
-from ..mappers import _handyman_event_data, _to_response, _review_to_response
+from ..helpers import find_invalid_skills, normalize_skills_input, refresh_handyman_rating
+from ..mappers import handyman_event_data, to_response, review_to_response
 from ...domain.events import build_event
 from ...domain.models import Handyman, HandymanReview, OutboxEvent
-from ...domain.schemas import CreateHandyman, HandymanResponse, UpdateLocation, UpdateHandyman, CreateHandymanReview, HandymanReviewResponse
+from ...domain.schemas import (
+    CreateHandyman, HandymanResponse, UpdateLocation, 
+    UpdateHandyman, CreateHandymanReview, HandymanReviewResponse
+)
 from shared.shared.crud_helpers import apply_partial_update, fetch_or_404
 from shared.shared.outbox_helpers import add_outbox_event
 
@@ -50,14 +53,14 @@ class HandymanCommandService:
         )
         self.db.add(h)
 
-        evt = build_event("handyman.created", _handyman_event_data(h))
+        evt = build_event("handyman.created", handyman_event_data(h))
 
         add_outbox_event(self.db, OutboxEvent, evt)
 
         await self.db.commit()
         await self.db.refresh(h)
 
-        return _to_response(h)
+        return to_response(h)
     
     async def update_location(self, email: str, data: UpdateLocation) -> HandymanResponse: 
         h = await fetch_or_404(self.db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
@@ -74,7 +77,7 @@ class HandymanCommandService:
 
         await self.db.commit()
         await self.db.refresh(h)
-        return _to_response(h)
+        return to_response(h)
 
     async def update_handyman(self, email: str, data: UpdateHandyman) -> HandymanResponse:
         h = await fetch_or_404(self.db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
@@ -101,13 +104,13 @@ class HandymanCommandService:
             "years_experience", "service_radius_km", "latitude", "longitude",
         ])
 
-        evt = build_event("handyman.updated", _handyman_event_data(h))
+        evt = build_event("handyman.updated", handyman_event_data(h))
 
         add_outbox_event(self.db, OutboxEvent, evt)
 
         await self.db.commit()
         await self.db.refresh(h)
-        return _to_response(h)
+        return to_response(h)
 
     async def delete_handyman(self, email: str):
         h = await fetch_or_404(self.db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
@@ -141,9 +144,9 @@ class HandymanCommandService:
         self.db.add(review)
         await self.db.flush()
 
-        await _refresh_handyman_rating(self.db, data.handyman_email)
+        await refresh_handyman_rating(self.db, data.handyman_email)
 
         await self.db.commit()
         await self.db.refresh(review)
 
-        return _review_to_response(review)
+        return review_to_response(review)

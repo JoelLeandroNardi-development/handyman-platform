@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import json
 
-from ..application.mappers import norm, utc_now_iso, _normalize_handyman
+from ..application.mappers import norm, utc_now_iso, normalize_handyman
 from ..domain.constants import (
     PROJ_HANDYMAN_KEY,
     PROJ_HANDYMEN_INDEX,
@@ -11,12 +11,12 @@ from ..domain.constants import (
     PROJ_AVAIL_KEY,
     PROJ_AVAIL_INDEX
 )
-from ..infrastructure.availability_projection import _clean_slots, get_availability_slots, delete_availability_projection, availability_projection_count
+from ..infrastructure.availability_projection import clean_slots, get_availability_slots, delete_availability_projection, availability_projection_count
 from ..infrastructure.clients import fetch_handymen_http, fetch_completed_jobs_counts_batch, fetch_availability_http
 from ..infrastructure.projections import get_handyman_projection, handyman_projection_count, list_projected_handymen_by_skill, redis_client
 
 async def upsert_handyman_projection(doc: dict) -> None:
-    normalized = _normalize_handyman(doc)
+    normalized = normalize_handyman(doc)
     email = normalized.get("email")
     if not email:
         return
@@ -56,13 +56,13 @@ async def upsert_availability_projection(*, email: str, slots: list[dict]) -> No
     if not email:
         return
 
-    clean_slots = _clean_slots(slots)
+    cleaned_slots = clean_slots(slots)
 
-    if not clean_slots:
+    if not cleaned_slots:
         await delete_availability_projection(email)
         return
 
-    payload = {"email": email, "slots": clean_slots, "updated_at": utc_now_iso()}
+    payload = {"email": email, "slots": cleaned_slots, "updated_at": utc_now_iso()}
 
     pipe = redis_client.pipeline()
     pipe.set(PROJ_AVAIL_KEY.format(email=email), json.dumps(payload))

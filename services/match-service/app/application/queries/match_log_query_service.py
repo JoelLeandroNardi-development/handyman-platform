@@ -4,7 +4,7 @@ from fastapi import Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ..mappers import _log_to_response, norm
+from ..mappers import log_to_response, norm
 from ..services import norm
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchLogResponse
@@ -26,8 +26,8 @@ class MatchLogQueryService:
 
         res = await self.db.execute(stmt)
         rows = res.scalars().all()
-        return [_log_to_response(r) for r in rows]
+        return [log_to_response(r) for r in rows]
 
     async def get_match_log(self, log_id: int) -> MatchLogResponse:
         row = await fetch_or_404(self.db, MatchLog, filter_column=MatchLog.id, filter_value=log_id, detail="MatchLog not found")
-        return _log_to_response(row)
+        return log_to_response(row)

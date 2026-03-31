@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 
-from ..mappers import norm, _log_to_response
+from ..mappers import norm, log_to_response
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchLogResponse, UpdateMatchLog
 from shared.shared.crud_helpers import fetch_or_404
@@ -26,7 +26,7 @@ class MatchLogCommandService:
 
         await self.db.commit()
         await self.db.refresh(row)
-        return _log_to_response(row)
+        return log_to_response(row)
 
     async def delete_match_log(self, log_id: int) -> dict:
         row = await fetch_or_404(self.db, MatchLog, filter_column=MatchLog.id, filter_value=log_id, detail="MatchLog not found")

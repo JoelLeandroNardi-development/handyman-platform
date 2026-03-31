@@ -2,7 +2,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..queries.skill_query_service import SkillQueryService
-from ..helpers import normalize_catalog, normalize_skills_input, _label_from_key, validate_catalog_shape
+from ..helpers import normalize_catalog, normalize_skills_input, label_from_key, validate_catalog_shape
 from ...domain.models import SkillCatalogItem, SkillsCategory
 from ...domain.schemas import SkillsCatalogPatchResponse, SkillsCatalogReplaceResponse
 
@@ -31,7 +31,7 @@ class SkillCommandService:
                 next_sort = len(list(existing_count_res.scalars().all()))
                 category = SkillsCategory(
                     key=category_key,
-                    label=_label_from_key(category_key),
+                    label=label_from_key(category_key),
                     is_active=True,
                     sort_order=next_sort,
                 )
@@ -40,7 +40,7 @@ class SkillCommandService:
             else:
                 category.is_active = True
                 if not category.label:
-                    category.label = _label_from_key(category_key)
+                    category.label = label_from_key(category_key)
 
             for skill_key in skills:
                 item_res = await self.db.execute(
@@ -57,8 +57,8 @@ class SkillCommandService:
                         SkillCatalogItem(
                             category_key=category_key,
                             skill_key=skill_key,
-                            category_label=_label_from_key(category_key),
-                            skill_label=_label_from_key(skill_key),
+                            category_label=label_from_key(category_key),
+                            skill_label=label_from_key(skill_key),
                             is_active=True,
                             sort_order=next_sort,
                         )
@@ -66,8 +66,8 @@ class SkillCommandService:
                     added_skills += 1
                 else:
                     item.category_key = category_key
-                    item.category_label = _label_from_key(category_key)
-                    item.skill_label = _label_from_key(skill_key)
+                    item.category_label = label_from_key(category_key)
+                    item.skill_label = label_from_key(skill_key)
                     item.is_active = True
 
         if activate_categories:
@@ -132,7 +132,7 @@ class SkillCommandService:
             self.db.add(
                 SkillsCategory(
                     key=category_key,
-                    label=_label_from_key(category_key),
+                    label=label_from_key(category_key),
                     is_active=True,
                     sort_order=cat_order,
                 )
@@ -143,8 +143,8 @@ class SkillCommandService:
                     SkillCatalogItem(
                         category_key=category_key,
                         skill_key=skill_key,
-                        category_label=_label_from_key(category_key),
-                        skill_label=_label_from_key(skill_key),
+                        category_label=label_from_key(category_key),
+                        skill_label=label_from_key(skill_key),
                         is_active=True,
                         sort_order=skill_order,
                     )

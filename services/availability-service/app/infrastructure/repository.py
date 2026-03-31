@@ -6,7 +6,7 @@ import time
 from shared.shared.intervals import overlaps
 
 from .cache import redis_client
-from ..application.helpers import _res_key, _res_handyman_set, _parse
+from ..application.helpers import res_key, res_handyman_set, parse
 
 RES_TTL_SECONDS = 300
 EXPIRY_ZSET = "reservation_expiry"
@@ -18,19 +18,19 @@ async def create_reservation(
     desired_start: str,
     desired_end: str,
 ) -> bool:
-    ds = _parse(desired_start)
-    de = _parse(desired_end)
+    ds = parse(desired_start)
+    de = parse(desired_end)
 
-    set_key = _res_handyman_set(handyman_email)
+    set_key = res_handyman_set(handyman_email)
     existing = await redis_client.smembers(set_key)
     for bid in existing:
-        data = await redis_client.get(_res_key(bid))
+        data = await redis_client.get(res_key(bid))
         if not data:
             continue
         try:
             obj = json.loads(data)
-            ods = _parse(obj["desired_start"])
-            ode = _parse(obj["desired_end"])
+            ods = parse(obj["desired_start"])
+            ode = parse(obj["desired_end"])
         except Exception:
             continue
         if overlaps(ods, ode, ds, de):
@@ -46,7 +46,7 @@ async def create_reservation(
     }
 
     pipe = redis_client.pipeline()
-    pipe.set(_res_key(booking_id), json.dumps(payload), ex=RES_TTL_SECONDS)
+    pipe.set(res_key(booking_id), json.dumps(payload), ex=RES_TTL_SECONDS)
     pipe.sadd(set_key, booking_id)
     pipe.expire(set_key, RES_TTL_SECONDS + 30)
     pipe.zadd(EXPIRY_ZSET, {booking_id: time.time() + RES_TTL_SECONDS})
@@ -54,7 +54,7 @@ async def create_reservation(
     return True
 
 async def get_reservation(booking_id: str) -> dict | None:
-    raw = await redis_client.get(_res_key(booking_id))
+    raw = await redis_client.get(res_key(booking_id))
     if not raw:
         return None
     try:
@@ -65,8 +65,8 @@ async def get_reservation(booking_id: str) -> dict | None:
 async def delete_reservation(booking_id: str) -> None:
     res = await get_reservation(booking_id)
     pipe = redis_client.pipeline()
-    pipe.delete(_res_key(booking_id))
+    pipe.delete(res_key(booking_id))
     pipe.zrem(EXPIRY_ZSET, booking_id)
     if res and res.get("handyman_email"):
-        pipe.srem(_res_handyman_set(res["handyman_email"]), booking_id)
+        pipe.srem(res_handyman_set(res["handyman_email"]), booking_id)
     await pipe.execute()

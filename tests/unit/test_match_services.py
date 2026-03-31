@@ -26,7 +26,7 @@ def match_services_module(monkeypatch):
         reload_modules=True,
     )
     # Attach required helpers from their real locations
-    from match_service_test_app.application.mappers import parse_dt, _normalize_handyman, norm, _as_utc
+    from match_service_test_app.application.mappers import parse_dt, normalize_handyman, norm, as_utc
     from match_service_test_app.domain.geo import haversine, bucket_id, time_bucket, km_to_deg_lon, buckets_in_radius
     from match_service_test_app.infrastructure.cache_keys import cache_key
     from match_service_test_app.infrastructure.availability_projection import projected_has_overlap
@@ -38,9 +38,9 @@ def match_services_module(monkeypatch):
 
     # Attach as attributes for test compatibility
     module.parse_dt = parse_dt
-    module._normalize_handyman = _normalize_handyman
+    module.normalize_handyman = normalize_handyman
     module.norm = norm
-    module._as_utc = _as_utc
+    module.as_utc = as_utc
     module.haversine = haversine
     module.bucket_id = bucket_id
     module.time_bucket = time_bucket
@@ -121,7 +121,7 @@ class TestMatchServiceHelpers:
         assert (0, 0) in buckets
 
     def test_normalize_handyman_deduplicates_skills(self, match_services_module):
-        result = match_services_module._normalize_handyman(
+        result = match_services_module.normalize_handyman(
             {
                 "email": "pro@example.com",
                 "skills": [" Plumbing ", "plumbing", "Electrical"],
@@ -528,7 +528,7 @@ class TestMatchServiceRedisFlows:
 
 @pytest.mark.unit
 class TestNormalizeHandymanProjectionFields:
-    """Ensure _normalize_handyman preserves trust/reputation fields."""
+    """Ensure normalize_handyman preserves trust/reputation fields."""
 
     def test_full_payload_preserves_all_fields(self, match_services_module):
         doc = {
@@ -543,7 +543,7 @@ class TestNormalizeHandymanProjectionFields:
             "profile_completeness": 88,
             "completed_jobs_count": 17,
         }
-        result = match_services_module._normalize_handyman(doc)
+        result = match_services_module.normalize_handyman(doc)
 
         assert result["avg_rating"] == 4.8
         assert result["rating_count"] == 23
@@ -556,7 +556,7 @@ class TestNormalizeHandymanProjectionFields:
             "skills": ["plumbing"],
             "avg_rating": 3.5,
         }
-        result = match_services_module._normalize_handyman(doc)
+        result = match_services_module.normalize_handyman(doc)
 
         assert result["avg_rating"] == 3.5
         assert result["rating_count"] == 0
@@ -573,7 +573,7 @@ class TestNormalizeHandymanProjectionFields:
             "latitude": 51.5,
             "longitude": -0.1,
         }
-        result = match_services_module._normalize_handyman(doc)
+        result = match_services_module.normalize_handyman(doc)
 
         assert result["email"] == "legacy@example.com"
         assert result["avg_rating"] == 0
@@ -592,7 +592,7 @@ class TestNormalizeHandymanProjectionFields:
             "profile_completeness": None,
             "completed_jobs_count": None,
         }
-        result = match_services_module._normalize_handyman(doc)
+        result = match_services_module.normalize_handyman(doc)
 
         assert result["avg_rating"] == 0
         assert result["rating_count"] == 0
@@ -601,7 +601,7 @@ class TestNormalizeHandymanProjectionFields:
 
     def test_avg_rating_stored_as_float(self, match_services_module):
         doc = {"email": "pro@example.com", "skills": [], "avg_rating": 4}
-        result = match_services_module._normalize_handyman(doc)
+        result = match_services_module.normalize_handyman(doc)
 
         assert isinstance(result["avg_rating"], float)
         assert result["avg_rating"] == 4.0
@@ -614,26 +614,26 @@ class TestNormalizeHandymanProjectionFields:
             "profile_completeness": 75.0,
             "completed_jobs_count": 3.0,
         }
-        result = match_services_module._normalize_handyman(doc)
+        result = match_services_module.normalize_handyman(doc)
 
         assert isinstance(result["rating_count"], int)
         assert isinstance(result["profile_completeness"], int)
         assert isinstance(result["completed_jobs_count"], int)
 
     def test_empty_doc_returns_empty(self, match_services_module):
-        result = match_services_module._normalize_handyman({})
+        result = match_services_module.normalize_handyman({})
         assert result == {}
 
 
 @pytest.mark.unit
 class TestCleanSlots:
-    """Tests for the _clean_slots helper that deduplicates slot-validation logic."""
+    """Tests for the clean_slots helper that deduplicates slot-validation logic."""
 
     def test_valid_slots_pass_through(self, match_services_module):
         slots = [
             {"start": "2026-03-17T10:00:00+00:00", "end": "2026-03-17T12:00:00+00:00"},
         ]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert len(result) == 1
         assert "2026-03-17T10:00:00" in result[0]["start"]
 
@@ -641,14 +641,14 @@ class TestCleanSlots:
         slots = [
             {"start": "2026-03-17T14:00:00+00:00", "end": "2026-03-17T12:00:00+00:00"},
         ]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert result == []
 
     def test_equal_start_end_dropped(self, match_services_module):
         slots = [
             {"start": "2026-03-17T10:00:00+00:00", "end": "2026-03-17T10:00:00+00:00"},
         ]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert result == []
 
     def test_missing_start_or_end_dropped(self, match_services_module):
@@ -657,21 +657,21 @@ class TestCleanSlots:
             {"end": "2026-03-17T12:00:00+00:00"},
             {},
         ]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert result == []
 
     def test_non_dict_entries_dropped(self, match_services_module):
         slots = ["bad", 42, None]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert result == []
 
     def test_unparseable_dates_dropped(self, match_services_module):
         slots = [{"start": "not-a-date", "end": "2026-03-17T12:00:00+00:00"}]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert result == []
 
     def test_none_input_returns_empty(self, match_services_module):
-        result = match_services_module._clean_slots(None)
+        result = match_services_module.clean_slots(None)
         assert result == []
 
     def test_mixed_valid_and_invalid(self, match_services_module):
@@ -680,7 +680,7 @@ class TestCleanSlots:
             {"start": "bad", "end": "worse"},
             {"start": "2026-03-17T14:00:00+00:00", "end": "2026-03-17T16:00:00+00:00"},
         ]
-        result = match_services_module._clean_slots(slots)
+        result = match_services_module.clean_slots(slots)
         assert len(result) == 2
 
 

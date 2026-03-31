@@ -7,7 +7,7 @@ from dateutil import parser
 from ..domain.models import MatchLog
 from ..domain.schemas import MatchLogResponse
 
-def _log_to_response(row: MatchLog) -> MatchLogResponse:
+def log_to_response(row: MatchLog) -> MatchLogResponse:
     return MatchLogResponse(
         id=row.id,
         user_latitude=row.user_latitude,
@@ -19,37 +19,37 @@ def _log_to_response(row: MatchLog) -> MatchLogResponse:
 def norm(s: str) -> str:
     return (s or "").strip().lower()
 
-def _safe_float(value: Any, *, default: float = 0.0) -> float:
+def safe_float(value: Any, *, default: float = 0.0) -> float:
     try:
         return float(value)
     except Exception:
         return default
 
-def _safe_int(value: Any, *, default: int = 0) -> int:
+def safe_int(value: Any, *, default: int = 0) -> int:
     try:
         return int(value)
     except Exception:
         return default
 
-def _clamp01(value: float) -> float:
+def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-def _as_utc(dt: datetime) -> datetime:
+def as_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
 
 def parse_dt(x: Any) -> datetime:
     if isinstance(x, datetime):
-        return _as_utc(x)
+        return as_utc(x)
     if isinstance(x, str):
-        return _as_utc(parser.isoparse(x))
+        return as_utc(parser.isoparse(x))
     raise ValueError(f"Unsupported datetime type: {type(x).__name__}")
 
-def _normalize_handyman(doc: dict) -> dict:
+def normalize_handyman(doc: dict) -> dict:
     email = (doc or {}).get("email")
     if not email:
         return {}

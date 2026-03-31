@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..helpers import normalize_skills_input, get_allowed_skill_keys
-from ..mappers import _review_to_response, _to_response
+from ..mappers import review_to_response, to_response
 from ...domain.models import Handyman, HandymanReview
 from ...domain.schemas import HandymanResponse, InvalidHandymanSkillsResponse, HandymanReviewResponse
 from shared.shared.crud_helpers import fetch_or_404
@@ -16,11 +16,11 @@ class HandymanQueryService:
             select(Handyman).order_by(Handyman.id.asc()).limit(limit).offset(offset)
         )
         rows = res.scalars().all()
-        return [_to_response(h) for h in rows]
+        return [to_response(h) for h in rows]
 
     async def get_handyman(self, email: str) -> HandymanResponse:
         h = await fetch_or_404(self.db, Handyman, filter_column=Handyman.email, filter_value=email, detail="Handyman not found")
-        return _to_response(h)
+        return to_response(h)
     
     async def get_handymen_with_invalid_skills(self) -> InvalidHandymanSkillsResponse:
         allowed = await get_allowed_skill_keys(self.db, active_only=True)
@@ -62,4 +62,4 @@ class HandymanQueryService:
             .offset(offset)
         )
         rows = res.scalars().all()
-        return [_review_to_response(r) for r in rows]
+        return [review_to_response(r) for r in rows]

@@ -2,7 +2,7 @@ from ..domain.policies import compute_profile_completeness
 from ..domain.models import Handyman, HandymanReview
 from ..domain.schemas import HandymanResponse, HandymanReviewResponse
 
-def _completeness(h) -> int:
+def completeness(h) -> int:
     return compute_profile_completeness(
         first_name=h.first_name,
         last_name=h.last_name,
@@ -16,7 +16,7 @@ def _completeness(h) -> int:
         longitude=h.longitude,
     )
 
-def _to_response(h: Handyman) -> HandymanResponse:
+def to_response(h: Handyman) -> HandymanResponse:
     return HandymanResponse(
         email=h.email,
         first_name=h.first_name,
@@ -34,11 +34,11 @@ def _to_response(h: Handyman) -> HandymanResponse:
         longitude=h.longitude,
         avg_rating=float(h.avg_rating or 0),
         rating_count=int(h.rating_count or 0),
-        profile_completeness=_completeness(h),
+        profile_completeness=completeness(h),
         created_at=h.created_at,
     )
 
-def _handyman_event_data(h) -> dict:
+def handyman_event_data(h) -> dict:
     return {
         "email": h.email,
         "first_name": h.first_name,
@@ -56,10 +56,10 @@ def _handyman_event_data(h) -> dict:
         "longitude": h.longitude,
         "avg_rating": float(h.avg_rating or 0),
         "rating_count": int(h.rating_count or 0),
-        "profile_completeness": _completeness(h),
+        "profile_completeness": completeness(h),
     }
 
-def _review_to_response(r: HandymanReview) -> HandymanReviewResponse:
+def review_to_response(r: HandymanReview) -> HandymanReviewResponse:
     return HandymanReviewResponse(
         id=r.id,
         booking_id=r.booking_id,

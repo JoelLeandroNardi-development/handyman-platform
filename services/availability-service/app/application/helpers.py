@@ -7,16 +7,16 @@ from ..domain.events import build_event
 from ..domain.schemas import AvailabilitySlot
 from ..infrastructure.outbox_worker import enqueue_domain_event
 
-def _res_key(booking_id: str) -> str:
+def res_key(booking_id: str) -> str:
     return f"reservation:{booking_id}"
 
-def _res_handyman_set(email: str) -> str:
+def res_handyman_set(email: str) -> str:
     return f"reservations_by_handyman:{email}"
 
-def _parse(dt_str: str) -> datetime:
+def parse(dt_str: str) -> datetime:
     return parser.isoparse(dt_str)
 
-def _slots_payload(slots: list[AvailabilitySlot]) -> list[dict]:
+def slots_payload(slots: list[AvailabilitySlot]) -> list[dict]:
     out: list[dict] = []
     for s in slots or []:
         try:

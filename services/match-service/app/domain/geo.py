@@ -4,7 +4,7 @@ import math
 from datetime import datetime
 
 from .constants import GRID_DEG, TIME_BUCKET_SECONDS
-from ..application.mappers import _as_utc
+from ..application.mappers import as_utc
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     r = 6371.0
@@ -23,7 +23,7 @@ def bucket_id(lat: float, lon: float) -> tuple[int, int]:
     return int(math.floor(lat / GRID_DEG)), int(math.floor(lon / GRID_DEG))
 
 def time_bucket(desired_start: datetime) -> int:
-    epoch = int(_as_utc(desired_start).timestamp())
+    epoch = int(as_utc(desired_start).timestamp())
     return epoch // TIME_BUCKET_SECONDS
 
 def km_to_deg_lat(km: float) -> float:

@@ -38,10 +38,10 @@ def reservations_module(monkeypatch):
 class TestReservationKeys:
 
     def test_res_key(self, reservations_module):
-        assert reservations_module._res_key("booking-1") == "reservation:booking-1"
+        assert reservations_module.res_key("booking-1") == "reservation:booking-1"
 
     def test_res_handyman_set(self, reservations_module):
-        assert reservations_module._res_handyman_set("pro@example.com") == "reservations_by_handyman:pro@example.com"
+        assert reservations_module.res_handyman_set("pro@example.com") == "reservations_by_handyman:pro@example.com"
 
 
 @pytest.mark.unit

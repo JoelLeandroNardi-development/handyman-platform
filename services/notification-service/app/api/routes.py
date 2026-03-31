@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..application.commands.notification_command_service import NotificationCommandService
 from ..application.queries.notification_query_service import NotificationQueryService
-from ..domain.schemas import *
+from ..domain.schemas import (
+    MarkAllReadResponse, NotificationListResponse, NotificationPreferencesResponse, 
+    UnreadCountResponse, PushDeviceResponse, RegisterPushDeviceRequest, UpdateNotificationPreferencesRequest
+)
 from ..infrastructure.auth import get_current_email
 from ..infrastructure.db import get_db
 
