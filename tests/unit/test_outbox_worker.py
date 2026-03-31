@@ -96,9 +96,9 @@ class TestRunOutboxLoop:
         session.begin.return_value = _BeginCtx()
         ev = SimpleNamespace(id=1, routing_key="booking.requested", payload={"id": 1}, event_id="evt-1", attempts=0)
 
-        monkeypatch.setattr("shared.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
-        monkeypatch.setattr("shared.outbox.worker._mark_sent", AsyncMock())
-        monkeypatch.setattr("shared.outbox.worker._mark_failure", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.core.outbox.worker._mark_sent", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._mark_failure", AsyncMock())
 
         await run_outbox_loop(
             stop_event=stop_event,
@@ -131,9 +131,9 @@ class TestRunOutboxLoop:
         ev = SimpleNamespace(id=2, routing_key="booking.requested", payload={"id": 2}, event_id="evt-2", attempts=1)
         mark_failure = AsyncMock()
 
-        monkeypatch.setattr("shared.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
-        monkeypatch.setattr("shared.outbox.worker._mark_sent", AsyncMock())
-        monkeypatch.setattr("shared.outbox.worker._mark_failure", mark_failure)
+        monkeypatch.setattr("shared.core.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.core.outbox.worker._mark_sent", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._mark_failure", mark_failure)
 
         await run_outbox_loop(
             stop_event=stop_event,
@@ -159,7 +159,7 @@ class TestRunOutboxLoop:
             await awaitable
             raise asyncio.TimeoutError()
 
-        monkeypatch.setattr("shared.outbox.worker.asyncio.wait_for", fake_wait_for)
+        monkeypatch.setattr("shared.core.outbox.worker.asyncio.wait_for", fake_wait_for)
 
         class FailingSessionFactory:
             def __call__(self):
@@ -198,9 +198,9 @@ class TestBookingRejectedOutboxBehavior:
         )
         mark_sent = AsyncMock()
 
-        monkeypatch.setattr("shared.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
-        monkeypatch.setattr("shared.outbox.worker._mark_sent", mark_sent)
-        monkeypatch.setattr("shared.outbox.worker._mark_failure", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.core.outbox.worker._mark_sent", mark_sent)
+        monkeypatch.setattr("shared.core.outbox.worker._mark_failure", AsyncMock())
 
         await run_outbox_loop(
             stop_event=stop_event,
@@ -240,9 +240,9 @@ class TestBookingRejectedOutboxBehavior:
         )
         mark_failure = AsyncMock()
 
-        monkeypatch.setattr("shared.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
-        monkeypatch.setattr("shared.outbox.worker._mark_sent", AsyncMock())
-        monkeypatch.setattr("shared.outbox.worker._mark_failure", mark_failure)
+        monkeypatch.setattr("shared.core.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.core.outbox.worker._mark_sent", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._mark_failure", mark_failure)
 
         await run_outbox_loop(
             stop_event=stop_event,
@@ -278,9 +278,9 @@ class TestBookingRejectedOutboxBehavior:
         )
         mark_failure = AsyncMock()
 
-        monkeypatch.setattr("shared.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
-        monkeypatch.setattr("shared.outbox.worker._mark_sent", AsyncMock())
-        monkeypatch.setattr("shared.outbox.worker._mark_failure", mark_failure)
+        monkeypatch.setattr("shared.core.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.core.outbox.worker._mark_sent", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._mark_failure", mark_failure)
 
         await run_outbox_loop(
             stop_event=stop_event,
@@ -312,9 +312,9 @@ class TestBookingRejectedOutboxBehavior:
         )
         mark_sent = AsyncMock()
 
-        monkeypatch.setattr("shared.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
-        monkeypatch.setattr("shared.outbox.worker._mark_sent", mark_sent)
-        monkeypatch.setattr("shared.outbox.worker._mark_failure", AsyncMock())
+        monkeypatch.setattr("shared.core.outbox.worker._claim_batch", AsyncMock(return_value=[ev]))
+        monkeypatch.setattr("shared.core.outbox.worker._mark_sent", mark_sent)
+        monkeypatch.setattr("shared.core.outbox.worker._mark_failure", AsyncMock())
 
         await run_outbox_loop(
             stop_event=stop_event,
