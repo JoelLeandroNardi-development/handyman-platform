@@ -25,16 +25,16 @@ async def get_reservation_endpoint(booking_id: str):
 
 @router.post("/availability/{email}")
 async def set_availability(email: str, data: SetAvailability):
-    return await AvailabilityCommandService().set_availability(email, data)
+    return await AvailabilityCommandService.set_availability(email, data)
 
 @router.delete("/availability/{email}")
 async def clear_availability(email: str):
-    return await AvailabilityCommandService().clear_availability(email)
+    return await AvailabilityCommandService.clear_availability(email)
 
 @router.post("/availability/{email}/overlap")
 async def check_overlap(email: str, req: OverlapRequest):
-    return await AvailabilityCommandService().check_overlap(email, req)
+    return await AvailabilityCommandService.check_overlap(email, req)
 
 @router.delete("/reservations/{booking_id}")
 async def delete_reservation_endpoint(booking_id: str):
-    return await AvailabilityCommandService().delete_reservation(booking_id)
+    return await AvailabilityCommandService.delete_reservation(booking_id)

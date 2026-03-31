@@ -8,9 +8,10 @@ from shared.shared.intervals import fully_contains as contains_interval
 from ..helpers import slots_payload, avail_key, emit_availability_updated
 from ...domain.schemas import SetAvailability, OverlapRequest
 from ...infrastructure.cache import redis_client
-from ...infrastructure.repository import delete_reservation
+from ...infrastructure.repository import delete_reservation as delete_reservation_repo
 
 class AvailabilityCommandService:
+    @staticmethod
     async def set_availability(email: str, data: SetAvailability):
         key = avail_key(email)
         await redis_client.delete(key)
@@ -21,12 +22,14 @@ class AvailabilityCommandService:
         await emit_availability_updated(email, slots_payload(data.slots))
         return {"message": "Availability updated"}
 
+    @staticmethod
     async def clear_availability(email: str):
         key = avail_key(email)
         await redis_client.delete(key)
         await emit_availability_updated(email, [])
         return {"message": "Availability cleared"}
 
+    @staticmethod
     async def check_overlap(email: str, req: OverlapRequest):
         try:
             ds = parser.isoparse(req.desired_start)
@@ -53,6 +56,7 @@ class AvailabilityCommandService:
 
         return {"available": False}
 
+    @staticmethod
     async def delete_reservation(booking_id: str):
-        await delete_reservation(booking_id)
+        await delete_reservation_repo(booking_id)
         return {"message": "deleted", "booking_id": booking_id}
