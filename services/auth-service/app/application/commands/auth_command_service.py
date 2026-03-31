@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.models import AuthUser, AuthSession
-from ...domain.schemas import Register, Login, RefreshRequest, GoogleLoginRequest
+from ...domain.schemas import Register, Login, RefreshRequest, GoogleLoginRequest, LogoutRequest
 from ...infrastructure.password_hasher import password_hasher
 from ...infrastructure.token_service import (
     JWTError,
@@ -14,7 +14,6 @@ from ...infrastructure.token_service import (
     hash_token,
     issue_token_pair,
 )
-from shared.shared.schemas.auth import LogoutRequest
 
 class AuthCommandService:
     def __init__(self, db: AsyncSession):

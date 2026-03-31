@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-
 class CreateUser(BaseModel):
     email: str
     first_name: Optional[str] = None
@@ -16,11 +15,9 @@ class CreateUser(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
-
 class UpdateUserLocation(BaseModel):
     latitude: float
     longitude: float
-
 
 class UpdateUser(BaseModel):
     first_name: Optional[str] = None
@@ -33,7 +30,6 @@ class UpdateUser(BaseModel):
     country: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-
 
 class UserResponse(BaseModel):
     email: str
@@ -48,7 +44,6 @@ class UserResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     created_at: datetime
-
 
 class DeleteUserResponse(BaseModel):
     message: str

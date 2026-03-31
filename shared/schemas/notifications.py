@@ -5,7 +5,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 class NotificationItem(BaseModel):
     id: str
     type: str
@@ -20,22 +19,17 @@ class NotificationItem(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     read_at: datetime | None = None
-
     model_config = {"from_attributes": True}
-
 
 class NotificationListResponse(BaseModel):
     items: list[NotificationItem]
     next_cursor: str | None = None
 
-
 class UnreadCountResponse(BaseModel):
     count: int = Field(..., ge=0)
 
-
 class MarkAllReadResponse(BaseModel):
     updated: int = Field(..., ge=0)
-
 
 class NotificationPreferencesResponse(BaseModel):
     booking_in_app_enabled: bool = True
@@ -51,9 +45,7 @@ class NotificationPreferencesResponse(BaseModel):
     quiet_hours_end: str | None = None
     timezone: str | None = None
     locale: str | None = None
-
     model_config = {"from_attributes": True}
-
 
 class UpdateNotificationPreferencesRequest(BaseModel):
     booking_in_app_enabled: bool | None = None
@@ -70,13 +62,11 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     timezone: str | None = None
     locale: str | None = None
 
-
 class RegisterPushDeviceRequest(BaseModel):
     platform: Literal["web", "ios", "android"]
     device_token: str
     device_name: str | None = None
     app_version: str | None = None
-
 
 class PushDeviceResponse(BaseModel):
     id: int
@@ -86,5 +76,4 @@ class PushDeviceResponse(BaseModel):
     device_name: str | None = None
     app_version: str | None = None
     is_active: bool
-
     model_config = {"from_attributes": True}

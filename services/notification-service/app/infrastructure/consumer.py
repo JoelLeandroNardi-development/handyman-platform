@@ -12,7 +12,7 @@ from ..api.sse import hub
 from ..application.mappers import map_event_to_notifications
 from ..application.preferences import category_enabled
 from ..domain.schemas import NotificationItem
-from shared.shared.consumer import run_consumer_with_retry_dlq
+from shared.core.messaging.consumer import run_consumer_with_retry_dlq
 
 RABBIT_URL = os.getenv("RABBIT_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE_NAME = os.getenv("DOMAIN_EVENTS_EXCHANGE", "domain_events")

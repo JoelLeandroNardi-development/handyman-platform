@@ -1,4 +1,4 @@
-from shared.shared.schemas.handymen import (
+from shared.schemas.handymen import (
     CreateHandyman,
     UpdateLocation,
     UpdateHandyman,

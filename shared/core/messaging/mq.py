@@ -11,7 +11,6 @@ from aio_pika import DeliveryMode, ExchangeType, Message
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass(frozen=True)
 class RabbitConfig:
     url: Optional[str]
@@ -28,7 +27,6 @@ class RabbitConfig:
             exchange_name = "domain_events"
 
         return RabbitConfig(url=url, exchange_name=exchange_name)
-
 
 class RabbitPublisher:
 
@@ -138,12 +136,10 @@ class RabbitPublisher:
             )
             raise
 
-
 async def rabbit_connect(cfg: RabbitConfig) -> aio_pika.RobustConnection | None:
     if not cfg.url:
         return None
     return await aio_pika.connect_robust(cfg.url)
-
 
 def create_publisher(*, required: bool = True):
     cfg = RabbitConfig.from_env(required=required)

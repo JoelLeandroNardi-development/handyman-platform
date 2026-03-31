@@ -9,10 +9,8 @@ try:
 except Exception:
     _jsonable_encoder = None
 
-
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
 
 def build_event(
     event_type: str,
@@ -29,7 +27,6 @@ def build_event(
         "source": source,
         "data": data or {},
     }
-
 
 def build_event_jsonable(
     event_type: str,
@@ -51,7 +48,6 @@ def build_event_jsonable(
         return evt
 
     return _jsonable_encoder(evt)
-
 
 def make_event_builder(service_name: str):
     def _build(event_type: str, data: dict) -> dict:

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlalchemy.orm import declarative_base
 
-from shared.shared.outbox_model import make_outbox_event_model
-from shared.shared.outbox_worker import (
+from shared.core.outbox.model import make_outbox_event_model
+from shared.core.outbox.worker import (
     _claim_batch,
     _mark_failure,
     _mark_sent,
@@ -16,10 +16,8 @@ from shared.shared.outbox_worker import (
     run_outbox_loop,
 )
 
-
 Base = declarative_base()
 OutboxEventModel = make_outbox_event_model(Base)
-
 
 class _BeginCtx:
     async def __aenter__(self):
@@ -27,7 +25,6 @@ class _BeginCtx:
 
     async def __aexit__(self, exc_type, exc, tb):
         return False
-
 
 class _SessionCtx:
     def __init__(self, session):
@@ -38,7 +35,6 @@ class _SessionCtx:
 
     async def __aexit__(self, exc_type, exc, tb):
         return False
-
 
 @pytest.mark.unit
 class TestOutboxWorkerHelpers:
@@ -86,7 +82,6 @@ class TestOutboxWorkerHelpers:
         stats = await make_outbox_stats(lambda: _SessionCtx(session), OutboxEventModel)
 
         assert stats == {"type": "sql", "pending": 2, "failed": 1, "sent": 7}
-
 
 @pytest.mark.unit
 class TestRunOutboxLoop:
@@ -179,7 +174,6 @@ class TestRunOutboxLoop:
         )
 
         assert 2.0 in wait_calls
-
 
 @pytest.mark.unit
 class TestBookingRejectedOutboxBehavior:

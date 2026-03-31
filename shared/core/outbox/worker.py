@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-
 async def _claim_batch(
     db: AsyncSession, OutboxEvent, batch_size: int
 ) -> Sequence:
@@ -24,7 +23,6 @@ async def _claim_batch(
     res = await db.execute(stmt)
     return list(res.scalars().all())
 
-
 async def _mark_sent(db: AsyncSession, OutboxEvent, row_id: int) -> None:
     await db.execute(
         update(OutboxEvent)
@@ -35,7 +33,6 @@ async def _mark_sent(db: AsyncSession, OutboxEvent, row_id: int) -> None:
             last_error=None,
         )
     )
-
 
 async def _mark_failure(
     db: AsyncSession,
@@ -56,7 +53,6 @@ async def _mark_failure(
         )
     )
 
-
 async def make_outbox_stats(SessionLocal, OutboxEvent) -> dict:
     async with SessionLocal() as db:
         res = await db.execute(
@@ -71,7 +67,6 @@ async def make_outbox_stats(SessionLocal, OutboxEvent) -> dict:
         "failed": counts.get("FAILED", 0),
         "sent": counts.get("SENT", 0),
     }
-
 
 async def run_outbox_loop(
     *,

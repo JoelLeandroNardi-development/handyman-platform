@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from shared.shared.mq import RabbitConfig, RabbitPublisher, create_publisher, rabbit_connect
-
+from shared.core.messaging.mq import RabbitConfig, RabbitPublisher, create_publisher, rabbit_connect
 
 @pytest.mark.unit
 class TestRabbitConfig:
@@ -33,7 +32,6 @@ class TestRabbitConfig:
 
         with pytest.raises(RuntimeError):
             RabbitConfig.from_env(required=True)
-
 
 @pytest.mark.unit
 class TestRabbitPublisher:
@@ -187,7 +185,6 @@ class TestRabbitPublisher:
 
         with pytest.raises(RuntimeError):
             await publisher.publish(routing_key="booking.requested", payload={"id": 1})
-
 
 @pytest.mark.unit
 class TestRabbitHelpers:

@@ -6,8 +6,7 @@ import json
 
 import pytest
 
-from shared.shared.consumer import _safe_decode_json
-
+from shared.core.messaging.consumer import _safe_decode_json
 
 @pytest.mark.failure_mode
 @pytest.mark.rabbit
@@ -59,7 +58,6 @@ class TestConsumerRetryMechanism:
         
         assert retry_delay_ms == 5000
 
-
 @pytest.mark.failure_mode
 @pytest.mark.rabbit
 class TestDLQHandling:
@@ -110,7 +108,6 @@ class TestDLQHandling:
         payload = json.loads(message.body.decode("utf-8"))
         assert payload == original_payload
         assert message.headers["x-retry-count"] == 3
-
 
 @pytest.mark.failure_mode
 @pytest.mark.rabbit
@@ -167,7 +164,6 @@ class TestConsumerFailureModes:
         for exc in exception_types:
             pass
 
-
 @pytest.mark.failure_mode
 @pytest.mark.rabbit
 class TestConnectionFailures:
@@ -183,7 +179,6 @@ class TestConnectionFailures:
     @pytest.mark.asyncio
     async def test_redis_connection_failure_affects_idempotency(self):
         pass
-
 
 @pytest.mark.failure_mode
 @pytest.mark.rabbit
@@ -233,7 +228,6 @@ class TestEventConsumerSpecific:
         
         payload = json.loads(message.body.decode("utf-8"))
         assert payload is not None
-
 
 @pytest.mark.failure_mode
 @pytest.mark.rabbit

@@ -1,4 +1,4 @@
-from shared.shared.mq import RabbitConfig, rabbit_connect
+from shared.core.messaging.mq import RabbitConfig, rabbit_connect
 
 cfg = RabbitConfig.from_env(required=False)
 RABBIT_URL = cfg.url

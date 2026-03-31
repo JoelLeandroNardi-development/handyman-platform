@@ -10,8 +10,8 @@ from ...domain.schemas import (
     CreateHandyman, HandymanResponse, UpdateLocation, 
     UpdateHandyman, CreateHandymanReview, HandymanReviewResponse
 )
-from shared.shared.crud_helpers import apply_partial_update, fetch_or_404
-from shared.shared.outbox_helpers import add_outbox_event
+from shared.core.db.crud import apply_partial_update, fetch_or_404
+from shared.core.outbox.helpers import add_outbox_event
 
 class HandymanCommandService:
     def __init__(self, db: AsyncSession):

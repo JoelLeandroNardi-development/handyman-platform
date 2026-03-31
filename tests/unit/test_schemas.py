@@ -3,14 +3,13 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from shared.shared.events import build_event
-from shared.shared.schemas.bookings import (
+from shared.core.messaging.events import build_event
+from shared.schemas.bookings import (
     BookingResponse,
     CancelBooking,
     CreateBooking,
     RejectBookingRequest,
 )
-
 
 @pytest.mark.unit
 class TestBookingSchemas:
@@ -81,7 +80,6 @@ class TestBookingSchemas:
     def test_reject_booking_request_requires_non_empty_reason(self):
         with pytest.raises(ValidationError):
             RejectBookingRequest(reason="")
-
 
 @pytest.mark.unit
 class TestEventSchemas:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 ALLOWED_ROLES = frozenset({"user", "handyman", "admin"})
 
-
 def normalize_roles(
     roles: list[str],
     *,

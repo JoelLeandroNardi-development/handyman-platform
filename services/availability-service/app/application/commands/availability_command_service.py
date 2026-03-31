@@ -3,12 +3,11 @@ from __future__ import annotations
 from fastapi import HTTPException
 from dateutil import parser
 
-from shared.shared.intervals import fully_contains as contains_interval
-
 from ..helpers import slots_payload, avail_key, emit_availability_updated
 from ...domain.schemas import SetAvailability, OverlapRequest
 from ...infrastructure.cache import redis_client
 from ...infrastructure.repository import delete_reservation as delete_reservation_repo
+from shared.core.utils.intervals import fully_contains as contains_interval
 
 class AvailabilityCommandService:
     @staticmethod

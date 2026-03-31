@@ -4,7 +4,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
-
 async def fetch_or_404(
     db: AsyncSession,
     model,
@@ -18,7 +17,6 @@ async def fetch_or_404(
     if obj is None:
         raise HTTPException(status_code=404, detail=detail)
     return obj
-
 
 def apply_partial_update(entity, data, fields: list[str]) -> None:
     for field in fields:

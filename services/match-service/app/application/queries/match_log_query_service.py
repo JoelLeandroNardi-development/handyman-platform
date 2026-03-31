@@ -8,7 +8,7 @@ from ..mappers import log_to_response, norm
 from ..services import norm
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchLogResponse
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.db.crud import fetch_or_404
 
 class MatchLogQueryService:
     def __init__(self, db: AsyncSession):

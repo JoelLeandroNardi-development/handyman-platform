@@ -4,12 +4,11 @@ import json
 import pytest
 from aio_pika import ExchangeType
 
-from shared.shared.consumer import (
+from shared.core.messaging.consumer import (
     setup_consumer_topology,
     _safe_decode_json,
     run_consumer_with_retry_dlq,
 )
-
 
 @pytest.mark.unit
 @pytest.mark.rabbit
@@ -62,7 +61,6 @@ class TestSafeDecodeJson:
         result = _safe_decode_json(rabbit_message_mock)
         
         assert result == payload
-
 
 @pytest.mark.unit
 @pytest.mark.rabbit
@@ -150,7 +148,6 @@ class TestSetupConsumerTopology:
         
         assert arguments["x-dead-letter-exchange"] == ""
         assert arguments["x-dead-letter-routing-key"] == "booking_dlq"
-
 
 @pytest.mark.unit
 @pytest.mark.rabbit
@@ -275,7 +272,6 @@ class TestConsumerRetryDLQ:
         message.reject.assert_awaited_once_with(requeue=False)
         message.ack.assert_not_awaited()
         message.channel.default_exchange.publish.assert_not_awaited()
-
 
 @pytest.mark.unit
 @pytest.mark.rabbit

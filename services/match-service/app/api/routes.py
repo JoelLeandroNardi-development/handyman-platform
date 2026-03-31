@@ -8,7 +8,7 @@ from ..application.commands.match_log_command_service import MatchLogCommandServ
 from ..application.queries.match_log_query_service import MatchLogQueryService
 from ..domain.schemas import MatchRequest, MatchLogResponse, UpdateMatchLog
 from ..infrastructure.db import SessionLocal
-from shared.shared.db import make_get_db
+from shared.core.db.session import make_get_db
 
 router = APIRouter()
 get_db = make_get_db(SessionLocal)

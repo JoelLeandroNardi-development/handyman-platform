@@ -2,7 +2,6 @@ from __future__ import annotations
 
 IDEMPOTENCY_DEFAULT_TTL_SECONDS = 3600
 
-
 async def already_processed(
     *,
     redis_client,

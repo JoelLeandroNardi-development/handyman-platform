@@ -1,4 +1,4 @@
-from shared.shared.schemas.bookings import (
+from shared.schemas.bookings import (
     CreateBooking,
     BookingResponse,
     CancelBooking,

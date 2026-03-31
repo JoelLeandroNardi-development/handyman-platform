@@ -6,7 +6,7 @@ from sqlalchemy import delete
 from ..mappers import norm, log_to_response
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchLogResponse, UpdateMatchLog
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.db.crud import fetch_or_404
 
 class MatchLogCommandService:
     def __init__(self, db: AsyncSession):

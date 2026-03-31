@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, 
 from sqlalchemy.sql import func
 
 from ..infrastructure.db import Base
-from shared.shared.outbox_model import make_outbox_event_model
+from shared.core.outbox.model import make_outbox_event_model
 
 class Handyman(Base):
     __tablename__ = "handymen"

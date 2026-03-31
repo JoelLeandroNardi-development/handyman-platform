@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 Handler = Callable[[dict], Awaitable[None]]
 
-
 async def setup_consumer_topology(
     *,
     channel: aio_pika.abc.AbstractChannel,
@@ -58,7 +57,6 @@ async def setup_consumer_topology(
 
     return exchange, main_queue
 
-
 def _safe_decode_json(message: aio_pika.IncomingMessage) -> dict:
     if not message.body:
         return {}
@@ -66,7 +64,6 @@ def _safe_decode_json(message: aio_pika.IncomingMessage) -> dict:
         return json.loads(message.body.decode("utf-8"))
     except Exception:
         return {}
-
 
 async def run_consumer_with_retry_dlq(
     *,

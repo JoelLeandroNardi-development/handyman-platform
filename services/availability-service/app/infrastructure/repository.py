@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import time
 
-from shared.shared.intervals import overlaps
-
 from .cache import redis_client
 from ..application.helpers import res_key, res_handyman_set, parse
+from shared.core.utils.intervals import overlaps
 
 RES_TTL_SECONDS = 300
 EXPIRY_ZSET = "reservation_expiry"

@@ -3,7 +3,7 @@ from __future__ import annotations
 from .db import SessionLocal
 from .messaging import publisher
 from ..domain.models import OutboxEvent
-from shared.shared.outbox_worker import run_outbox_loop, make_outbox_stats
+from shared.core.outbox.worker import run_outbox_loop, make_outbox_stats
 
 async def outbox_stats() -> dict:
     return await make_outbox_stats(SessionLocal, OutboxEvent)

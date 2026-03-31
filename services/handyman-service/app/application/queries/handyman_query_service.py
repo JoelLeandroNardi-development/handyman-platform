@@ -5,7 +5,7 @@ from ..helpers import normalize_skills_input, get_allowed_skill_keys
 from ..mappers import review_to_response, to_response
 from ...domain.models import Handyman, HandymanReview
 from ...domain.schemas import HandymanResponse, InvalidHandymanSkillsResponse, HandymanReviewResponse
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.db.crud import fetch_or_404
 
 class HandymanQueryService:
     def __init__(self, db: AsyncSession):

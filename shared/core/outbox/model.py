@@ -3,7 +3,6 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, String, DateTime, JSON
 from sqlalchemy.sql import func
 
-
 def make_outbox_event_model(Base):
     class OutboxEvent(Base):
         __tablename__ = "outbox_events"

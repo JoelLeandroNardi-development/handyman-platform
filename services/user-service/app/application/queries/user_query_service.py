@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..mappers import to_response
 from ...domain.models import User
 from ...domain.schemas import UserResponse
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.db.crud import fetch_or_404
 
 class UserQueryService:
     def __init__(self, db: AsyncSession):

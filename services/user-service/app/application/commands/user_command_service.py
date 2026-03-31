@@ -6,8 +6,8 @@ from ..mappers import to_response
 from ...domain.events import build_event
 from ...domain.models import User, OutboxEvent
 from ...domain.schemas import CreateUser, UpdateUser, UpdateUserLocation, UserResponse
-from shared.shared.crud_helpers import apply_partial_update, fetch_or_404
-from shared.shared.outbox_helpers import add_outbox_event
+from shared.core.db.crud import apply_partial_update, fetch_or_404
+from shared.core.outbox.helpers import add_outbox_event
 
 class UserCommandService:
     def __init__(self, db: AsyncSession):

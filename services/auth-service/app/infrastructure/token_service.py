@@ -6,7 +6,6 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
-
 from jose import JWTError, jwt
 
 JWT_SECRET = os.getenv("JWT_SECRET")

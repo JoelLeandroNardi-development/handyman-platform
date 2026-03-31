@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from shared.shared import events as events_module
-from shared.shared.db import create_db, make_get_db
-from shared.shared.schemas.auth import (
+from shared.core.messaging import events as events_module
+from shared.core.db.session import create_db, make_get_db
+from shared.schemas.auth import (
     AuthUserResponse,
     Login,
     Register,
@@ -16,8 +16,8 @@ from shared.shared.schemas.auth import (
     UpdateAuthUserPassword,
     UpdateAuthUserRoles,
 )
-from shared.shared.schemas.availability import AvailabilitySlot, OverlapRequest, SetAvailability
-from shared.shared.schemas.handymen import (
+from shared.schemas.availability import AvailabilitySlot, OverlapRequest, SetAvailability
+from shared.schemas.handymen import (
     CreateHandyman,
     CreateHandymanReview,
     HandymanResponse,
@@ -32,9 +32,8 @@ from shared.shared.schemas.handymen import (
     UpdateHandyman,
     UpdateLocation,
 )
-from shared.shared.schemas.match import MatchLogResponse, MatchRequest, MatchResult, UpdateMatchLog
-from shared.shared.schemas.users import CreateUser, UpdateUser, UpdateUserLocation, UserResponse
-
+from shared.schemas.match import MatchLogResponse, MatchRequest, MatchResult, UpdateMatchLog
+from shared.schemas.users import CreateUser, UpdateUser, UpdateUserLocation, UserResponse
 
 @pytest.mark.unit
 class TestAuthSchemas:
@@ -83,7 +82,6 @@ class TestAuthSchemas:
 
         assert payload.roles == ["admin", "user"]
 
-
 @pytest.mark.unit
 class TestAvailabilitySchemas:
 
@@ -100,7 +98,6 @@ class TestAvailabilitySchemas:
     def test_overlap_request_requires_values(self):
         with pytest.raises(ValidationError):
             OverlapRequest(desired_start="", desired_end="2026-03-17T12:00:00Z")
-
 
 @pytest.mark.unit
 class TestMatchSchemas:
@@ -160,7 +157,6 @@ class TestMatchSchemas:
         assert payload.skill == "electrical"
         assert payload.user_latitude is None
 
-
 @pytest.mark.unit
 class TestUserSchemas:
 
@@ -188,7 +184,6 @@ class TestUserSchemas:
         )
 
         assert payload.created_at.year == 2026
-
 
 @pytest.mark.unit
 class TestHandymanSchemas:
@@ -277,7 +272,6 @@ class TestHandymanSchemas:
         )
 
         assert payload.rating == 5
-
 
 @pytest.mark.unit
 class TestSharedEventsAndDb:

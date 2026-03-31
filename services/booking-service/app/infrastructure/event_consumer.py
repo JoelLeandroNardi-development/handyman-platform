@@ -6,7 +6,7 @@ import aio_pika
 from .db import SessionLocal
 from .messaging import EXCHANGE_NAME, RABBIT_URL, publisher
 from ..domain.models import Booking
-from shared.shared.consumer import run_consumer_with_retry_dlq
+from shared.core.messaging.consumer import run_consumer_with_retry_dlq
 
 QUEUE_NAME = "booking_service_domain_events"
 RETRY_QUEUE = "booking_service_domain_events_retry"

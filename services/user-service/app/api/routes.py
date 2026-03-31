@@ -5,7 +5,7 @@ from ..application.commands.user_command_service import UserCommandService
 from ..application.queries.user_query_service import UserQueryService
 from ..domain.schemas import CreateUser, UpdateUserLocation, UpdateUser, UserResponse
 from ..infrastructure.db import SessionLocal
-from shared.shared.db import make_get_db
+from shared.core.db.session import make_get_db
 
 router = APIRouter()
 get_db = make_get_db(SessionLocal)

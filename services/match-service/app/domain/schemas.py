@@ -1,4 +1,4 @@
-from shared.shared.schemas.match import (
+from shared.schemas.match import (
     MatchRequest,
     MatchResult,
     MatchLogResponse,

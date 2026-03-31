@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from shared.shared.schemas.auth import (
+from shared.schemas.auth import (
     Register,
     RegisterResponse,
     Login,
@@ -19,14 +19,14 @@ from shared.shared.schemas.auth import (
     UpdateAuthUser,
     DeleteAuthUserResponse,
 )
-from shared.shared.schemas.users import (
+from shared.schemas.users import (
     CreateUser,
     UpdateUserLocation,
     UpdateUser,
     UserResponse,
     DeleteUserResponse,
 )
-from shared.shared.schemas.handymen import (
+from shared.schemas.handymen import (
     CreateHandyman,
     UpdateLocation as UpdateHandymanLocation,
     UpdateHandyman,
@@ -43,20 +43,20 @@ from shared.shared.schemas.handymen import (
     SkillsCatalogReplaceResponse,
     SkillsCatalogPatchResponse,
 )
-from shared.shared.schemas.availability import (
+from shared.schemas.availability import (
     AvailabilitySlot,
     SetAvailability,
     AvailabilityMessageResponse,
     AvailabilityResponse,
     AvailabilityListResponse,
 )
-from shared.shared.schemas.match import (
+from shared.schemas.match import (
     MatchRequest,
     MatchResult,
     MatchLogResponse,
     DeleteMatchLogResponse,
 )
-from shared.shared.schemas.bookings import (
+from shared.schemas.bookings import (
     BookingResponse,
     ConfirmBookingResponse,
     CancelBookingResponse,
@@ -68,9 +68,9 @@ from shared.shared.schemas.bookings import (
     CompletedJobsCountResponse,
     CompletedJobsCountsResponse,
 )
-from shared.shared.schemas.bookings import CreateBooking as CreateBookingRequest
-from shared.shared.schemas.bookings import CancelBooking as CancelBookingRequest
-from shared.shared.schemas.notifications import (
+from shared.schemas.bookings import CreateBooking as CreateBookingRequest
+from shared.schemas.bookings import CancelBooking as CancelBookingRequest
+from shared.schemas.notifications import (
     MarkAllReadResponse,
     NotificationItem,
     NotificationListResponse,

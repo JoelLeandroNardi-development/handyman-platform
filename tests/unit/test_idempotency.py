@@ -2,11 +2,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from shared.shared.idempotency import (
+from shared.core.utils.idempotency import (
     already_processed,
     IDEMPOTENCY_DEFAULT_TTL_SECONDS,
 )
-
 
 @pytest.mark.unit
 @pytest.mark.idempotency
@@ -152,7 +151,6 @@ class TestAlreadyProcessed:
         assert value == "1"
         assert isinstance(value, str)
 
-
 @pytest.mark.unit
 @pytest.mark.idempotency
 class TestIdempotencyIntegration:
@@ -199,4 +197,3 @@ class TestIdempotencyIntegration:
             ttl_seconds=short_ttl,
         )
         assert result2 is False
-

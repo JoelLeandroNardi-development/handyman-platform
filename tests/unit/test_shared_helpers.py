@@ -8,19 +8,16 @@ from fastapi import HTTPException
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
 
-from shared.shared.crud_helpers import apply_partial_update, fetch_or_404
-from shared.shared.roles import normalize_roles
-
+from shared.core.db.crud import apply_partial_update, fetch_or_404
+from shared.core.auth.roles import normalize_roles
 
 Base = declarative_base()
-
 
 class DummyModel(Base):
     __tablename__ = "dummy_model"
 
     id = Column(Integer, primary_key=True)
     name = Column(String)
-
 
 @pytest.mark.unit
 class TestCrudHelpers:
@@ -70,7 +67,6 @@ class TestCrudHelpers:
         assert entity.name == "new"
         assert entity.status == "pending"
         assert entity.count == 3
-
 
 @pytest.mark.unit
 class TestRoles:

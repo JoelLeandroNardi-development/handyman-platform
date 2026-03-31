@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..domain.events import build_event
 from ..domain.models import Booking, OutboxEvent
 from ..domain.schemas import CompleteBookingResponse
-from shared.shared.outbox_helpers import add_outbox_event
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.outbox.helpers import add_outbox_event
+from shared.core.db.crud import fetch_or_404
 
 async def complete_booking_side(db: AsyncSession, booking_id: str, *, side: str) -> CompleteBookingResponse:
     booking = await fetch_or_404(db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")

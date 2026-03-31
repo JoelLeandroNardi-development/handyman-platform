@@ -1,4 +1,4 @@
-from shared.shared.schemas.users import (
+from shared.schemas.users import (
     CreateUser,
     UpdateUserLocation,
     UpdateUser,

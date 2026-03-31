@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 def add_outbox_event(db, OutboxEvent, event: dict) -> None:
     db.add(
         OutboxEvent(

@@ -12,7 +12,7 @@ from ..domain.schemas import (
     SkillCatalogFlatResponse, SkillCatalogPatchRequest, SkillsCatalogPatchResponse
 )
 from ..infrastructure.db import SessionLocal
-from shared.shared.db import make_get_db
+from shared.core.db.session import make_get_db
 
 router = APIRouter()
 get_db = make_get_db(SessionLocal)

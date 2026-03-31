@@ -5,7 +5,7 @@ from ..mappers import to_response
 from ...domain.models import Booking
 from ...domain.schemas import BookingResponse, CompletedJobsCountResponse
 from ...infrastructure.repository import get_completed_jobs_count
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.db.crud import fetch_or_404
 
 class BookingQueryService:
     def __init__(self, db: AsyncSession):

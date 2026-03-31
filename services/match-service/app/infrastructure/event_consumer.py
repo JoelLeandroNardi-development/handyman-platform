@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from shared.shared.consumer import run_consumer_with_retry_dlq
-from shared.shared.idempotency import already_processed
+from shared.core.messaging.consumer import run_consumer_with_retry_dlq
+from shared.core.utils.idempotency import already_processed
 
 from ..application.services import (
     upsert_handyman_projection,

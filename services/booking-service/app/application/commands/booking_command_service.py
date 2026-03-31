@@ -23,8 +23,8 @@ from ...domain.schemas import (
     DeleteBookingResponse
 )
 from ...infrastructure.repository import get_completed_jobs_counts
-from shared.shared.outbox_helpers import add_outbox_event
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.outbox.helpers import add_outbox_event
+from shared.core.db.crud import fetch_or_404
 
 class BookingCommandService:
     def __init__(self, db: AsyncSession):

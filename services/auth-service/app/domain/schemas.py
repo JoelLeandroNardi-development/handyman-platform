@@ -1,4 +1,4 @@
-from shared.shared.schemas.auth import (
+from shared.schemas.auth import (
     Register,
     Login,
     GoogleLoginRequest,

@@ -5,7 +5,7 @@ from ..mappers import to_auth_user_response
 from ...domain.models import AuthUser
 from ...domain.schemas import AuthUserResponse, UpdateAuthUser
 from ...infrastructure.password_hasher import password_hasher
-from shared.shared.crud_helpers import fetch_or_404
+from shared.core.db.crud import fetch_or_404
 
 class AuthUserCommandService:
     def __init__(self, db: AsyncSession):

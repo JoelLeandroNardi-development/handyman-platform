@@ -12,7 +12,6 @@ async def get_current_email(x_user_email: str | None = Header(default=None)) -> 
         )
     return x_user_email
 
-
 async def get_current_roles(x_user_roles: str | None = Header(default=None)) -> list[str]:
     if not x_user_roles:
         return []

@@ -9,9 +9,9 @@ from .outbox_worker import enqueue_domain_event
 from .repository import create_reservation, get_reservation, delete_reservation
 from ..application.helpers import avail_key, parse_raw_slot
 from ..domain.events import build_event
-from shared.shared.consumer import run_consumer_with_retry_dlq
-from shared.shared.idempotency import already_processed
-from shared.shared.intervals import fully_contains as contains_interval, overlaps
+from shared.core.messaging.consumer import run_consumer_with_retry_dlq
+from shared.core.utils.idempotency import already_processed
+from shared.core.utils.intervals import fully_contains as contains_interval, overlaps
 
 QUEUE_NAME = "availability_service_booking_events"
 RETRY_QUEUE = "availability_service_booking_events_retry"

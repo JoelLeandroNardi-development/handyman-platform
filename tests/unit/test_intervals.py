@@ -2,8 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from shared.shared.intervals import overlaps, fully_contains
-
+from shared.core.utils.intervals import overlaps, fully_contains
 
 @pytest.mark.unit
 @pytest.mark.intervals
@@ -66,7 +65,6 @@ class TestOverlaps:
         b_end = base_utc + timedelta(hours=3)
         
         assert overlaps(a_start, a_end, b_start, b_end) is True
-
 
 @pytest.mark.unit
 @pytest.mark.intervals

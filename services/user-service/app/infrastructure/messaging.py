@@ -1,4 +1,4 @@
-from shared.shared.mq import create_publisher
+from shared.core.messaging.mq import create_publisher
 
 publisher, cfg = create_publisher(required=True)
 RABBIT_URL = cfg.url

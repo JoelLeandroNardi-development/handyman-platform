@@ -3,10 +3,9 @@ import uuid
 
 import pytest
 
-from shared.shared.outbox_helpers import add_outbox_event
+from shared.core.outbox.helpers import add_outbox_event
 
 from tests.service_loader import load_service_app_module
-
 
 @pytest.fixture
 def booking_modules(monkeypatch):
@@ -28,7 +27,6 @@ def booking_modules(monkeypatch):
         package_name="booking_service_test_app",
     )
     return models_module, events_module
-
 
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle
@@ -138,7 +136,6 @@ class TestBookingLifecycle:
         assert booking.rejection_reason == "Equipment not available"
         assert booking.status == "REJECTED"
 
-
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle
 class TestBookingEventFlow:
@@ -218,7 +215,6 @@ class TestBookingEventFlow:
         assert event["event_type"] == "booking.cancel_requested"
         assert event["data"]["reason"] == reason
 
-
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle
 class TestOutboxPattern:
@@ -267,7 +263,6 @@ class TestOutboxPattern:
         added_event = mock_db_session.add.call_args.args[0]
 
         assert added_event.payload == event
-
 
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle
@@ -330,7 +325,6 @@ class TestBookingCompletion:
 
         assert booking.completed_at is not None
         assert isinstance(booking.completed_at, datetime)
-
 
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle
@@ -433,7 +427,6 @@ class TestBookingRejectedEventFlow:
 
         assert event_a["event_id"] != event_b["event_id"]
 
-
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle
 class TestPartialCompletionEventFlow:
@@ -529,7 +522,6 @@ class TestPartialCompletionEventFlow:
             assert event["event_type"] == event_type
             assert "event_id" in event
             assert "occurred_at" in event
-
 
 @pytest.mark.integration
 @pytest.mark.booking_lifecycle

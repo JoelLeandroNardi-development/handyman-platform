@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
-
 class CreateHandyman(BaseModel):
     email: str
     first_name: Optional[str] = None
@@ -19,11 +18,9 @@ class CreateHandyman(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
 
-
 class UpdateLocation(BaseModel):
     latitude: float
     longitude: float
-
 
 class UpdateHandyman(BaseModel):
     first_name: Optional[str] = None
@@ -39,7 +36,6 @@ class UpdateHandyman(BaseModel):
     service_radius_km: Optional[int] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-
 
 class HandymanResponse(BaseModel):
     email: str
@@ -61,10 +57,8 @@ class HandymanResponse(BaseModel):
     profile_completeness: int = 0
     created_at: datetime
 
-
 class SkillCatalogReplaceRequest(BaseModel):
     catalog: dict[str, List[str]] = Field(default_factory=dict)
-
 
 class SkillCatalogPatchRequest(BaseModel):
     upserts: dict[str, List[str]] = Field(default_factory=dict)
@@ -73,13 +67,11 @@ class SkillCatalogPatchRequest(BaseModel):
     activate_categories: List[str] = Field(default_factory=list)
     deactivate_categories: List[str] = Field(default_factory=list)
 
-
 class SkillCatalogSkillItem(BaseModel):
     key: str
     label: str
     active: bool
     sort_order: int
-
 
 class SkillCatalogCategoryItem(BaseModel):
     key: str
@@ -88,11 +80,9 @@ class SkillCatalogCategoryItem(BaseModel):
     sort_order: int
     skills: List[SkillCatalogSkillItem]
 
-
 class SkillCatalogFlatResponse(BaseModel):
     categories: List[SkillCatalogCategoryItem]
     allowed_skill_keys: List[str]
-
 
 class InvalidHandymanSkillsItem(BaseModel):
     email: str
@@ -100,11 +90,9 @@ class InvalidHandymanSkillsItem(BaseModel):
     invalid_skills: List[str]
     valid_skills: List[str]
 
-
 class InvalidHandymanSkillsResponse(BaseModel):
     items: List[InvalidHandymanSkillsItem]
     count: int
-
 
 class CreateHandymanReview(BaseModel):
     booking_id: str
@@ -112,7 +100,6 @@ class CreateHandymanReview(BaseModel):
     user_email: str
     rating: int = Field(..., ge=1, le=5)
     review_text: Optional[str] = Field(default=None, max_length=2000)
-
 
 class HandymanReviewResponse(BaseModel):
     id: int
@@ -123,17 +110,14 @@ class HandymanReviewResponse(BaseModel):
     review_text: Optional[str] = None
     created_at: datetime
 
-
 class DeleteHandymanResponse(BaseModel):
     message: str
     email: str
-
 
 class SkillsCatalogReplaceResponse(BaseModel):
     message: str
     categories: int
     skills: int
-
 
 class SkillsCatalogPatchResponse(BaseModel):
     message: str

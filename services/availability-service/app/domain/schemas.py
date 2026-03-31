@@ -1,4 +1,4 @@
-from shared.shared.schemas.availability import (
+from shared.schemas.availability import (
     AvailabilitySlot,
     SetAvailability,
     OverlapRequest,
