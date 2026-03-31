@@ -54,7 +54,7 @@ class TestRabbitPublisher:
         connection.channel = AsyncMock(return_value=channel)
         channel.declare_exchange = AsyncMock(return_value=exchange)
         connect = AsyncMock(return_value=connection)
-        monkeypatch.setattr("shared.shared.mq.aio_pika.connect_robust", connect)
+        monkeypatch.setattr("shared.core.messaging.mq.aio_pika.connect_robust", connect)
 
         publisher = RabbitPublisher(RabbitConfig(url="amqp://guest:guest@localhost/", exchange_name="events"))
         await publisher.start()
@@ -70,7 +70,7 @@ class TestRabbitPublisher:
         publisher._conn = MagicMock(is_closed=False)
         publisher._exchange = MagicMock()
         connect = AsyncMock()
-        monkeypatch.setattr("shared.shared.mq.aio_pika.connect_robust", connect)
+        monkeypatch.setattr("shared.core.messaging.mq.aio_pika.connect_robust", connect)
 
         await publisher.start()
 
@@ -79,7 +79,7 @@ class TestRabbitPublisher:
     @pytest.mark.asyncio
     async def test_start_closes_resources_when_connect_fails(self, monkeypatch):
         connect = AsyncMock(side_effect=RuntimeError("connect failed"))
-        monkeypatch.setattr("shared.shared.mq.aio_pika.connect_robust", connect)
+        monkeypatch.setattr("shared.core.messaging.mq.aio_pika.connect_robust", connect)
 
         publisher = RabbitPublisher(RabbitConfig(url="amqp://guest:guest@localhost/", exchange_name="events"))
         publisher.close = AsyncMock()
@@ -199,7 +199,7 @@ class TestRabbitHelpers:
     async def test_rabbit_connect_uses_aio_pika(self, monkeypatch):
         connection = MagicMock()
         connect = AsyncMock(return_value=connection)
-        monkeypatch.setattr("shared.shared.mq.aio_pika.connect_robust", connect)
+        monkeypatch.setattr("shared.core.messaging.mq.aio_pika.connect_robust", connect)
 
         result = await rabbit_connect(RabbitConfig(url="amqp://guest:guest@localhost/", exchange_name="events"))
 
