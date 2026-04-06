@@ -16,7 +16,6 @@ def _dampened_count_score(value: Any, *, cap: int) -> float:
     return clamp01(math.log1p(count) / math.log1p(cap))
 
 def compute_match_score(candidate: dict[str, Any]) -> float:
-    """Compute deterministic weighted ranking score for /match candidates."""
     avg_rating = clamp01(safe_float(candidate.get("avg_rating"), default=0.0) / 5.0)
     availability_confidence = 0.0 if bool(candidate.get("availability_unknown")) else 1.0
     profile_completeness = clamp01(safe_float(candidate.get("profile_completeness"), default=0.0) / 100.0)
@@ -39,8 +38,6 @@ def compute_match_score(candidate: dict[str, Any]) -> float:
     return score
 
 def rank_match_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Sort by score desc, then deterministic tie-breakers."""
-
     def sort_key(c: dict[str, Any]) -> tuple[float, float, int, str]:
         score = compute_match_score(c)
         distance = max(0.0, safe_float(c.get("distance_km"), default=1_000_000.0))

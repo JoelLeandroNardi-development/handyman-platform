@@ -4,61 +4,6 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import redis.asyncio as redis_async
-
-from tests.service_loader import load_service_app_module
-
-@pytest.fixture
-def match_services_module(monkeypatch):
-    fake_redis = MagicMock()
-    fake_redis.smembers = AsyncMock(return_value=set())
-    fake_redis.delete = AsyncMock(return_value=0)
-    fake_redis.pipeline = MagicMock()
-
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    monkeypatch.setenv("MATCH_DB", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
-
-    module = load_service_app_module(
-        "match-service",
-        "application/services",
-        package_name="match_service_test_app",
-        reload_modules=True,
-    )
-    # Attach required helpers from their real locations
-    from match_service_test_app.application.mappers import parse_dt, normalize_handyman, norm, as_utc
-    from match_service_test_app.domain.geo import haversine, bucket_id, time_bucket, km_to_deg_lon, buckets_in_radius
-    from match_service_test_app.infrastructure.cache_keys import cache_key
-    from match_service_test_app.infrastructure.availability_projection import projected_has_overlap
-    from match_service_test_app.infrastructure.projections import get_handyman_projection, invalidate_bucket, get_cached_result, set_cache_with_index
-    from match_service_test_app.domain.scoring import rank_match_candidates
-    from match_service_test_app.domain.constants import TIME_BUCKET_SECONDS
-    from match_service_test_app.domain.scoring import compute_match_score
-    import types
-
-    # Attach as attributes for test compatibility
-    module.parse_dt = parse_dt
-    module.normalize_handyman = normalize_handyman
-    module.norm = norm
-    module.as_utc = as_utc
-    module.haversine = haversine
-    module.bucket_id = bucket_id
-    module.time_bucket = time_bucket
-    module.km_to_deg_lon = km_to_deg_lon
-    module.buckets_in_radius = buckets_in_radius
-    module.cache_key = cache_key
-    module.projected_has_overlap = projected_has_overlap
-    module.get_handyman_projection = get_handyman_projection
-    module.invalidate_bucket = invalidate_bucket
-    module.get_cached_result = get_cached_result
-    module.set_cache_with_index = set_cache_with_index
-    module.rank_match_candidates = rank_match_candidates
-    module.redis_client = fake_redis
-    # Attach missing constants and functions for test compatibility
-
-    module.TIME_BUCKET_SECONDS = TIME_BUCKET_SECONDS
-    module.compute_match_score = compute_match_score
-    return module
 
 @pytest.mark.unit
 class TestMatchServiceHelpers:
@@ -146,7 +91,6 @@ class TestMatchServiceHelpers:
             datetime(2026, 3, 17, 11, 0, tzinfo=timezone.utc),
             datetime(2026, 3, 17, 11, 30, tzinfo=timezone.utc),
         ) is True
-
 
 @pytest.mark.unit
 class TestMatchServiceRedisFlows:
@@ -528,8 +472,6 @@ class TestMatchServiceRedisFlows:
 
 @pytest.mark.unit
 class TestNormalizeHandymanProjectionFields:
-    """Ensure normalize_handyman preserves trust/reputation fields."""
-
     def test_full_payload_preserves_all_fields(self, match_services_module):
         doc = {
             "email": "pro@example.com",
@@ -564,7 +506,6 @@ class TestNormalizeHandymanProjectionFields:
         assert result["completed_jobs_count"] == 0
 
     def test_legacy_payload_without_new_fields(self, match_services_module):
-        """Old events that lack all four new fields should still normalize fine."""
         doc = {
             "email": "legacy@example.com",
             "skills": ["electrical"],
@@ -627,8 +568,6 @@ class TestNormalizeHandymanProjectionFields:
 
 @pytest.mark.unit
 class TestCleanSlots:
-    """Tests for the clean_slots helper that deduplicates slot-validation logic."""
-
     def test_valid_slots_pass_through(self, match_services_module):
         slots = [
             {"start": "2026-03-17T10:00:00+00:00", "end": "2026-03-17T12:00:00+00:00"},
@@ -683,10 +622,8 @@ class TestCleanSlots:
         result = match_services_module.clean_slots(slots)
         assert len(result) == 2
 
-
 @pytest.mark.unit
 class TestCompletedJobsHydration:
-
     @pytest.mark.asyncio
     async def test_fetch_completed_jobs_counts_batch_success(self, match_services_module, monkeypatch):
         response = MagicMock()
@@ -788,10 +725,8 @@ class TestCompletedJobsHydration:
         assert hydrated[0]["completed_jobs_count"] == 6
         assert hydrated[1]["completed_jobs_count"] == 0
 
-
 @pytest.mark.unit
 class TestWeightedRanking:
-
     def test_close_unrated_vs_slightly_farther_highly_rated(self, match_services_module):
         candidates = [
             {

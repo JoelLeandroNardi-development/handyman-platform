@@ -2,19 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from shared.core.messaging.consumer import run_consumer_with_retry_dlq
-from shared.core.utils.idempotency import already_processed
-
-from ..application.services import (
-    upsert_handyman_projection,
-    upsert_availability_projection,
-    delete_handyman_projection,
-)
 from .availability_projection import delete_availability_projection
-from .messaging import connect, EXCHANGE_NAME
-from .projections import invalidate_bucket, get_handyman_projection, redis_client
-from ..application.mappers import norm
-from ..domain.constants import (
+from .config import (
     QUEUE_NAME,
     RETRY_QUEUE,
     DLQ_QUEUE,
@@ -24,7 +13,17 @@ from ..domain.constants import (
     IDEMPOTENCY_TTL_SECONDS,
     RETRY_SECONDS
 )
+from .messaging import connect, EXCHANGE_NAME
+from .projections import invalidate_bucket, get_handyman_projection, redis_client
+from ..application.services import (
+    upsert_handyman_projection,
+    upsert_availability_projection,
+    delete_handyman_projection,
+)
 from ..domain.geo import buckets_in_radius
+from shared.core.messaging.consumer import run_consumer_with_retry_dlq
+from shared.core.utils.idempotency import already_processed
+from shared.core.utils.normalize import norm
 
 async def _invalidate_for_handyman_profile(profile: dict | None):
     if not profile:

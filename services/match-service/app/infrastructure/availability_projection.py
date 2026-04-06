@@ -4,8 +4,8 @@ import json
 from datetime import datetime
 
 from .projections import redis_client
-from ..application.mappers import as_utc, parse_dt
-from ..domain.constants import PROJ_AVAIL_KEY, PROJ_AVAIL_INDEX
+from .redis_keys import PROJ_AVAIL_KEY, PROJ_AVAIL_INDEX
+from shared.core.utils.datetime import as_utc, parse_dt
 from shared.core.utils.intervals import overlaps
 
 def clean_slots(slots: list[dict] | None) -> list[dict]:

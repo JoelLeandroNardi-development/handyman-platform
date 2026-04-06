@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..mappers import norm
 from ..match_orchestrator import run_match_query
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchRequest
+from shared.core.utils.normalize import norm
 
 class MatchCommandService:
     def __init__(self, db: AsyncSession):

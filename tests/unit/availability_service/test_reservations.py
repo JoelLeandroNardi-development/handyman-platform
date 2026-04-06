@@ -8,7 +8,6 @@ import redis.asyncio as redis_async
 
 from tests.service_loader import load_service_app_module
 
-
 @pytest.fixture
 def reservations_module(monkeypatch):
     fake_redis = MagicMock()
@@ -33,7 +32,6 @@ def reservations_module(monkeypatch):
     module.redis_client = fake_redis
     return module
 
-
 @pytest.mark.unit
 class TestReservationKeys:
 
@@ -42,7 +40,6 @@ class TestReservationKeys:
 
     def test_res_handyman_set(self, reservations_module):
         assert reservations_module.res_handyman_set("pro@example.com") == "reservations_by_handyman:pro@example.com"
-
 
 @pytest.mark.unit
 class TestReservationCrud:

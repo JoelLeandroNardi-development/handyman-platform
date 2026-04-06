@@ -1,15 +1,3 @@
-"""Tests for booking-service completed_jobs_count aggregate.
-
-Covers:
-  - single completed booking → count = 1
-  - multiple completed bookings → correct count
-  - non-completed statuses (PENDING, CONFIRMED, CANCELED, etc.) are ignored
-  - duplicate completion (same booking already COMPLETED) does not double-count
-  - batch query returns correct counts per handyman
-  - empty batch returns empty dict
-  - unknown handyman returns 0
-"""
-
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -19,11 +7,9 @@ import pytest
 
 from tests.service_loader import load_service_app_module
 
-
 os.environ.setdefault("BOOKING_DB", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("RABBIT_URL", "amqp://guest:guest@localhost:5672/")
 os.environ.setdefault("EXCHANGE_NAME", "test_exchange")
-
 
 @pytest.fixture(scope="module")
 def booking_db_module():
@@ -33,14 +19,12 @@ def booking_db_module():
         reload_modules=True,
     )
 
-
 @pytest.fixture(scope="module")
 def booking_models_module(booking_db_module):
     return load_service_app_module(
         "booking-service", "domain/models",
         package_name="booking_cj_test_app",
     )
-
 
 @pytest.fixture(scope="module")
 def completed_jobs_module(booking_models_module):
@@ -49,17 +33,14 @@ def completed_jobs_module(booking_models_module):
         package_name="booking_cj_test_app",
     )
 
-
 @pytest.fixture(autouse=True)
 async def _setup_tables(booking_db_module, booking_models_module):
-    """Create tables before each test and drop after."""
     engine = booking_db_module.engine
     async with engine.begin() as conn:
         await conn.run_sync(booking_db_module.Base.metadata.create_all)
     yield
     async with engine.begin() as conn:
         await conn.run_sync(booking_db_module.Base.metadata.drop_all)
-
 
 async def _insert_booking(
     booking_db_module,
@@ -70,7 +51,6 @@ async def _insert_booking(
     status: str,
     user_email: str = "user@example.com",
 ):
-    """Insert a booking row directly into the DB."""
     from datetime import datetime, timezone
 
     Booking = booking_models_module.Booking
@@ -85,11 +65,8 @@ async def _insert_booking(
         ))
         await db.commit()
 
-
 @pytest.mark.unit
 class TestCompletedJobsCount:
-    """Single-handyman completed_jobs_count."""
-
     @pytest.mark.asyncio
     async def test_one_completed_booking(
         self, booking_db_module, booking_models_module, completed_jobs_module,
@@ -162,14 +139,10 @@ class TestCompletedJobsCount:
     async def test_duplicate_completed_booking_id_not_possible(
         self, booking_db_module, booking_models_module, completed_jobs_module,
     ):
-        """booking_id is unique — re-inserting the same booking_id is impossible,
-        so replaying a completion event on an already-COMPLETED booking is a
-        no-op (status stays COMPLETED), and the count stays correct."""
         await _insert_booking(
             booking_db_module, booking_models_module,
             booking_id="b-dup", handyman_email="h@test.com", status="COMPLETED",
         )
-        # Simulate replayed event: status is already COMPLETED, no new row
         async with booking_db_module.SessionLocal() as db:
             count = await completed_jobs_module.get_completed_jobs_count(db, "h@test.com")
         assert count == 1
@@ -194,11 +167,8 @@ class TestCompletedJobsCount:
             assert await completed_jobs_module.get_completed_jobs_count(db, "alice@test.com") == 2
             assert await completed_jobs_module.get_completed_jobs_count(db, "bob@test.com") == 1
 
-
 @pytest.mark.unit
 class TestCompletedJobsCountsBatch:
-    """Batch completed_jobs_counts query."""
-
     @pytest.mark.asyncio
     async def test_batch_returns_correct_counts(
         self, booking_db_module, booking_models_module, completed_jobs_module,

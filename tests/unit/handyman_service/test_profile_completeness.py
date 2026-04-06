@@ -1,30 +1,18 @@
-"""Tests for handyman-service profile_completeness computation.
-
-Covers:
-  - fully complete profile  → 100
-  - partially filled profile → proportional score
-  - minimal / empty profile  → 0
-  - edge cases around the city/country and lat/lng pair rules
-"""
 from __future__ import annotations
 
 import pytest
 
 from tests.service_loader import load_service_app_module
 
-
 @pytest.fixture(scope="module")
 def pc_module():
-    """Load the profile_completeness module from handyman-service (domain/)."""
     return load_service_app_module(
         "handyman-service",
         "domain/policies",
         package_name="handyman_pc_test_app",
     )
 
-
 def _full_profile() -> dict:
-    """Return kwargs representing a fully complete handyman profile."""
     return dict(
         first_name="Jane",
         last_name="Doe",
@@ -38,13 +26,8 @@ def _full_profile() -> dict:
         longitude=-77.03,
     )
 
-
 @pytest.mark.unit
 class TestProfileCompleteness:
-    """Profile completeness scoring (0..100 integer)."""
-
-    # ── full / empty extremes ──────────────────────────────────────────
-
     def test_fully_complete_profile_scores_100(self, pc_module):
         score = pc_module.compute_profile_completeness(**_full_profile())
         assert score == 100
@@ -61,10 +44,7 @@ class TestProfileCompleteness:
         score = pc_module.compute_profile_completeness()
         assert score == 0
 
-    # ── partial profiles ───────────────────────────────────────────────
-
     def test_only_names_filled(self, pc_module):
-        """first_name + last_name = 2/8 checks → 25."""
         score = pc_module.compute_profile_completeness(
             first_name="Jane",
             last_name="Doe",
@@ -72,7 +52,6 @@ class TestProfileCompleteness:
         assert score == 25
 
     def test_half_filled_profile(self, pc_module):
-        """4 out of 8 checks → 50."""
         score = pc_module.compute_profile_completeness(
             first_name="Jane",
             last_name="Doe",
@@ -82,18 +61,14 @@ class TestProfileCompleteness:
         assert score == 50
 
     def test_everything_except_location(self, pc_module):
-        """7/8 checks → 88."""
         profile = _full_profile()
         profile["latitude"] = None
         profile["longitude"] = None
         score = pc_module.compute_profile_completeness(**profile)
         assert score == 88
 
-    # ── city/country pair rule ─────────────────────────────────────────
-
     def test_city_alone_counts(self, pc_module):
         score = pc_module.compute_profile_completeness(city="Lima")
-        # 1 check out of 8 → round(12.5) = 12
         assert score == 12
 
     def test_country_alone_counts(self, pc_module):
@@ -101,12 +76,9 @@ class TestProfileCompleteness:
         assert score == 12
 
     def test_city_and_country_still_one_check(self, pc_module):
-        """city + country together is still a single check, same as city alone."""
         score_both = pc_module.compute_profile_completeness(city="Lima", country="Peru")
         score_city = pc_module.compute_profile_completeness(city="Lima")
         assert score_both == score_city
-
-    # ── lat/lng pair rule ──────────────────────────────────────────────
 
     def test_latitude_only_does_not_count(self, pc_module):
         score = pc_module.compute_profile_completeness(latitude=-12.04)
@@ -119,8 +91,6 @@ class TestProfileCompleteness:
     def test_both_lat_lng_counts(self, pc_module):
         score = pc_module.compute_profile_completeness(latitude=-12.04, longitude=-77.03)
         assert score == 12
-
-    # ── skills edge cases ──────────────────────────────────────────────
 
     def test_empty_skills_list_does_not_count(self, pc_module):
         score = pc_module.compute_profile_completeness(skills=[])
@@ -135,8 +105,6 @@ class TestProfileCompleteness:
         score_many = pc_module.compute_profile_completeness(skills=["plumbing", "electrical"])
         assert score_one == score_many
 
-    # ── numeric edge cases ─────────────────────────────────────────────
-
     def test_zero_experience_does_not_count(self, pc_module):
         score = pc_module.compute_profile_completeness(years_experience=0)
         assert score == 0
@@ -148,8 +116,6 @@ class TestProfileCompleteness:
     def test_zero_radius_does_not_count(self, pc_module):
         score = pc_module.compute_profile_completeness(service_radius_km=0)
         assert score == 0
-
-    # ── return type ────────────────────────────────────────────────────
 
     def test_return_type_is_int(self, pc_module):
         score = pc_module.compute_profile_completeness(**_full_profile())

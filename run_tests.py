@@ -1,15 +1,9 @@
-"""
-Test runner script for the handyman platform.
-Provides a cross-platform way to run tests.
-"""
 import argparse
 import subprocess
 import sys
 from pathlib import Path
 
-
 def run_command(cmd, description):
-    """Run a command and report status."""
     print(f"\n{'='*60}")
     print(f"Running: {description}")
     print(f"{'='*60}\n")
@@ -19,7 +13,6 @@ def run_command(cmd, description):
         return False
     print(f"\n✅ PASSED: {description}")
     return True
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -87,7 +80,6 @@ def main():
         print("\n📊 Coverage report generated in htmlcov/index.html")
     
     sys.exit(0 if success else 1)
-
 
 if __name__ == "__main__":
     main()

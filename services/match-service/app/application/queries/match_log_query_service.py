@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from fastapi import Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ..mappers import log_to_response, norm
-from ..services import norm
+from ...application.mappers import log_to_response
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchLogResponse
 from shared.core.db.crud import fetch_or_404
+from shared.core.utils.normalize import norm
 
 class MatchLogQueryService:
     def __init__(self, db: AsyncSession):
@@ -16,9 +15,9 @@ class MatchLogQueryService:
 
     async def list_match_logs(
         self,
-        limit: int = Query(50, ge=1, le=500),
-        offset: int = Query(0, ge=0),
-        skill: str | None = Query(default=None),
+        limit: int,
+        offset: int,
+        skill: str | None,
     ) -> list[MatchLogResponse]:
         stmt = select(MatchLog).order_by(MatchLog.id.desc()).limit(limit).offset(offset)
         if skill:

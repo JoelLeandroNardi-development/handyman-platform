@@ -3,10 +3,11 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 
-from ..mappers import norm, log_to_response
+from ..mappers import log_to_response
 from ...domain.models import MatchLog
 from ...domain.schemas import MatchLogResponse, UpdateMatchLog
 from shared.core.db.crud import fetch_or_404
+from shared.core.utils.normalize import norm
 
 class MatchLogCommandService:
     def __init__(self, db: AsyncSession):

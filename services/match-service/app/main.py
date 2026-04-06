@@ -6,8 +6,8 @@ from fastapi import FastAPI
 
 from .api.routes import router
 from .application.services import seed_handyman_projection_if_empty
-from .domain.constants import QUEUE_NAME, ROUTING_KEYS
 from .infrastructure.availability_projection import availability_projection_count
+from .infrastructure.config import QUEUE_NAME, ROUTING_KEYS
 from .infrastructure.event_consumer import start_consumer_with_retry
 from .infrastructure.messaging import RABBIT_URL, EXCHANGE_NAME
 from .infrastructure.outbox_worker import worker

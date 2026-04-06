@@ -9,12 +9,12 @@ from .services import (
     get_effective_availability_slots,
     projections_have_any_availability,
 )
-from ..application.mappers import norm
 from ..domain.geo import haversine, bucket_id
 from ..domain.scoring import rank_match_candidates
 from ..infrastructure.availability_projection import projected_has_overlap
 from ..infrastructure.cache_keys import cache_key
 from ..infrastructure.projections import get_cached_result, set_cache_with_index
+from shared.core.utils.normalize import norm
 
 async def run_match_query(
     latitude: float,

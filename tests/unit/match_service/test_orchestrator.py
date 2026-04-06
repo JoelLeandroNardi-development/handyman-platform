@@ -5,28 +5,6 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import redis.asyncio as redis_async
-
-from tests.service_loader import load_service_app_module
-
-@pytest.fixture
-def match_orchestrator_module(monkeypatch):
-    fake_redis = MagicMock()
-    fake_redis.smembers = AsyncMock(return_value=set())
-    fake_redis.delete = AsyncMock(return_value=0)
-    fake_redis.pipeline = MagicMock()
-
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    monkeypatch.setenv("MATCH_DB", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
-
-    module = load_service_app_module(
-        "match-service",
-        "application/match_orchestrator",
-        package_name="match_orchestrator_test_app",
-        reload_modules=True,
-    )
-    return module
 
 @pytest.mark.unit
 class TestRunMatchQuery:
@@ -325,7 +303,6 @@ class TestRunMatchQuery:
 
     @pytest.mark.asyncio
     async def test_uses_projected_handymen_when_available(self, match_orchestrator_module):
-        """Projection-first: when projections exist, live fetch must not be called."""
         handyman = {
             "email": "proj@example.com",
             "latitude": 45.001,
@@ -342,7 +319,6 @@ class TestRunMatchQuery:
         ]
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        # get_effective_handymen_for_skill returns projection source — no live fetch needed
         mock_effective = AsyncMock(return_value=([handyman], "projection"))
         match_orchestrator_module.get_effective_handymen_for_skill = mock_effective
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])
@@ -365,7 +341,6 @@ class TestRunMatchQuery:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_live_when_projections_empty(self, match_orchestrator_module):
-        """Fallback path: when projections are empty, live source is used."""
         handyman = {
             "email": "live@example.com",
             "latitude": 45.001,
@@ -382,7 +357,6 @@ class TestRunMatchQuery:
         ]
         match_orchestrator_module.projections_have_any_availability = AsyncMock(return_value=True)
         match_orchestrator_module.get_cached_result = AsyncMock(return_value=None)
-        # get_effective_handymen_for_skill signals fallback via "live" source label
         mock_effective = AsyncMock(return_value=([handyman], "live"))
         match_orchestrator_module.get_effective_handymen_for_skill = mock_effective
         match_orchestrator_module.hydrate_completed_jobs_counts = AsyncMock(return_value=[handyman])

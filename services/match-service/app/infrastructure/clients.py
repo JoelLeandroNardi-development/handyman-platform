@@ -3,8 +3,8 @@ from __future__ import annotations
 import httpx
 
 from .availability_projection import clean_slots
-from ..application.mappers import normalize_handyman
-from ..domain.constants import HANDYMAN_SERVICE_URL, AVAILABILITY_SERVICE_URL, BOOKING_SERVICE_URL, HTTP_TIMEOUT
+from .config import HANDYMAN_SERVICE_URL, AVAILABILITY_SERVICE_URL, BOOKING_SERVICE_URL, HTTP_TIMEOUT
+from ..application.normalizers import normalize_handyman
 
 async def fetch_handymen_http() -> list[dict]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:

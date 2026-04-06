@@ -1,51 +1,9 @@
 from __future__ import annotations
 
-import os
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import redis.asyncio as redis_async
 from fastapi import HTTPException
-
-from tests.service_loader import load_service_app_module
-
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-os.environ.setdefault("JWT_SECRET", "test-secret-key-for-helpers")
-os.environ.setdefault("JWT_ALGORITHM", "HS256")
-
-
-@pytest.fixture
-def gateway_modules(monkeypatch):
-    fake_redis = MagicMock()
-    fake_redis.get = AsyncMock(return_value=None)
-    fake_redis.set = AsyncMock(return_value=True)
-    fake_redis.incr = AsyncMock(return_value=1)
-    fake_redis.expire = AsyncMock(return_value=True)
-    fake_redis.mget = AsyncMock(return_value=[None, None, None])
-    fake_redis.pipeline = MagicMock()
-
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
-
-    load_service_app_module(
-        "gateway-service",
-        "clients/redis_client",
-        package_name="gateway_service_test_app",
-        reload_modules=True,
-    )
-    breaker_module = load_service_app_module(
-        "gateway-service",
-        "breakers/breaker",
-        package_name="gateway_service_test_app",
-    )
-    rbac_module = load_service_app_module(
-        "gateway-service",
-        "utils/rbac",
-        package_name="gateway_service_test_app",
-    )
-    breaker_module.redis_client = fake_redis
-    return breaker_module, rbac_module, fake_redis
-
 
 @pytest.mark.unit
 class TestRequireRole:
@@ -72,7 +30,6 @@ class TestRequireRole:
 
         assert exc_info.value.status_code == 403
         assert exc_info.value.detail == "Access forbidden for this role"
-
 
 @pytest.mark.unit
 class TestCircuitBreaker:
@@ -217,45 +174,6 @@ class TestCircuitBreaker:
         assert status["opened_at_epoch"] == 100.0
         assert status["open_for_seconds"] == 8.2
 
-
-@pytest.fixture
-def helpers_module(monkeypatch):
-    """Load the gateway helpers module with fake Redis and stubbed clients."""
-    fake_redis = MagicMock()
-    fake_redis.get = AsyncMock(return_value=None)
-    fake_redis.set = AsyncMock(return_value=True)
-    fake_redis.incr = AsyncMock(return_value=1)
-    fake_redis.expire = AsyncMock(return_value=True)
-    fake_redis.mget = AsyncMock(return_value=[None, None, None])
-    fake_redis.pipeline = MagicMock()
-
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    monkeypatch.setattr(redis_async, "from_url", lambda *args, **kwargs: fake_redis)
-
-    load_service_app_module(
-        "gateway-service",
-        "clients/redis_client",
-        package_name="gateway_helpers_test_app",
-        reload_modules=True,
-    )
-    load_service_app_module(
-        "gateway-service",
-        "breakers/breaker",
-        package_name="gateway_helpers_test_app",
-    )
-    load_service_app_module(
-        "gateway-service",
-        "config",
-        package_name="gateway_helpers_test_app",
-    )
-    helpers_mod = load_service_app_module(
-        "gateway-service",
-        "utils/helpers",
-        package_name="gateway_helpers_test_app",
-    )
-    return helpers_mod
-
-
 @pytest.mark.unit
 class TestUserEmail:
 
@@ -270,7 +188,6 @@ class TestUserEmail:
     def test_returns_string_for_numeric_sub(self, helpers_module):
         assert helpers_module._user_email({"sub": 42}) == "42"
 
-
 @pytest.mark.unit
 class TestHasRole:
 
@@ -283,7 +200,6 @@ class TestHasRole:
     def test_has_role_returns_false_for_empty_roles(self, helpers_module):
         assert helpers_module._has_role({}, "admin") is False
 
-
 @pytest.mark.unit
 class TestAuthUserHasAnyRole:
 
@@ -295,7 +211,6 @@ class TestAuthUserHasAnyRole:
 
     def test_empty_auth_roles(self, helpers_module):
         assert helpers_module._auth_user_has_any_role({}, ["admin"]) is False
-
 
 @pytest.mark.unit
 class TestOverallStatus:
@@ -310,7 +225,6 @@ class TestOverallStatus:
 
     def test_empty_list(self, helpers_module):
         assert helpers_module._overall_status([]) == "up"
-
 
 @pytest.mark.unit
 class TestBookingOwnedOrAdmin:
@@ -359,7 +273,6 @@ class TestBookingOwnedOrAdmin:
             )
 
         assert exc.value.status_code == 403
-
 
 @pytest.mark.unit
 class TestGetAuthUserAfterRegister:

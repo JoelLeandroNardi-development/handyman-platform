@@ -38,7 +38,6 @@ class _SessionCtx:
 
 @pytest.mark.unit
 class TestOutboxWorkerHelpers:
-
     @pytest.mark.asyncio
     async def test_claim_batch_returns_scalar_rows(self):
         rows = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
@@ -177,9 +176,6 @@ class TestRunOutboxLoop:
 
 @pytest.mark.unit
 class TestBookingRejectedOutboxBehavior:
-    """Verify outbox worker handles booking.rejected events correctly,
-    covering the retry and idempotency acceptance criteria."""
-
     @pytest.mark.asyncio
     async def test_booking_rejected_event_published_and_marked_sent(self, monkeypatch):
         stop_event = asyncio.Event()
@@ -291,7 +287,6 @@ class TestBookingRejectedOutboxBehavior:
             poll_interval=0.01,
         )
 
-        # attempts reaches max_attempts → _mark_failure transitions status to FAILED
         mark_failure.assert_awaited_once_with(session, OutboxEventModel, 12, 20, "permanent failure", 20)
 
     @pytest.mark.asyncio

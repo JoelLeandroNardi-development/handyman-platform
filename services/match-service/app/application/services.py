@@ -3,17 +3,19 @@ from __future__ import annotations
 import httpx
 import json
 
-from ..application.mappers import norm, utc_now_iso, normalize_handyman
-from ..domain.constants import (
+from ..application.normalizers import normalize_handyman
+from ..infrastructure.availability_projection import clean_slots, get_availability_slots, delete_availability_projection, availability_projection_count
+from ..infrastructure.clients import fetch_handymen_http, fetch_completed_jobs_counts_batch, fetch_availability_http
+from ..infrastructure.projections import get_handyman_projection, handyman_projection_count, list_projected_handymen_by_skill, redis_client
+from ..infrastructure.redis_keys import (
     PROJ_HANDYMAN_KEY,
     PROJ_HANDYMEN_INDEX,
     PROJ_HANDYMEN_SKILL_INDEX,
     PROJ_AVAIL_KEY,
     PROJ_AVAIL_INDEX
 )
-from ..infrastructure.availability_projection import clean_slots, get_availability_slots, delete_availability_projection, availability_projection_count
-from ..infrastructure.clients import fetch_handymen_http, fetch_completed_jobs_counts_batch, fetch_availability_http
-from ..infrastructure.projections import get_handyman_projection, handyman_projection_count, list_projected_handymen_by_skill, redis_client
+from shared.core.utils.datetime import utc_now_iso
+from shared.core.utils.normalize import norm
 
 async def upsert_handyman_projection(doc: dict) -> None:
     normalized = normalize_handyman(doc)

@@ -2,14 +2,12 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-
 @pytest.fixture
 def failure_scenario_handler():
     async def handler_that_fails(payload):
         raise ValueError(f"Failed to process: {payload}")
     
     return handler_that_fails
-
 
 @pytest.fixture
 def handler_with_retry_count():
@@ -26,11 +24,9 @@ def handler_with_retry_count():
     
     return RetryTracker()
 
-
 @pytest.fixture
 def mock_dlq_publisher():
     return AsyncMock()
-
 
 @pytest.fixture
 def malformed_messages():
@@ -42,7 +38,6 @@ def malformed_messages():
         None,
     ]
 
-
 @pytest.fixture
 def timeout_config():
     return {
@@ -50,7 +45,6 @@ def timeout_config():
         "connection_timeout_seconds": 10,
         "rabbitmq_heartbeat": 60,
     }
-
 
 @pytest.fixture
 def dlq_config():
@@ -60,4 +54,3 @@ def dlq_config():
         "dlq_queue_name": "booking_dlq",
         "dlq_enabled": True,
     }
-

@@ -5,9 +5,7 @@ import sys
 import types
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
 
 def load_service_app_module(
     service_dir: str,

@@ -5,8 +5,8 @@ import os
 import redis.asyncio as redis
 
 from .cache_keys import bucket_set_key
-from ..application.mappers import norm
-from ..domain.constants import PROJ_HANDYMAN_KEY, PROJ_HANDYMEN_INDEX, PROJ_HANDYMEN_SKILL_INDEX
+from .redis_keys import PROJ_HANDYMAN_KEY, PROJ_HANDYMEN_INDEX, PROJ_HANDYMEN_SKILL_INDEX
+from shared.core.utils.normalize import norm
 
 REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:

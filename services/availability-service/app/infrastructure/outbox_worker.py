@@ -26,12 +26,6 @@ def _envelope(routing_key: str, payload: dict) -> dict:
     }
 
 async def enqueue_domain_event(event: dict) -> None:
-    """
-    Producers should call this instead of publishing directly.
-    Enforces routing_key == event["event_type"].
-
-    This keeps HTTP + consumers working even if RabbitMQ is down.
-    """
     event_type = (event or {}).get("event_type")
     if not event_type or not isinstance(event_type, str):
         await redis_client.rpush(OUTBOX_DLQ, json.dumps({"bad_event": event, "reason": "missing_event_type"}))

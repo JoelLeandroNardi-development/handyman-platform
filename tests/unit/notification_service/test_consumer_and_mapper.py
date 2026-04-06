@@ -1,27 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import os
 
 import pytest
 
-from tests.service_loader import load_service_app_module
-
-
-os.environ.setdefault("NOTIFICATION_DB", "postgresql+asyncpg://admin:admin@localhost:5432/notification_db")
-
-
-mapper_module = load_service_app_module("notification-service", "application/mappers", package_name="notification_service_app", reload_modules=True)
-consumer_module = load_service_app_module("notification-service", "infrastructure/consumer", package_name="notification_service_app", reload_modules=True)
-
-
 @pytest.mark.unit
 class TestNotificationMapper:
-    def test_map_event_missing_type_or_id_returns_empty(self):
+    def test_map_event_missing_type_or_id_returns_empty(self, mapper_module):
         assert mapper_module.map_event_to_notifications({"event_type": "slot.confirmed"}) == []
         assert mapper_module.map_event_to_notifications({"event_id": "evt-1"}) == []
 
-    def test_map_booking_requested_targets_handyman(self):
+    def test_map_booking_requested_targets_handyman(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-1",
@@ -37,7 +26,7 @@ class TestNotificationMapper:
         assert intents[0]["user_email"] == "handy@example.com"
         assert intents[0]["type"] == "job.requested"
 
-    def test_map_slot_confirmed_targets_both_parties(self):
+    def test_map_slot_confirmed_targets_both_parties(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-2",
@@ -53,7 +42,7 @@ class TestNotificationMapper:
         assert {intent["user_email"] for intent in intents} == {"user@example.com", "handy@example.com"}
         assert {intent["type"] for intent in intents} == {"booking.confirmed", "job.confirmed"}
 
-    def test_map_booking_completed_targets_both_parties(self):
+    def test_map_booking_completed_targets_both_parties(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-completed-1",
@@ -75,7 +64,7 @@ class TestNotificationMapper:
             assert intent["entity_id"] == "b-complete-1"
             assert intent["category"] == "booking"
 
-    def test_map_booking_completed_only_user_when_no_handyman(self):
+    def test_map_booking_completed_only_user_when_no_handyman(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-completed-2",
@@ -90,7 +79,7 @@ class TestNotificationMapper:
         assert intents[0]["user_email"] == "user@example.com"
         assert intents[0]["type"] == "booking.completed"
 
-    def test_map_booking_completed_empty_when_no_parties(self):
+    def test_map_booking_completed_empty_when_no_parties(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-completed-3",
@@ -100,7 +89,7 @@ class TestNotificationMapper:
         )
         assert intents == []
 
-    def test_map_booking_rejected_targets_user(self):
+    def test_map_booking_rejected_targets_user(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-rejected-1",
@@ -120,7 +109,7 @@ class TestNotificationMapper:
         assert intents[0]["payload"]["reason"] == "Conflicting schedule"
         assert intents[0]["entity_id"] == "b-reject-1"
 
-    def test_map_booking_rejected_empty_when_no_user(self):
+    def test_map_booking_rejected_empty_when_no_user(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-rejected-2",
@@ -130,7 +119,7 @@ class TestNotificationMapper:
         )
         assert intents == []
 
-    def test_map_booking_completed_by_user_targets_handyman(self):
+    def test_map_booking_completed_by_user_targets_handyman(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-cbu-1",
@@ -149,7 +138,7 @@ class TestNotificationMapper:
         assert intents[0]["payload"]["user_email"] == "user@example.com"
         assert intents[0]["entity_id"] == "b-cbu-1"
 
-    def test_map_booking_completed_by_user_empty_when_no_handyman(self):
+    def test_map_booking_completed_by_user_empty_when_no_handyman(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-cbu-2",
@@ -159,7 +148,7 @@ class TestNotificationMapper:
         )
         assert intents == []
 
-    def test_map_booking_completed_by_handyman_targets_user(self):
+    def test_map_booking_completed_by_handyman_targets_user(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-cbh-1",
@@ -178,7 +167,7 @@ class TestNotificationMapper:
         assert intents[0]["payload"]["handyman_email"] == "handy@example.com"
         assert intents[0]["entity_id"] == "b-cbh-1"
 
-    def test_map_booking_completed_by_handyman_empty_when_no_user(self):
+    def test_map_booking_completed_by_handyman_empty_when_no_user(self, mapper_module):
         intents = mapper_module.map_event_to_notifications(
             {
                 "event_id": "evt-cbh-2",
@@ -188,11 +177,10 @@ class TestNotificationMapper:
         )
         assert intents == []
 
-
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestNotificationConsumer:
-    async def test_handle_event_no_intents(self, monkeypatch):
+    async def test_handle_event_no_intents(self, consumer_module, monkeypatch):
         called = False
 
         async def fake_publish(_email, _payload):
@@ -206,7 +194,7 @@ class TestNotificationConsumer:
 
         assert called is False
 
-    async def test_handle_event_skips_disabled_category(self, monkeypatch):
+    async def test_handle_event_skips_disabled_category(self, consumer_module, monkeypatch):
         intent = {
             "user_email": "user@example.com",
             "event_id": "evt-1",
@@ -234,7 +222,7 @@ class TestNotificationConsumer:
 
         await consumer_module.handle_event(db=object(), event={"event_id": "evt-1", "event_type": "slot.confirmed"})
 
-    async def test_handle_event_persists_and_publishes(self, monkeypatch):
+    async def test_handle_event_persists_and_publishes(self, consumer_module, monkeypatch):
         published: list[tuple[str, dict]] = []
 
         intent = {
@@ -282,7 +270,7 @@ class TestNotificationConsumer:
         assert published[0][1]["type"] == "notification.created"
         assert published[0][1]["unread_count"] == 3
 
-    async def test_handle_event_fanout_publishes_for_each_recipient(self, monkeypatch):
+    async def test_handle_event_fanout_publishes_for_each_recipient(self, consumer_module, monkeypatch):
         published: list[tuple[str, dict]] = []
 
         intents = [
@@ -346,7 +334,7 @@ class TestNotificationConsumer:
         assert len(published) == 2
         assert {email for email, _ in published} == {"user@example.com", "handy@example.com"}
 
-    async def test_handle_event_duplicate_on_retry_has_no_side_effects(self, monkeypatch):
+    async def test_handle_event_duplicate_on_retry_has_no_side_effects(self, consumer_module, monkeypatch):
         publish_calls: list[tuple[str, dict]] = []
         unread_calls: list[str] = []
 
