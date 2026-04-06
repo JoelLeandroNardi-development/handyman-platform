@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+ARG PYTHON_VERSION=3.14.3
+FROM python:${PYTHON_VERSION}-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -10,10 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/match-service/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && python -m pip install --no-cache-dir -r /app/requirements.txt
 
 COPY shared /app/shared
-RUN pip install --no-cache-dir -e /app/shared
+RUN python -m pip install --no-cache-dir -e /app/shared
 
 COPY services/match-service/app /app/app
 COPY services/match-service/alembic /app/alembic

@@ -55,21 +55,19 @@ test-specific:
 
 install-all-deps:
 	pip install -r requirements-test.txt
-	cd services/auth-service && pip install -r requirements.txt && cd ../..
-	cd services/booking-service && pip install -r requirements.txt && cd ../..
-	cd services/availability-service && pip install -r requirements.txt && cd ../..
-	cd services/handyman-service && pip install -r requirements.txt && cd ../..
-	cd services/match-service && pip install -r requirements.txt && cd ../..
-	cd services/user-service && pip install -r requirements.txt && cd ../..
-	cd services/gateway-service && pip install -r requirements.txt && cd ../..
+	@for service in services/*; do \
+		if [ -f "$$service/requirements.txt" ]; then \
+			(cd "$$service" && pip install -r requirements.txt); \
+		fi; \
+	done
 	cd shared && pip install -e ".[test]" && cd ..
 	@echo "All dependencies installed!"
 
 test-docker:
-	docker-compose up -d postgres redis rabbitmq
+	docker compose up -d postgres redis rabbitmq
 	sleep 5
 	pytest tests/ -v
-	docker-compose down
+	docker compose down
 
 quality: test-cov
 	@echo "Running linting (if configured)..."

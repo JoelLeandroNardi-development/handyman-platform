@@ -441,7 +441,12 @@ Flow:
 
 - Docker
 - Docker Compose v2+
-- Python 3.11+ for local non-Docker work
+- Python 3.14.3 for local non-Docker work
+
+The repository is now standardized on Python 3.14.3 across local development,
+Docker images, and GitHub Actions. The repository root includes a
+`.python-version` file so pyenv, asdf, uv, and compatible tooling can pick up
+the same interpreter automatically.
 
 ## Start everything
 
@@ -540,14 +545,14 @@ There is also a custom `tests/service_loader.py` to support service module loadi
 ## Install test dependencies
 
 ```bash
-pip install -r requirements-test.txt
+python -m pip install -r requirements-test.txt
 ```
 
 ## Install the shared package in editable mode
 
 ```bash
 cd shared
-pip install -e ".[test]"
+python -m pip install -e ".[test]"
 cd ..
 ```
 
@@ -585,8 +590,7 @@ The repo currently registers markers such as:
 
 GitHub Actions runs automated tests on:
 
-- Python 3.11
-- Python 3.12
+- Python 3.14.3
 
 The test workflow also provisions:
 

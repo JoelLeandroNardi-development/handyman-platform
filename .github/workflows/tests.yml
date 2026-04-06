@@ -9,6 +9,7 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PYTHONPATH: ${{ github.workspace }}
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
   test:
@@ -53,46 +54,39 @@ jobs:
         ports:
           - 6379:6379
 
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-
     steps:
     - uses: actions/checkout@v5
     
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.14.3
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version-file: .python-version
         cache: 'pip'
+        cache-dependency-path: |
+          .python-version
+          requirements-test.txt
+          shared/pyproject.toml
+          services/*/requirements.txt
+
+    - name: Show Python version
+      run: python -VV
 
     - name: Install test dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-test.txt
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r requirements-test.txt
 
     - name: Install shared module
       run: |
         cd shared
-        pip install -e ".[test]"
+        python -m pip install -e ".[test]"
         cd ..
 
     - name: Install service dependencies
       run: |
-        services=(
-          "services/auth-service"
-          "services/availability-service"
-          "services/booking-service"
-          "services/handyman-service"
-          "services/match-service"
-          "services/notification-service"
-          "services/user-service"
-          "services/gateway-service"
-        )
-        
-        for service in "${services[@]}"; do
+        for service in services/*/; do
           if [ -f "$service/requirements.txt" ]; then
-            pip install -r "$service/requirements.txt"
+            python -m pip install -r "$service/requirements.txt"
           fi
         done
 
@@ -106,6 +100,7 @@ jobs:
     - name: Run unit tests
       run: pytest tests/unit/ -v --cov=shared --cov=services --cov-report=xml --cov-report=term-missing
       env:
+        BCRYPT_ROUNDS: "4"
         JWT_SECRET: test-secret-key-for-ci
         JWT_ALGORITHM: HS256
         BOOKING_DB: "sqlite+aiosqlite:///:memory:"
@@ -118,6 +113,7 @@ jobs:
     - name: Run integration tests
       run: pytest tests/integration/ -v --cov=shared --cov=services --cov-report=xml --cov-report=term-missing --cov-append
       env:
+        BCRYPT_ROUNDS: "4"
         DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/handyman_test
         RABBIT_URL: amqp://guest:guest@localhost:5672/
         REDIS_URL: redis://localhost:6379
@@ -147,7 +143,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report-${{ matrix.python-version }}
+        name: coverage-report-python-3.14.3
         path: htmlcov/
 
   markers-check:
@@ -167,17 +163,25 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
+        python-version-file: .python-version
         cache: 'pip'
+        cache-dependency-path: |
+          .python-version
+          requirements-test.txt
+          shared/pyproject.toml
+          services/*/requirements.txt
+
+    - name: Show Python version
+      run: python -VV
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-test.txt
-        cd shared && pip install -e ".[test]" && cd ..
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r requirements-test.txt
+        cd shared && python -m pip install -e ".[test]" && cd ..
         for service in services/*/; do
           if [ -f "$service/requirements.txt" ]; then
-            pip install -r "$service/requirements.txt"
+            python -m pip install -r "$service/requirements.txt"
           fi
         done
 
