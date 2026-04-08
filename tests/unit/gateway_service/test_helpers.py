@@ -178,53 +178,53 @@ class TestCircuitBreaker:
 class TestUserEmail:
 
     def test_returns_sub(self, helpers_module):
-        assert helpers_module._user_email({"sub": "u@ex.com"}) == "u@ex.com"
+        assert helpers_module.user_email({"sub": "u@ex.com"}) == "u@ex.com"
 
     def test_raises_when_sub_missing(self, helpers_module):
         with pytest.raises(HTTPException) as exc:
-            helpers_module._user_email({})
+            helpers_module.user_email({})
         assert exc.value.status_code == 401
 
     def test_returns_string_for_numeric_sub(self, helpers_module):
-        assert helpers_module._user_email({"sub": 42}) == "42"
+        assert helpers_module.user_email({"sub": 42}) == "42"
 
 @pytest.mark.unit
 class TestHasRole:
 
     def test_has_role_case_insensitive(self, helpers_module):
-        assert helpers_module._has_role({"roles": ["Admin"]}, "admin") is True
+        assert helpers_module.has_role({"roles": ["Admin"]}, "admin") is True
 
     def test_has_role_returns_false_when_absent(self, helpers_module):
-        assert helpers_module._has_role({"roles": ["user"]}, "admin") is False
+        assert helpers_module.has_role({"roles": ["user"]}, "admin") is False
 
     def test_has_role_returns_false_for_empty_roles(self, helpers_module):
-        assert helpers_module._has_role({}, "admin") is False
+        assert helpers_module.has_role({}, "admin") is False
 
 @pytest.mark.unit
 class TestAuthUserHasAnyRole:
 
     def test_matching_roles(self, helpers_module):
-        assert helpers_module._auth_user_has_any_role({"roles": ["handyman"]}, ["handyman", "admin"]) is True
+        assert helpers_module.auth_user_has_any_role({"roles": ["handyman"]}, ["handyman", "admin"]) is True
 
     def test_disjoint_roles(self, helpers_module):
-        assert helpers_module._auth_user_has_any_role({"roles": ["user"]}, ["admin"]) is False
+        assert helpers_module.auth_user_has_any_role({"roles": ["user"]}, ["admin"]) is False
 
     def test_empty_auth_roles(self, helpers_module):
-        assert helpers_module._auth_user_has_any_role({}, ["admin"]) is False
+        assert helpers_module.auth_user_has_any_role({}, ["admin"]) is False
 
 @pytest.mark.unit
 class TestOverallStatus:
 
     def test_all_up(self, helpers_module):
         results = [{"status": "up"}, {"status": "up"}]
-        assert helpers_module._overall_status(results) == "up"
+        assert helpers_module.overall_status(results) == "up"
 
     def test_degraded(self, helpers_module):
         results = [{"status": "up"}, {"status": "down"}]
-        assert helpers_module._overall_status(results) == "degraded"
+        assert helpers_module.overall_status(results) == "degraded"
 
     def test_empty_list(self, helpers_module):
-        assert helpers_module._overall_status([]) == "up"
+        assert helpers_module.overall_status([]) == "up"
 
 @pytest.mark.unit
 class TestBookingOwnedOrAdmin:
@@ -234,7 +234,7 @@ class TestBookingOwnedOrAdmin:
         booking = {"user_email": "a@ex.com", "handyman_email": "b@ex.com"}
         helpers_module.get_booking = AsyncMock(return_value=booking)
 
-        result = await helpers_module._booking_owned_or_admin(
+        result = await helpers_module.booking_owned_or_admin(
             "b-1", {"sub": "admin@ex.com", "roles": ["admin"]}, "req-1"
         )
 
@@ -245,7 +245,7 @@ class TestBookingOwnedOrAdmin:
         booking = {"user_email": "owner@ex.com", "handyman_email": "h@ex.com"}
         helpers_module.get_booking = AsyncMock(return_value=booking)
 
-        result = await helpers_module._booking_owned_or_admin(
+        result = await helpers_module.booking_owned_or_admin(
             "b-1", {"sub": "owner@ex.com", "roles": ["user"]}, "req-1"
         )
 
@@ -256,7 +256,7 @@ class TestBookingOwnedOrAdmin:
         booking = {"user_email": "u@ex.com", "handyman_email": "hm@ex.com"}
         helpers_module.get_booking = AsyncMock(return_value=booking)
 
-        result = await helpers_module._booking_owned_or_admin(
+        result = await helpers_module.booking_owned_or_admin(
             "b-1", {"sub": "hm@ex.com", "roles": ["handyman"]}, "req-1"
         )
 
@@ -268,7 +268,7 @@ class TestBookingOwnedOrAdmin:
         helpers_module.get_booking = AsyncMock(return_value=booking)
 
         with pytest.raises(HTTPException) as exc:
-            await helpers_module._booking_owned_or_admin(
+            await helpers_module.booking_owned_or_admin(
                 "b-1", {"sub": "stranger@ex.com", "roles": ["user"]}, "req-1"
             )
 
@@ -282,7 +282,7 @@ class TestGetAuthUserAfterRegister:
         auth_user = {"id": 1, "email": "u@ex.com", "roles": ["user"]}
         helpers_module.get_auth_user_by_email = AsyncMock(return_value=auth_user)
 
-        result = await helpers_module._get_auth_user_after_register("u@ex.com", "req-1")
+        result = await helpers_module.get_auth_user_after_register("u@ex.com", "req-1")
 
         assert result == auth_user
 
@@ -293,6 +293,6 @@ class TestGetAuthUserAfterRegister:
         )
 
         with pytest.raises(HTTPException) as exc:
-            await helpers_module._get_auth_user_after_register("u@ex.com", "req-1")
+            await helpers_module.get_auth_user_after_register("u@ex.com", "req-1")
 
         assert exc.value.status_code == 502
