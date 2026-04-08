@@ -1,4 +1,4 @@
-from app.breakers.breaker import CircuitBreaker
+from .breaker import CircuitBreaker
 
 cb_auth = CircuitBreaker("auth-service", 5, 10)
 cb_availability = CircuitBreaker("availability-service", 5, 10)

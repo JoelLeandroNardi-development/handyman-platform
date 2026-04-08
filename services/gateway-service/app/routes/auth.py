@@ -1,42 +1,24 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from typing import List
 
-from app.clients.auth_client import *
-from app.clients.handyman_client import get_handyman, create_handyman
-from app.clients.user_client import get_user, create_user
-from app.schemas import (
-    Register,
-    RegisterResponse,
-    Login,
-    GoogleLoginRequest,
-    GoogleLoginResponse,
-    TokenPairResponse,
-    RefreshRequest,
-    LogoutRequest,
-    ForgotPasswordRequest,
-    ResetPasswordRequest,
-    EmailVerifyRequest,
-    EmailVerifyConfirmRequest,
-    AuthActionResponse,
-    AuthUserResponse,
-    UpdateAuthUser,
-    DeleteAuthUserResponse,
-    OnboardingUserRequest,
-    OnboardingUserResponse,
-    OnboardingHandymanRequest,
-    OnboardingHandymanResponse,
-    OnboardingCombinedRequest,
-    OnboardingCombinedResponse,
-    MeResponse,
+from ..clients.auth_client import *
+from ..clients.handyman_client import get_handyman, create_handyman
+from ..clients.user_client import get_user, create_user
+from ..schemas import (
+    Register, RegisterResponse, Login, GoogleLoginRequest, GoogleLoginResponse, TokenPairResponse, RefreshRequest,
+    LogoutRequest, ForgotPasswordRequest, ResetPasswordRequest, EmailVerifyRequest, EmailVerifyConfirmRequest,
+    AuthActionResponse, AuthUserResponse, UpdateAuthUser, DeleteAuthUserResponse, OnboardingUserRequest,
+    OnboardingUserResponse, OnboardingHandymanRequest, OnboardingHandymanResponse, OnboardingCombinedRequest,
+    OnboardingCombinedResponse, MeResponse,
 )
-from app.utils.helpers import (
-    _user_email,
-    _has_role,
-    _auth_user_has_any_role,
-    _get_auth_user_after_register,
+from ..utils.helpers import (
+    user_email,
+    has_role,
+    auth_user_has_any_role,
+    get_auth_user_after_register,
 )
-from app.utils.rbac import require_role
-from app.utils.security import get_current_user
+from ..utils.rbac import require_role
+from ..utils.security import get_current_user
 
 router = APIRouter()
 
@@ -122,9 +104,9 @@ async def onboarding_user(data: OnboardingUserRequest, request: Request):
         request_id=request.state.request_id,
     )
 
-    auth_user = await _get_auth_user_after_register(data.email, request.state.request_id)
+    auth_user = await get_auth_user_after_register(data.email, request.state.request_id)
 
-    if not _auth_user_has_any_role(auth_user, ["user", "admin"]):
+    if not auth_user_has_any_role(auth_user, ["user", "admin"]):
         raise HTTPException(status_code=422, detail="Auth user must have role user or admin")
 
     user_profile = await create_user(
@@ -161,9 +143,9 @@ async def onboarding_handyman(data: OnboardingHandymanRequest, request: Request)
         request_id=request.state.request_id,
     )
 
-    auth_user = await _get_auth_user_after_register(data.email, request.state.request_id)
+    auth_user = await get_auth_user_after_register(data.email, request.state.request_id)
 
-    if not _auth_user_has_any_role(auth_user, ["handyman", "admin"]):
+    if not auth_user_has_any_role(auth_user, ["handyman", "admin"]):
         raise HTTPException(status_code=422, detail="Auth user must have role handyman or admin")
 
     handyman_profile = await create_handyman(
@@ -203,12 +185,12 @@ async def onboarding_combined(data: OnboardingCombinedRequest, request: Request)
         request_id=request.state.request_id,
     )
 
-    auth_user = await _get_auth_user_after_register(data.email, request.state.request_id)
+    auth_user = await get_auth_user_after_register(data.email, request.state.request_id)
 
-    if not _auth_user_has_any_role(auth_user, ["user", "admin"]):
+    if not auth_user_has_any_role(auth_user, ["user", "admin"]):
         raise HTTPException(status_code=422, detail="Auth user must have role user or admin")
 
-    if not _auth_user_has_any_role(auth_user, ["handyman", "admin"]):
+    if not auth_user_has_any_role(auth_user, ["handyman", "admin"]):
         raise HTTPException(status_code=422, detail="Auth user must have role handyman or admin")
 
     user_profile = await create_user(
@@ -258,20 +240,20 @@ async def onboarding_combined(data: OnboardingCombinedRequest, request: Request)
 
 @router.get("/me", response_model=MeResponse, tags=["Auth"])
 async def get_me(request: Request, user=Depends(get_current_user)):
-    email = _user_email(user)
+    email = user_email(user)
     roles = list(user.get("roles") or [])
 
     user_profile = None
     handyman_profile = None
 
-    if _has_role(user, "user") or _has_role(user, "admin"):
+    if has_role(user, "user") or has_role(user, "admin"):
         try:
             user_profile = await get_user(email, request_id=request.state.request_id, user_payload=user)
         except HTTPException as e:
             if e.status_code != 404:
                 raise
 
-    if _has_role(user, "handyman") or _has_role(user, "admin"):
+    if has_role(user, "handyman") or has_role(user, "admin"):
         try:
             handyman_profile = await get_handyman(email, request_id=request.state.request_id, user_payload=user)
         except HTTPException as e:

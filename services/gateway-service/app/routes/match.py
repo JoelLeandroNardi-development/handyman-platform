@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Request, Query
 from typing import List
 
-from app.clients.match_client import match_request, list_match_logs, delete_match_log
-from app.schemas import MatchRequest, MatchResult, MatchLogResponse, DeleteMatchLogResponse
-from app.utils.rbac import require_role
-from app.utils.security import get_current_user
+from ..clients.match_client import match_request, list_match_logs, delete_match_log
+from ..schemas import MatchRequest, MatchResult, MatchLogResponse, DeleteMatchLogResponse
+from ..utils.rbac import require_role
+from ..utils.security import get_current_user
 
 router = APIRouter()
 

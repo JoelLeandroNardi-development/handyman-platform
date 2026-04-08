@@ -1,20 +1,18 @@
 from fastapi import APIRouter, Depends, Request, Query
 
-from app.clients.availability_client import (
+from ..clients.availability_client import (
     set_availability,
     get_availability,
     clear_availability,
     list_all_availability,
 )
-from app.schemas import (
-    SetAvailability,
-    AvailabilityMessageResponse,
-    AvailabilityResponse,
-    AvailabilityListResponse,
+from ..schemas import (
+    SetAvailability, AvailabilityMessageResponse,
+    AvailabilityResponse, AvailabilityListResponse,
 )
-from app.utils.helpers import _user_email
-from app.utils.rbac import require_role
-from app.utils.security import get_current_user
+from ..utils.helpers import user_email
+from ..utils.rbac import require_role
+from ..utils.security import get_current_user
 
 router = APIRouter()
 
@@ -46,14 +44,14 @@ async def admin_list_all_availability(
 @router.get("/me/availability", response_model=AvailabilityResponse, tags=["Availability"])
 async def get_my_availability(request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await get_availability(_user_email(user), request_id=request.state.request_id, user_payload=user)
+    return await get_availability(user_email(user), request_id=request.state.request_id, user_payload=user)
 
 @router.post("/me/availability", response_model=AvailabilityMessageResponse, tags=["Availability"])
 async def set_my_availability(data: SetAvailability, request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await set_availability(_user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
+    return await set_availability(user_email(user), data.model_dump(), request_id=request.state.request_id, user_payload=user)
 
 @router.delete("/me/availability", response_model=AvailabilityMessageResponse, tags=["Availability"])
 async def clear_my_availability(request: Request, user=Depends(get_current_user)):
     require_role(user, ["handyman", "admin"])
-    return await clear_availability(_user_email(user), request_id=request.state.request_id, user_payload=user)
+    return await clear_availability(user_email(user), request_id=request.state.request_id, user_payload=user)

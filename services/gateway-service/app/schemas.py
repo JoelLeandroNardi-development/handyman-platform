@@ -1,84 +1,39 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from shared.schemas.auth import (
-    Register,
-    RegisterResponse,
-    Login,
-    GoogleLoginRequest,
-    GoogleLoginResponse,
-    TokenPairResponse,
-    TokenResponse,
-    RefreshRequest,
-    LogoutRequest,
-    ForgotPasswordRequest,
-    ResetPasswordRequest,
-    EmailVerifyRequest,
-    EmailVerifyConfirmRequest,
-    AuthActionResponse,
-    AuthUserResponse,
-    UpdateAuthUser,
-    DeleteAuthUserResponse,
+    Register, RegisterResponse, Login, GoogleLoginRequest, GoogleLoginResponse, TokenPairResponse,
+    TokenResponse, RefreshRequest, LogoutRequest, ForgotPasswordRequest, ResetPasswordRequest,
+    EmailVerifyRequest, EmailVerifyConfirmRequest, AuthActionResponse, AuthUserResponse,
+    UpdateAuthUser, DeleteAuthUserResponse,
 )
 from shared.schemas.users import (
-    CreateUser,
-    UpdateUserLocation,
-    UpdateUser,
-    UserResponse,
-    DeleteUserResponse,
+    CreateUser, UpdateUserLocation, UpdateUser,
+    UserResponse, DeleteUserResponse,
 )
 from shared.schemas.handymen import (
-    CreateHandyman,
-    UpdateLocation as UpdateHandymanLocation,
-    UpdateHandyman,
-    HandymanResponse,
-    SkillCatalogReplaceRequest,
-    SkillCatalogPatchRequest,
-    SkillCatalogSkillItem,
-    SkillCatalogCategoryItem,
-    SkillCatalogFlatResponse,
-    InvalidHandymanSkillsItem,
-    InvalidHandymanSkillsResponse,
-    HandymanReviewResponse,
-    DeleteHandymanResponse,
-    SkillsCatalogReplaceResponse,
-    SkillsCatalogPatchResponse,
+    CreateHandyman, UpdateLocation as UpdateHandymanLocation, UpdateHandyman, HandymanResponse,
+    SkillCatalogReplaceRequest, SkillCatalogPatchRequest, SkillCatalogSkillItem, SkillCatalogCategoryItem,
+    SkillCatalogFlatResponse, InvalidHandymanSkillsItem, InvalidHandymanSkillsResponse, HandymanReviewResponse,
+    DeleteHandymanResponse, SkillsCatalogReplaceResponse, SkillsCatalogPatchResponse,
 )
 from shared.schemas.availability import (
-    AvailabilitySlot,
-    SetAvailability,
-    AvailabilityMessageResponse,
-    AvailabilityResponse,
-    AvailabilityListResponse,
+    AvailabilitySlot, SetAvailability, AvailabilityMessageResponse,
+    AvailabilityResponse, AvailabilityListResponse,
 )
 from shared.schemas.match import (
-    MatchRequest,
-    MatchResult,
-    MatchLogResponse,
-    DeleteMatchLogResponse,
+    MatchRequest, MatchResult,
+    MatchLogResponse, DeleteMatchLogResponse,
 )
 from shared.schemas.bookings import (
-    BookingResponse,
-    ConfirmBookingResponse,
-    CancelBookingResponse,
-    CompleteBookingResponse,
-    RejectBookingRequest,
-    RejectBookingResponse,
-    UpdateBookingAdmin,
-    DeleteBookingResponse,
-    CompletedJobsCountResponse,
-    CompletedJobsCountsResponse,
+    BookingResponse, ConfirmBookingResponse, CancelBookingResponse, CompleteBookingResponse, 
+    RejectBookingRequest, RejectBookingResponse, UpdateBookingAdmin, DeleteBookingResponse, 
+    CompletedJobsCountResponse, CompletedJobsCountsResponse,
 )
 from shared.schemas.bookings import CreateBooking as CreateBookingRequest
 from shared.schemas.bookings import CancelBooking as CancelBookingRequest
 from shared.schemas.notifications import (
-    MarkAllReadResponse,
-    NotificationItem,
-    NotificationListResponse,
-    NotificationPreferencesResponse,
-    PushDeviceResponse,
-    RegisterPushDeviceRequest,
-    UnreadCountResponse,
-    UpdateNotificationPreferencesRequest,
+    MarkAllReadResponse, NotificationItem, NotificationListResponse, NotificationPreferencesResponse,
+    PushDeviceResponse, RegisterPushDeviceRequest, UnreadCountResponse, UpdateNotificationPreferencesRequest,
 )
 
 class OnboardingUserRequest(BaseModel):
@@ -95,7 +50,6 @@ class OnboardingUserRequest(BaseModel):
     country: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-
 
 class OnboardingHandymanRequest(BaseModel):
     email: str
@@ -115,7 +69,6 @@ class OnboardingHandymanRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
-
 class OnboardingCombinedRequest(BaseModel):
     email: str
     password: str
@@ -124,34 +77,28 @@ class OnboardingCombinedRequest(BaseModel):
     user_profile: CreateUser
     handyman_profile: CreateHandyman
 
-
 class OnboardingUserResponse(BaseModel):
     auth_user: AuthUserResponse
     user_profile: UserResponse
 
-
 class OnboardingHandymanResponse(BaseModel):
     auth_user: AuthUserResponse
     handyman_profile: HandymanResponse
-
 
 class OnboardingCombinedResponse(BaseModel):
     auth_user: AuthUserResponse
     user_profile: UserResponse
     handyman_profile: HandymanResponse
 
-
 class CreateHandymanReviewRequest(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     review_text: Optional[str] = Field(default=None, max_length=2000)
-
 
 class MeResponse(BaseModel):
     email: str
     roles: List[str]
     user_profile: Optional[UserResponse] = None
     handyman_profile: Optional[HandymanResponse] = None
-
 
 class OkResponse(BaseModel):
     ok: bool = True

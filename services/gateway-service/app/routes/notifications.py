@@ -5,19 +5,13 @@ import httpx
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
-from app.clients.notification_client import (
-    archive_my_notification,
-    delete_my_push_device,
-    get_my_notification_preferences,
-    get_my_unread_count,
-    list_my_notifications,
-    mark_all_my_notifications_read,
-    mark_my_notification_read,
-    register_my_push_device,
+from ..clients.notification_client import (
+    archive_my_notification, delete_my_push_device, get_my_notification_preferences, get_my_unread_count,
+    list_my_notifications, mark_all_my_notifications_read, mark_my_notification_read, register_my_push_device,
     update_my_notification_preferences,
 )
-from app.config import NOTIFICATION_SERVICE_URL
-from app.schemas import (
+from ..config import NOTIFICATION_SERVICE_URL
+from ..schemas import (
     MarkAllReadResponse,
     NotificationListResponse,
     NotificationPreferencesResponse,
@@ -27,7 +21,7 @@ from app.schemas import (
     UnreadCountResponse,
     UpdateNotificationPreferencesRequest,
 )
-from app.utils.security import get_current_user, get_current_user_sse
+from ..utils.security import get_current_user, get_current_user_sse
 
 router = APIRouter()
 

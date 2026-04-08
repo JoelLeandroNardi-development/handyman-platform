@@ -1,6 +1,6 @@
 import time
 
-from app.clients.redis_client import redis_client
+from ..clients.redis_client import redis_client
 
 class CircuitBreakerOpen(Exception):
     pass
