@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from typing import List
 
-from ..clients.auth_client import *
+from ..clients.auth_client import (
+    register_user, login_user, google_login_user, refresh_user_token, logout_user, forgot_password, 
+    reset_password, request_email_verification, confirm_email_verification, list_auth_users, 
+    get_auth_user, update_auth_user, delete_auth_user, get_auth_user_by_email,
+)
 from ..clients.handyman_client import get_handyman, create_handyman
 from ..clients.user_client import get_user, create_user
 from ..schemas import (
