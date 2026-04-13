@@ -116,21 +116,25 @@ class ErrorMessage(StrEnum):
     NOTIFICATION_NOT_FOUND = "Notification not found"
     DEVICE_NOT_FOUND = "Device not found"
 
-TABLE_NOTIFICATIONS = "notifications"
-TABLE_NOTIFICATION_PREFERENCES = "notification_preferences"
-TABLE_PUSH_DEVICES = "push_devices"
+class TableName(StrEnum):
+    NOTIFICATIONS = "notifications"
+    NOTIFICATION_PREFERENCES = "notification_preferences"
+    PUSH_DEVICES = "push_devices"
 
-COLUMN_USER_EMAIL = "user_email"
-COLUMN_EVENT_ID = "event_id"
-COLUMN_TYPE = "type"
-COLUMN_ENTITY_ID = "entity_id"
+class ColumnName(StrEnum):
+    USER_EMAIL = "user_email"
+    EVENT_ID = "event_id"
+    TYPE = "type"
+    ENTITY_ID = "entity_id"
+
+class PreferenceCategory(StrEnum):
+    BOOKING = NotificationCategory.BOOKING
+    CHAT = NotificationCategory.CHAT
+
+class SseSetting(StrEnum):
+    MEDIA_TYPE = "text/event-stream"
+    HEARTBEAT_INTERVAL_SECONDS = 15
 
 INDEX_UQ_NOTIFICATIONS_RECIPIENT_EVENT_TYPE_ENTITY = "uq_notifications_recipient_event_type_entity"
 
-SSE_MEDIA_TYPE = "text/event-stream"
-SSE_HEARTBEAT_INTERVAL_SECONDS = 15
-
 QUERY_STATUS_ALIAS = "status"
-
-PREFERENCE_CATEGORY_BOOKING = NotificationCategory.BOOKING
-PREFERENCE_CATEGORY_CHAT = NotificationCategory.CHAT

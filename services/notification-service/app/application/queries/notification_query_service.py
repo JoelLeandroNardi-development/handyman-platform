@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.sse import hub
-from ...domain.constants import HttpHeader, PayloadKey, SseEvent, SSE_HEARTBEAT_INTERVAL_SECONDS, SSE_MEDIA_TYPE
+from ...domain.constants import HttpHeader, PayloadKey, SseEvent, SseSetting
 from ...domain.schemas import NotificationListResponse, NotificationPreferencesResponse, UnreadCountResponse
 from ...infrastructure.repository import (
     get_preferences,
@@ -54,7 +54,7 @@ class NotificationQueryService:
                 yield f"event: {SseEvent.READY}\ndata: {json.dumps({PayloadKey.OK: True})}\n\n"
                 while True:
                     try:
-                        payload = await asyncio.wait_for(queue.get(), timeout=SSE_HEARTBEAT_INTERVAL_SECONDS)
+                        payload = await asyncio.wait_for(queue.get(), timeout=SseSetting.HEARTBEAT_INTERVAL_SECONDS)
                         yield f"event: {payload[PayloadKey.TYPE]}\ndata: {json.dumps(payload)}\n\n"
                     except asyncio.TimeoutError:
                         yield f"event: {SseEvent.PING}\ndata: {json.dumps({PayloadKey.OK: True})}\n\n"
@@ -63,7 +63,7 @@ class NotificationQueryService:
 
         return StreamingResponse(
             event_generator(),
-            media_type=SSE_MEDIA_TYPE,
+            media_type=SseSetting.MEDIA_TYPE,
             headers={
                 HttpHeader.CACHE_CONTROL: HttpHeader.CACHE_CONTROL_VALUE,
                 HttpHeader.CONNECTION: HttpHeader.CONNECTION_VALUE,

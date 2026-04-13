@@ -7,13 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..domain.constants import (
-    NotificationStatus,
-    COLUMN_ENTITY_ID,
-    COLUMN_EVENT_ID,
-    COLUMN_TYPE,
-    COLUMN_USER_EMAIL,
-)
+from ..domain.constants import ColumnName, NotificationStatus
 from ..domain.models import Notification, NotificationPreference, PushDevice
 
 async def create_notification_if_absent(
@@ -48,7 +42,7 @@ async def create_notification_if_absent(
             status=NotificationStatus.UNREAD,
         )
         .on_conflict_do_nothing(
-            index_elements=[COLUMN_USER_EMAIL, COLUMN_EVENT_ID, COLUMN_TYPE, COLUMN_ENTITY_ID]
+            index_elements=[ColumnName.USER_EMAIL, ColumnName.EVENT_ID, ColumnName.TYPE, ColumnName.ENTITY_ID]
         )
         .returning(Notification)
     )
