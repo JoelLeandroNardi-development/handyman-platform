@@ -1,11 +1,12 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
 
+from .constants import BookingStatus, TableName
 from ..infrastructure.db import Base
 from shared.core.outbox.model import make_outbox_event_model
 
 class Booking(Base):
-    __tablename__ = "bookings"
+    __tablename__ = TableName.BOOKINGS
 
     id = Column(Integer, primary_key=True)
     booking_id = Column(String, unique=True, nullable=False, index=True)
@@ -18,7 +19,7 @@ class Booking(Base):
 
     job_description = Column(String, nullable=True)
 
-    status = Column(String, nullable=False, default="PENDING")
+    status = Column(String, nullable=False, default=BookingStatus.PENDING)
     failure_reason = Column(String, nullable=True)
 
     canceled_at = Column(DateTime(timezone=True), nullable=True)

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import json
-import os
 import redis.asyncio as redis
 
 from .cache_keys import bucket_set_key
+from .config import CACHE_INDEX_TTL_BUFFER_SECONDS, REDIS_URL, REDIS_URL_MISSING_ERROR
 from .redis_keys import PROJ_HANDYMAN_KEY, PROJ_HANDYMEN_INDEX, PROJ_HANDYMEN_SKILL_INDEX
+from ..domain.constants import CacheMode
 from shared.core.utils.normalize import norm
 
-REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:
-    raise RuntimeError("REDIS_URL environment variable is not set")
+    raise RuntimeError(REDIS_URL_MISSING_ERROR)
 
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
@@ -57,8 +57,8 @@ async def handyman_projection_count() -> int:
 
 async def invalidate_bucket(mode: str, skill: str, b_lat: int, b_lon: int) -> int:
     mode = norm(mode)
-    if mode not in ("strict", "degraded"):
-        mode = "strict"
+    if mode not in (CacheMode.STRICT, CacheMode.DEGRADED):
+        mode = CacheMode.STRICT
 
     skill = norm(skill)
     set_key = bucket_set_key(mode, skill, b_lat, b_lon)
@@ -93,5 +93,5 @@ async def set_cache_with_index(
     pipe = redis_client.pipeline()
     pipe.set(cache_key_str, value, ex=ttl_seconds)
     pipe.sadd(set_key, cache_key_str)
-    pipe.expire(set_key, ttl_seconds + 30)
+    pipe.expire(set_key, ttl_seconds + CACHE_INDEX_TTL_BUFFER_SECONDS)
     await pipe.execute()

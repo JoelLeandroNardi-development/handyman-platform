@@ -4,22 +4,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .api.routes import router
+from .infrastructure.config import SERVICE_LOG_PREFIX, SERVICE_NAME
 from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
 from .infrastructure.outbox_worker import worker, outbox_stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[user-service] starting up...")
+    print(f"{SERVICE_LOG_PREFIX} starting up...")
     try:
         await publisher.start()
     except Exception as e:
-        print(f"[user-service] publisher start failed (ok): {type(e).__name__}: {e}")
+        print(f"{SERVICE_LOG_PREFIX} publisher start failed (ok): {type(e).__name__}: {e}")
 
     await worker.start()
 
     yield
 
-    print("[user-service] shutting down...")
+    print(f"{SERVICE_LOG_PREFIX} shutting down...")
     try:
         await worker.stop()
     except Exception:
@@ -36,7 +37,7 @@ app.include_router(router)
 async def health():
     return {
         "status": "ok",
-        "service": "user-service",
+        "service": SERVICE_NAME,
         "events_enabled": publisher.enabled,
         "exchange_name": EXCHANGE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
@@ -46,7 +47,7 @@ async def health():
 @app.get("/debug/rabbit")
 async def debug_rabbit():
     return {
-        "service": "user-service",
+        "service": SERVICE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
         "exchange_name": EXCHANGE_NAME,
         "publisher": {"enabled": publisher.enabled},

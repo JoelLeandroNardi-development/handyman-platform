@@ -3,27 +3,24 @@ from __future__ import annotations
 from dateutil import parser
 import aio_pika
 
+from .config import (
+    DEFAULT_MAX_RETRIES, DEFAULT_PREFETCH, DEFAULT_RETRY_DELAY_MS, DLQ_QUEUE,
+    IDEMPOTENCY_TTL_SECONDS, QUEUE_NAME, RABBIT_URL_MISSING_ERROR, RETRY_QUEUE,
+    ROUTING_KEYS, SERVICE_LOG_PREFIX, SERVICE_NAME,
+)
 from .cache import redis_client
 from .messaging import RABBIT_URL, EXCHANGE_NAME
 from .outbox_worker import enqueue_domain_event
 from .repository import create_reservation, get_reservation, delete_reservation
 from ..application.helpers import avail_key, parse_raw_slot
+from ..domain.constants import (
+    AvailabilityEventType, BookingEventType, DataKey,
+    EventKey, RejectionReason, SlotEventType,
+)
 from ..domain.events import build_event
 from shared.core.messaging.consumer import run_consumer_with_retry_dlq
 from shared.core.utils.idempotency import already_processed
 from shared.core.utils.intervals import fully_contains as contains_interval, overlaps
-
-QUEUE_NAME = "availability_service_booking_events"
-RETRY_QUEUE = "availability_service_booking_events_retry"
-DLQ_QUEUE = "availability_service_booking_events_dlq"
-
-ROUTING_KEYS = [
-    "booking.requested",
-    "booking.confirm_requested",
-    "booking.cancel_requested",
-]
-
-IDEMPOTENCY_TTL = 3600
 
 async def read_current_slots(email: str) -> list[dict]:
     slots = await redis_client.lrange(avail_key(email), 0, -1)
@@ -34,16 +31,16 @@ async def read_current_slots(email: str) -> list[dict]:
         if result is None:
             continue
         ss, ee = result
-        parsed.append({"start": ss.isoformat(), "end": ee.isoformat()})
+        parsed.append({DataKey.START: ss.isoformat(), DataKey.END: ee.isoformat()})
 
     return parsed
 
 async def emit_availability_updated(email: str) -> None:
     ev = build_event(
-        "availability.updated",
+        AvailabilityEventType.UPDATED,
         {
-            "email": email,
-            "slots": await read_current_slots(email),
+            DataKey.EMAIL: email,
+            DataKey.SLOTS: await read_current_slots(email),
         },
     )
     await enqueue_domain_event(ev)
@@ -95,27 +92,27 @@ async def apply_confirm_to_slots(email: str, desired_start: str, desired_end: st
 
 async def process_event(payload: dict):
     event_id = payload.get("event_id")
-    event_type = payload.get("event_type")
-    data = payload.get("data") or {}
+    event_type = payload.get(EventKey.EVENT_TYPE)
+    data = payload.get(EventKey.DATA) or {}
 
     if not event_id or not event_type:
         return
-    if event_type not in set(ROUTING_KEYS):
+    if event_type not in ROUTING_KEYS:
         return
 
     if await already_processed(
         redis_client=redis_client,
         event_id=event_id,
-        ttl_seconds=IDEMPOTENCY_TTL,
+        ttl_seconds=IDEMPOTENCY_TTL_SECONDS,
     ):
         return
 
-    if event_type == "booking.requested":
-        booking_id = data.get("booking_id")
-        user_email = data.get("user_email")
-        handyman_email = data.get("handyman_email")
-        desired_start = data.get("desired_start")
-        desired_end = data.get("desired_end")
+    if event_type == BookingEventType.REQUESTED:
+        booking_id = data.get(DataKey.BOOKING_ID)
+        user_email = data.get(DataKey.USER_EMAIL)
+        handyman_email = data.get(DataKey.HANDYMAN_EMAIL)
+        desired_start = data.get(DataKey.DESIRED_START)
+        desired_end = data.get(DataKey.DESIRED_END)
 
         if not all([booking_id, user_email, handyman_email, desired_start, desired_end]):
             return
@@ -123,12 +120,12 @@ async def process_event(payload: dict):
         ok_slot = await handyman_has_slot(handyman_email, desired_start, desired_end)
         if not ok_slot:
             ev = build_event(
-                "slot.rejected",
+                SlotEventType.REJECTED,
                 {
-                    "booking_id": booking_id,
-                    "user_email": user_email,
-                    "handyman_email": handyman_email,
-                    "reason": "no_matching_slot",
+                    DataKey.BOOKING_ID: booking_id,
+                    DataKey.USER_EMAIL: user_email,
+                    DataKey.HANDYMAN_EMAIL: handyman_email,
+                    DataKey.REASON: RejectionReason.NO_MATCHING_SLOT,
                 },
             )
             await enqueue_domain_event(ev)
@@ -143,32 +140,32 @@ async def process_event(payload: dict):
         )
         if ok:
             ev = build_event(
-                "slot.reserved",
+                SlotEventType.RESERVED,
                 {
-                    "booking_id": booking_id,
-                    "user_email": user_email,
-                    "handyman_email": handyman_email,
+                    DataKey.BOOKING_ID: booking_id,
+                    DataKey.USER_EMAIL: user_email,
+                    DataKey.HANDYMAN_EMAIL: handyman_email,
                 },
             )
             await enqueue_domain_event(ev)
         else:
             ev = build_event(
-                "slot.rejected",
+                SlotEventType.REJECTED,
                 {
-                    "booking_id": booking_id,
-                    "user_email": user_email,
-                    "handyman_email": handyman_email,
-                    "reason": "slot_conflict_reserved",
+                    DataKey.BOOKING_ID: booking_id,
+                    DataKey.USER_EMAIL: user_email,
+                    DataKey.HANDYMAN_EMAIL: handyman_email,
+                    DataKey.REASON: RejectionReason.SLOT_CONFLICT_RESERVED,
                 },
             )
             await enqueue_domain_event(ev)
         return
 
-    if event_type == "booking.confirm_requested":
-        booking_id = data.get("booking_id")
-        handyman_email = data.get("handyman_email")
-        desired_start = data.get("desired_start")
-        desired_end = data.get("desired_end")
+    if event_type == BookingEventType.CONFIRM_REQUESTED:
+        booking_id = data.get(DataKey.BOOKING_ID)
+        handyman_email = data.get(DataKey.HANDYMAN_EMAIL)
+        desired_start = data.get(DataKey.DESIRED_START)
+        desired_end = data.get(DataKey.DESIRED_END)
 
         if not all([booking_id, handyman_email, desired_start, desired_end]):
             return
@@ -176,12 +173,12 @@ async def process_event(payload: dict):
         res = await get_reservation(booking_id)
         if not res:
             ev = build_event(
-                "slot.rejected",
+                SlotEventType.REJECTED,
                 {
-                    "booking_id": booking_id,
-                    "user_email": data.get("user_email"),
-                    "handyman_email": handyman_email,
-                    "reason": "reservation_missing",
+                    DataKey.BOOKING_ID: booking_id,
+                    DataKey.USER_EMAIL: data.get(DataKey.USER_EMAIL),
+                    DataKey.HANDYMAN_EMAIL: handyman_email,
+                    DataKey.REASON: RejectionReason.RESERVATION_MISSING,
                 },
             )
             await enqueue_domain_event(ev)
@@ -192,18 +189,18 @@ async def process_event(payload: dict):
         await emit_availability_updated(handyman_email)
 
         ev = build_event(
-            "slot.confirmed",
+            SlotEventType.CONFIRMED,
             {
-                "booking_id": booking_id,
-                "user_email": res.get("user_email") or data.get("user_email"),
-                "handyman_email": res.get("handyman_email") or handyman_email,
+                DataKey.BOOKING_ID: booking_id,
+                DataKey.USER_EMAIL: res.get(DataKey.USER_EMAIL) or data.get(DataKey.USER_EMAIL),
+                DataKey.HANDYMAN_EMAIL: res.get(DataKey.HANDYMAN_EMAIL) or handyman_email,
             },
         )
         await enqueue_domain_event(ev)
         return
 
-    if event_type == "booking.cancel_requested":
-        booking_id = data.get("booking_id")
+    if event_type == BookingEventType.CANCEL_REQUESTED:
+        booking_id = data.get(DataKey.BOOKING_ID)
         if not booking_id:
             return
 
@@ -211,12 +208,12 @@ async def process_event(payload: dict):
         await delete_reservation(booking_id)
 
         ev = build_event(
-            "slot.released",
+            SlotEventType.RELEASED,
             {
-                "booking_id": booking_id,
-                "user_email": data.get("user_email") or (res or {}).get("user_email"),
-                "handyman_email": data.get("handyman_email") or (res or {}).get("handyman_email"),
-                "reason": data.get("reason"),
+                DataKey.BOOKING_ID: booking_id,
+                DataKey.USER_EMAIL: data.get(DataKey.USER_EMAIL) or (res or {}).get(DataKey.USER_EMAIL),
+                DataKey.HANDYMAN_EMAIL: data.get(DataKey.HANDYMAN_EMAIL) or (res or {}).get(DataKey.HANDYMAN_EMAIL),
+                DataKey.REASON: data.get(DataKey.REASON),
             },
         )
         await enqueue_domain_event(ev)
@@ -224,7 +221,7 @@ async def process_event(payload: dict):
 
 async def start_consumer():
     if not RABBIT_URL:
-        raise RuntimeError("RABBIT_URL is not set")
+        raise RuntimeError(RABBIT_URL_MISSING_ERROR)
 
     conn = await aio_pika.connect_robust(RABBIT_URL)
     channel = await conn.channel()
@@ -237,11 +234,11 @@ async def start_consumer():
         dlq_queue=DLQ_QUEUE,
         routing_keys=ROUTING_KEYS,
         handler=process_event,
-        retry_delay_ms=5000,
-        max_retries=3,
-        prefetch=50,
-        service_label="availability-service",
+        retry_delay_ms=DEFAULT_RETRY_DELAY_MS,
+        max_retries=DEFAULT_MAX_RETRIES,
+        prefetch=DEFAULT_PREFETCH,
+        service_label=SERVICE_NAME,
     )
 
-    print("[availability-service] booking consumer started with DLQ + retry")
+    print(f"{SERVICE_LOG_PREFIX} booking consumer started with DLQ + retry")
     return conn

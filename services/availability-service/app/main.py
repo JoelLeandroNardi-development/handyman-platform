@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .api.routes import router
-from .infrastructure.event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
+from .infrastructure.config import CONSUMER_RECONNECT_WAIT_SECONDS, QUEUE_NAME, ROUTING_KEYS, SERVICE_LOG_PREFIX, SERVICE_NAME
+from .infrastructure.event_consumer import start_consumer
 from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
 from .infrastructure.outbox_worker import worker, outbox_stats
 from .workers.expiry_worker import expiry_loop
@@ -18,7 +19,7 @@ async def lifespan(app: FastAPI):
     async def consumer_with_retry():
         nonlocal consumer_conn
         if not RABBIT_URL:
-            print("[availability-service] RABBIT_URL not set, consumer disabled")
+            print(f"{SERVICE_LOG_PREFIX} RABBIT_URL not set, consumer disabled")
             return
 
         while not stop_event.is_set():
@@ -26,17 +27,20 @@ async def lifespan(app: FastAPI):
                 consumer_conn = await start_consumer()
                 return
             except Exception as e:
-                print(f"[availability-service] consumer connect failed, retrying in 5s: {e}")
+                print(
+                    f"{SERVICE_LOG_PREFIX} consumer connect failed, retrying in "
+                    f"{CONSUMER_RECONNECT_WAIT_SECONDS}s: {e}"
+                )
                 try:
-                    await asyncio.wait_for(stop_event.wait(), timeout=5)
+                    await asyncio.wait_for(stop_event.wait(), timeout=CONSUMER_RECONNECT_WAIT_SECONDS)
                 except asyncio.TimeoutError:
                     continue
 
-    print("[availability-service] starting up...")
+    print(f"{SERVICE_LOG_PREFIX} starting up...")
     try:
         await publisher.start()
     except Exception as e:
-        print(f"[availability-service] publisher start failed (ok): {e}")
+        print(f"{SERVICE_LOG_PREFIX} publisher start failed (ok): {e}")
 
     await worker.start()
 
@@ -45,7 +49,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    print("[availability-service] shutting down...")
+    print(f"{SERVICE_LOG_PREFIX} shutting down...")
     stop_event.set()
 
     try:
@@ -83,7 +87,7 @@ app.include_router(router)
 async def health():
     return {
         "status": "ok",
-        "service": "availability-service",
+        "service": SERVICE_NAME,
         "events_enabled": publisher.enabled,
         "exchange_name": EXCHANGE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
@@ -93,7 +97,7 @@ async def health():
 @app.get("/debug/rabbit")
 async def debug_rabbit():
     return {
-        "service": "availability-service",
+        "service": SERVICE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
         "exchange_name": EXCHANGE_NAME,
         "consumer": {

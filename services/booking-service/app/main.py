@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .api.routes import router
-from .infrastructure.event_consumer import start_consumer, QUEUE_NAME, ROUTING_KEYS
+from .infrastructure.config import CONSUMER_RECONNECT_WAIT_SECONDS, QUEUE_NAME, ROUTING_KEYS, SERVICE_LOG_PREFIX, SERVICE_NAME
+from .infrastructure.event_consumer import start_consumer
 from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
 from .infrastructure.outbox_worker import run_outbox_forever, outbox_stats
 
@@ -18,12 +19,12 @@ _consumer_task: asyncio.Task | None = None
 async def lifespan(app: FastAPI):
     global _consumer_conn, _outbox_task, _consumer_task
 
-    print("[booking-service] starting up...")
+    print(f"{SERVICE_LOG_PREFIX} starting up...")
 
     try:
         await publisher.start()
     except Exception as e:
-        print(f"[booking-service] publisher start failed (ok): {type(e).__name__}: {e}")
+        print(f"{SERVICE_LOG_PREFIX} publisher start failed (ok): {type(e).__name__}: {e}")
 
     _outbox_task = asyncio.create_task(run_outbox_forever(_stop))
 
@@ -34,9 +35,12 @@ async def lifespan(app: FastAPI):
                 _consumer_conn = await start_consumer()
                 return
             except Exception as e:
-                print(f"[booking-service] consumer connect failed, retrying in 5s: {e}")
+                print(
+                    f"{SERVICE_LOG_PREFIX} consumer connect failed, retrying in "
+                    f"{CONSUMER_RECONNECT_WAIT_SECONDS}s: {e}"
+                )
                 try:
-                    await asyncio.wait_for(_stop.wait(), timeout=5)
+                    await asyncio.wait_for(_stop.wait(), timeout=CONSUMER_RECONNECT_WAIT_SECONDS)
                 except asyncio.TimeoutError:
                     continue
 
@@ -44,7 +48,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    print("[booking-service] shutting down...")
+    print(f"{SERVICE_LOG_PREFIX} shutting down...")
     _stop.set()
 
     if _outbox_task:
@@ -71,7 +75,7 @@ app.include_router(router)
 async def health():
     return {
         "status": "ok",
-        "service": "booking-service",
+        "service": SERVICE_NAME,
         "events_enabled": publisher.enabled,
         "exchange_name": EXCHANGE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
@@ -81,7 +85,7 @@ async def health():
 @app.get("/debug/rabbit", response_model=dict[str, object])
 async def debug_rabbit():
     return {
-        "service": "booking-service",
+        "service": SERVICE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
         "exchange_name": EXCHANGE_NAME,
         "consumer": {

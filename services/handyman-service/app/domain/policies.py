@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-_TOTAL_CHECKS = 8
+from .constants import PROFILE_COMPLETENESS_TOTAL_CHECKS
 
 def compute_profile_completeness(
     *,
@@ -27,4 +27,4 @@ def compute_profile_completeness(
         (service_radius_km or 0) > 0,
         latitude is not None and longitude is not None,
     ])
-    return round(filled / _TOTAL_CHECKS * 100)
+    return round(filled / PROFILE_COMPLETENESS_TOTAL_CHECKS * 100)

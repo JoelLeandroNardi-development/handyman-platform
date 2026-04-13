@@ -4,14 +4,10 @@ import asyncio
 
 from .availability_projection import delete_availability_projection
 from .config import (
-    QUEUE_NAME,
-    RETRY_QUEUE,
-    DLQ_QUEUE,
-    ROUTING_KEYS,
-    MAX_RETRIES,
-    RETRY_DELAY_MS,
-    IDEMPOTENCY_TTL_SECONDS,
-    RETRY_SECONDS
+    CONSUMER_RETRY_SECONDS, DEFAULT_MAX_RETRIES, DEFAULT_PREFETCH,
+    DEFAULT_RETRY_DELAY_MS, QUEUE_NAME, RETRY_QUEUE, DLQ_QUEUE,
+    ROUTING_KEYS, IDEMPOTENCY_TTL_SECONDS, SERVICE_LOG_PREFIX,
+    SERVICE_NAME,
 )
 from .messaging import connect, EXCHANGE_NAME
 from .projections import invalidate_bucket, get_handyman_projection, redis_client
@@ -20,6 +16,7 @@ from ..application.services import (
     upsert_availability_projection,
     delete_handyman_projection,
 )
+from ..domain.constants import CacheMode, MatchEventType
 from ..domain.geo import buckets_in_radius
 from shared.core.messaging.consumer import run_consumer_with_retry_dlq
 from shared.core.utils.idempotency import already_processed
@@ -44,15 +41,13 @@ async def _invalidate_for_handyman_profile(profile: dict | None):
     buckets = buckets_in_radius(float(lat), float(lon), float(radius))
 
     for skill in skills:
-        for mode in ("strict", "degraded"):
+        for mode in (CacheMode.STRICT, CacheMode.DEGRADED):
             for b_lat, b_lon in buckets:
                 await invalidate_bucket(mode, skill, b_lat, b_lon)
-
 
 async def _invalidate_profiles(*profiles: dict | None):
     for p in profiles:
         await _invalidate_for_handyman_profile(p)
-
 
 async def process_event(payload: dict):
     event_id = payload.get("event_id")
@@ -71,7 +66,7 @@ async def process_event(payload: dict):
     ):
         return
 
-    if event_type == "availability.updated":
+    if event_type == MatchEventType.AVAILABILITY_UPDATED:
         email = data.get("email")
         slots = data.get("slots") or []
 
@@ -87,12 +82,12 @@ async def process_event(payload: dict):
         await _invalidate_profiles(profile)
         return
 
-    if event_type == "handyman.created":
+    if event_type == MatchEventType.HANDYMAN_CREATED:
         await upsert_handyman_projection(data)
         await _invalidate_profiles(data)
         return
 
-    if event_type in ("handyman.location_updated", "handyman.updated"):
+    if event_type in (MatchEventType.HANDYMAN_LOCATION_UPDATED, MatchEventType.HANDYMAN_UPDATED):
         email = data.get("email")
         if not email:
             return
@@ -105,7 +100,7 @@ async def process_event(payload: dict):
         await _invalidate_profiles(old, merged)
         return
 
-    if event_type == "handyman.deleted":
+    if event_type == MatchEventType.HANDYMAN_DELETED:
         email = data.get("email")
         if not email:
             return
@@ -114,7 +109,6 @@ async def process_event(payload: dict):
         await delete_availability_projection(email)
         await _invalidate_profiles(old)
         return
-
 
 async def _connect_and_consume():
     connection = await connect()
@@ -131,15 +125,14 @@ async def _connect_and_consume():
         dlq_queue=DLQ_QUEUE,
         routing_keys=ROUTING_KEYS,
         handler=process_event,
-        retry_delay_ms=RETRY_DELAY_MS,
-        max_retries=MAX_RETRIES,
-        prefetch=50,
-        service_label="match-service",
+        retry_delay_ms=DEFAULT_RETRY_DELAY_MS,
+        max_retries=DEFAULT_MAX_RETRIES,
+        prefetch=DEFAULT_PREFETCH,
+        service_label=SERVICE_NAME,
     )
 
-    print("[match-service] consumer started with DLQ + retry")
+    print(f"{SERVICE_LOG_PREFIX} consumer started with DLQ + retry")
     return connection
-
 
 async def start_consumer_with_retry(stop_event: asyncio.Event):
     while not stop_event.is_set():
@@ -147,8 +140,8 @@ async def start_consumer_with_retry(stop_event: asyncio.Event):
             conn = await _connect_and_consume()
             return conn
         except Exception as e:
-            print(f"[match-service] consumer failed, retrying in {RETRY_SECONDS}s: {e}")
+            print(f"{SERVICE_LOG_PREFIX} consumer failed, retrying in {CONSUMER_RETRY_SECONDS}s: {e}")
             try:
-                await asyncio.wait_for(stop_event.wait(), timeout=RETRY_SECONDS)
+                await asyncio.wait_for(stop_event.wait(), timeout=CONSUMER_RETRY_SECONDS)
             except asyncio.TimeoutError:
                 continue

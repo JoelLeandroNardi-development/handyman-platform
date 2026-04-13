@@ -86,7 +86,6 @@ async def find_invalid_skills(db, skills: Iterable[str] | None) -> list[str]:
     invalid = [s for s in normalized if s not in allowed]
     return sorted(invalid)
 
-
 async def get_allowed_skill_keys(db, *, active_only: bool = True) -> set[str]:
     stmt = select(SkillCatalogItem.skill_key)
     if active_only:

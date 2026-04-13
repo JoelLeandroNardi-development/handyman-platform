@@ -4,7 +4,7 @@ from fastapi import Query
 
 from ..helpers import avail_key
 from ...infrastructure.cache import redis_client
-from ...infrastructure.repository import get_reservation, delete_reservation
+from ...infrastructure.repository import get_reservation
 
 class AvailabilityQueryService:
     async def get_availability(email: str) -> dict:

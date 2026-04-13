@@ -1,16 +1,17 @@
-import os
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...domain.constants import DEBUG_TRUE_VALUES, ErrorMessage
 from ...domain.models import AuthUser, PasswordResetToken,  EmailVerificationToken
 from ...domain.schemas import ResetPasswordRequest, EmailVerifyRequest, EmailVerifyConfirmRequest, AuthActionResponse
+from ...infrastructure.config import DEBUG_MODE
 from ...infrastructure.password_hasher import password_hasher
 from ...infrastructure.token_service import generate_opaque_token, hash_token
 
-_DEBUG = os.getenv("DEBUG_MODE", "").lower() in ("1", "true", "yes")
+_DEBUG = DEBUG_MODE.lower() in DEBUG_TRUE_VALUES
 
 class VerificationCommandService:
     def __init__(self, db: AsyncSession):
@@ -41,15 +42,15 @@ class VerificationCommandService:
         token_row = token_result.scalar_one_or_none()
 
         if not token_row:
-            raise HTTPException(status_code=400, detail="Invalid reset token")
+            raise HTTPException(status_code=400, detail=ErrorMessage.INVALID_RESET_TOKEN)
         if token_row.used_at is not None:
-            raise HTTPException(status_code=400, detail="Reset token already used")
+            raise HTTPException(status_code=400, detail=ErrorMessage.RESET_TOKEN_ALREADY_USED)
         if token_row.expires_at <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=400, detail="Reset token expired")
+            raise HTTPException(status_code=400, detail=ErrorMessage.RESET_TOKEN_EXPIRED)
 
         user = await self.db.get(AuthUser, token_row.user_id)
         if not user:
-            raise HTTPException(status_code=400, detail="User not found")
+            raise HTTPException(status_code=400, detail=ErrorMessage.USER_NOT_FOUND)
 
         user.password = password_hasher.hash(data.new_password)
         token_row.used_at = datetime.now(timezone.utc)
@@ -86,15 +87,15 @@ class VerificationCommandService:
         token_row = token_result.scalar_one_or_none()
 
         if not token_row:
-            raise HTTPException(status_code=400, detail="Invalid verification token")
+            raise HTTPException(status_code=400, detail=ErrorMessage.INVALID_VERIFICATION_TOKEN)
         if token_row.used_at is not None:
-            raise HTTPException(status_code=400, detail="Verification token already used")
+            raise HTTPException(status_code=400, detail=ErrorMessage.VERIFICATION_TOKEN_ALREADY_USED)
         if token_row.expires_at <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=400, detail="Verification token expired")
+            raise HTTPException(status_code=400, detail=ErrorMessage.VERIFICATION_TOKEN_EXPIRED)
 
         user = await self.db.get(AuthUser, token_row.user_id)
         if not user:
-            raise HTTPException(status_code=400, detail="User not found")
+            raise HTTPException(status_code=400, detail=ErrorMessage.USER_NOT_FOUND)
 
         user.is_email_verified = True
         token_row.used_at = datetime.now(timezone.utc)

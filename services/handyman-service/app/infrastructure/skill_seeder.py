@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from ..application.helpers import normalize_catalog, label_from_key
+from ..domain.constants import SeedReason
 from ..domain.models import SkillsCategory, SkillCatalogItem
 from ..domain.skills_catalog import DEFAULT_SKILLS_CATALOG
 from ..infrastructure.db import SessionLocal
@@ -13,7 +14,7 @@ async def seed_default_catalog_if_empty() -> dict:
         if exists is not None:
             count_res = await db.execute(select(SkillCatalogItem.id))
             count = len(list(count_res.scalars().all()))
-            return {"seeded": False, "reason": "already_present", "count": count}
+            return {"seeded": False, "reason": SeedReason.ALREADY_PRESENT, "count": count}
 
         payload = normalize_catalog(DEFAULT_SKILLS_CATALOG)
 
@@ -46,4 +47,4 @@ async def seed_default_catalog_if_empty() -> dict:
             cat_order += 1
 
         await db.commit()
-        return {"seeded": True, "reason": "bootstrapped", "count": skill_total}
+        return {"seeded": True, "reason": SeedReason.BOOTSTRAPPED, "count": skill_total}

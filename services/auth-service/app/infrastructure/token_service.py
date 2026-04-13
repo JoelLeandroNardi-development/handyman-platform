@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from jose import JWTError, jwt
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM") or "HS256"
-ACCESS_TOKEN_TTL_MIN = int(os.getenv("ACCESS_TOKEN_TTL_MIN", "15"))
-REFRESH_TOKEN_TTL_DAYS = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", "30"))
+from ..domain.constants import TokenClaim, TokenType
+from .config import ACCESS_TOKEN_TTL_MIN, JWT_ALGORITHM, JWT_SECRET, JWT_SECRET_MISSING_ERROR, REFRESH_TOKEN_TTL_DAYS
 
 if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET environment variable is not set")
+    raise RuntimeError(JWT_SECRET_MISSING_ERROR)
 
 @dataclass
 class TokenPair:
@@ -45,22 +42,22 @@ def issue_token_pair(*, user_email: str, roles: list[str], session_id: str) -> T
     refresh_expires_at = now + timedelta(days=REFRESH_TOKEN_TTL_DAYS)
 
     access_payload = {
-        "sub": user_email,
-        "roles": roles,
-        "iat": int(now.timestamp()),
-        "exp": int(access_expires_at.timestamp()),
-        "jti": str(uuid4()),
-        "sid": session_id,
+        TokenClaim.SUBJECT: user_email,
+        TokenClaim.ROLES: roles,
+        TokenClaim.ISSUED_AT: int(now.timestamp()),
+        TokenClaim.EXPIRES_AT: int(access_expires_at.timestamp()),
+        TokenClaim.JWT_ID: str(uuid4()),
+        TokenClaim.SESSION_ID: session_id,
     }
 
     refresh_payload = {
-        "sub": user_email,
-        "roles": roles,
-        "iat": int(now.timestamp()),
-        "exp": int(refresh_expires_at.timestamp()),
-        "jti": str(uuid4()),
-        "sid": session_id,
-        "typ": "refresh",
+        TokenClaim.SUBJECT: user_email,
+        TokenClaim.ROLES: roles,
+        TokenClaim.ISSUED_AT: int(now.timestamp()),
+        TokenClaim.EXPIRES_AT: int(refresh_expires_at.timestamp()),
+        TokenClaim.JWT_ID: str(uuid4()),
+        TokenClaim.SESSION_ID: session_id,
+        TokenClaim.TOKEN_TYPE: TokenType.REFRESH,
     }
 
     return TokenPair(

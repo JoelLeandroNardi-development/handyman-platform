@@ -1,11 +1,12 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 
+from .constants import TableName
 from ..infrastructure.db import Base
 from shared.core.outbox.model import make_outbox_event_model
 
 class Handyman(Base):
-    __tablename__ = "handymen"
+    __tablename__ = TableName.HANDYMEN
 
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, index=True, nullable=False)
@@ -34,7 +35,7 @@ class Handyman(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class HandymanReview(Base):
-    __tablename__ = "handyman_reviews"
+    __tablename__ = TableName.HANDYMAN_REVIEWS
 
     id = Column(Integer, primary_key=True)
 
@@ -48,7 +49,7 @@ class HandymanReview(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class SkillsCategory(Base):
-    __tablename__ = "skills_categories"
+    __tablename__ = TableName.SKILLS_CATEGORIES
 
     id = Column(Integer, primary_key=True)
 
@@ -61,7 +62,7 @@ class SkillsCategory(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class SkillCatalogItem(Base):
-    __tablename__ = "skills_catalog_items"
+    __tablename__ = TableName.SKILLS_CATALOG_ITEMS
     __table_args__ = (
         UniqueConstraint("category_key", "skill_key", name="uq_skill_category_skill"),
         UniqueConstraint("skill_key", name="uq_skill_key_global"),

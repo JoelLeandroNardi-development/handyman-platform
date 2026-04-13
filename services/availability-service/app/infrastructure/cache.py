@@ -1,9 +1,9 @@
-import os
 import redis.asyncio as redis
 
-REDIS_URL = os.getenv("REDIS_URL")
+from .config import REDIS_URL, REDIS_URL_MISSING_ERROR
+
 if not REDIS_URL:
-    raise RuntimeError("REDIS_URL environment variable is not set")
+    raise RuntimeError(REDIS_URL_MISSING_ERROR)
 
 redis_client = redis.from_url(
     REDIS_URL,

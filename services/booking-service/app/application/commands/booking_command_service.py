@@ -6,20 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..helpers import complete_booking_side
 from ..mappers import to_response
-from ...domain.constants import VALID_BOOKING_STATUSES
+from ...domain.constants import (
+    BookingActor, BookingEventType, BookingStatus,
+    CancellationReason, DataKey, ErrorMessage,
+    ResponseMessage, VALID_BOOKING_STATUSES,
+)
 from ...domain.events import build_event
 from ...domain.models import Booking, OutboxEvent
 from ...domain.schemas import (
-    BookingResponse,
-    CreateBooking,
-    ConfirmBookingResponse,
-    CancelBooking,
-    CancelBookingResponse,
-    CompleteBookingResponse,
-    RejectBookingRequest,
-    RejectBookingResponse,
-    CompletedJobsCountsResponse,
-    UpdateBookingAdmin,
+    BookingResponse, CreateBooking, ConfirmBookingResponse, CancelBooking,
+    CancelBookingResponse, CompleteBookingResponse, RejectBookingRequest,
+    RejectBookingResponse, CompletedJobsCountsResponse, UpdateBookingAdmin,
     DeleteBookingResponse
 )
 from ...infrastructure.repository import get_completed_jobs_counts
@@ -34,14 +31,14 @@ class BookingCommandService:
         booking_id = str(uuid.uuid4())
 
         event = build_event(
-            "booking.requested",
+            BookingEventType.REQUESTED,
             {
-                "booking_id": booking_id,
-                "user_email": data.user_email,
-                "handyman_email": data.handyman_email,
-                "desired_start": data.desired_start,
-                "desired_end": data.desired_end,
-                "job_description": data.job_description,
+                DataKey.BOOKING_ID: booking_id,
+                DataKey.USER_EMAIL: data.user_email,
+                DataKey.HANDYMAN_EMAIL: data.handyman_email,
+                DataKey.DESIRED_START: data.desired_start,
+                DataKey.DESIRED_END: data.desired_end,
+                DataKey.JOB_DESCRIPTION: data.job_description,
             },
         )
 
@@ -52,7 +49,7 @@ class BookingCommandService:
             desired_start=data.desired_start,
             desired_end=data.desired_end,
             job_description=data.job_description,
-            status="PENDING",
+            status=BookingStatus.PENDING,
             completed_by_user=False,
             completed_by_handyman=False,
             rejected_by_handyman=False,
@@ -67,20 +64,26 @@ class BookingCommandService:
         return to_response(booking)
 
     async def confirm_booking(self, booking_id: str) -> ConfirmBookingResponse:
-        booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
+        booking = await fetch_or_404(
+            self.db,
+            Booking,
+            filter_column=Booking.booking_id,
+            filter_value=booking_id,
+            detail=ErrorMessage.BOOKING_NOT_FOUND,
+        )
 
-        if booking.status != "RESERVED":
+        if booking.status != BookingStatus.RESERVED:
             raise HTTPException(status_code=400, detail=f"Cannot confirm booking in status {booking.status}")
 
         event = build_event(
-            "booking.confirm_requested",
+            BookingEventType.CONFIRM_REQUESTED,
             {
-                "booking_id": booking.booking_id,
-                "user_email": booking.user_email,
-                "handyman_email": booking.handyman_email,
-                "desired_start": booking.desired_start,
-                "desired_end": booking.desired_end,
-                "job_description": booking.job_description,
+                DataKey.BOOKING_ID: booking.booking_id,
+                DataKey.USER_EMAIL: booking.user_email,
+                DataKey.HANDYMAN_EMAIL: booking.handyman_email,
+                DataKey.DESIRED_START: booking.desired_start,
+                DataKey.DESIRED_END: booking.desired_end,
+                DataKey.JOB_DESCRIPTION: booking.job_description,
             },
         )
 
@@ -90,29 +93,40 @@ class BookingCommandService:
         return ConfirmBookingResponse(booking_id=booking.booking_id, status=booking.status)
 
     async def cancel_booking(self, booking_id: str, data: CancelBooking) -> CancelBookingResponse:
-        booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
+        booking = await fetch_or_404(
+            self.db,
+            Booking,
+            filter_column=Booking.booking_id,
+            filter_value=booking_id,
+            detail=ErrorMessage.BOOKING_NOT_FOUND,
+        )
 
-        if booking.status in ("CANCELED", "FAILED", "EXPIRED", "REJECTED"):
+        if booking.status in (
+            BookingStatus.CANCELED,
+            BookingStatus.FAILED,
+            BookingStatus.EXPIRED,
+            BookingStatus.REJECTED,
+        ):
             return CancelBookingResponse(
                 booking_id=booking.booking_id,
                 status=booking.status,
                 cancellation_reason=booking.cancellation_reason,
             )
 
-        booking.status = "CANCELED"
-        booking.cancellation_reason = data.reason or "user_requested"
+        booking.status = BookingStatus.CANCELED
+        booking.cancellation_reason = data.reason or CancellationReason.USER_REQUESTED
         booking.canceled_at = datetime.now(timezone.utc)
 
         event = build_event(
-            "booking.cancel_requested",
+            BookingEventType.CANCEL_REQUESTED,
             {
-                "booking_id": booking.booking_id,
-                "user_email": booking.user_email,
-                "handyman_email": booking.handyman_email,
-                "desired_start": booking.desired_start,
-                "desired_end": booking.desired_end,
-                "job_description": booking.job_description,
-                "reason": booking.cancellation_reason,
+                DataKey.BOOKING_ID: booking.booking_id,
+                DataKey.USER_EMAIL: booking.user_email,
+                DataKey.HANDYMAN_EMAIL: booking.handyman_email,
+                DataKey.DESIRED_START: booking.desired_start,
+                DataKey.DESIRED_END: booking.desired_end,
+                DataKey.JOB_DESCRIPTION: booking.job_description,
+                DataKey.REASON: booking.cancellation_reason,
             },
         )
 
@@ -127,31 +141,37 @@ class BookingCommandService:
         )
 
     async def complete_booking_as_user(self, booking_id: str) -> CompleteBookingResponse:
-        return await complete_booking_side(self.db, booking_id, side="user")
+        return await complete_booking_side(self.db, booking_id, side=BookingActor.USER)
 
     async def complete_booking_as_handyman(self, booking_id: str) -> CompleteBookingResponse:
-        return await complete_booking_side(self.db, booking_id, side="handyman")
+        return await complete_booking_side(self.db, booking_id, side=BookingActor.HANDYMAN)
 
     async def reject_booking(self, booking_id: str, data: RejectBookingRequest) -> RejectBookingResponse:
-        booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
+        booking = await fetch_or_404(
+            self.db,
+            Booking,
+            filter_column=Booking.booking_id,
+            filter_value=booking_id,
+            detail=ErrorMessage.BOOKING_NOT_FOUND,
+        )
 
-        if booking.status not in ("RESERVED", "CONFIRMED"):
+        if booking.status not in (BookingStatus.RESERVED, BookingStatus.CONFIRMED):
             raise HTTPException(status_code=400, detail=f"Cannot reject booking in status {booking.status}")
 
-        booking.status = "REJECTED"
+        booking.status = BookingStatus.REJECTED
         booking.rejected_by_handyman = True
         booking.rejection_reason = data.reason
 
         event = build_event(
-            "booking.rejected",
+            BookingEventType.REJECTED,
             {
-                "booking_id": booking.booking_id,
-                "user_email": booking.user_email,
-                "handyman_email": booking.handyman_email,
-                "desired_start": booking.desired_start,
-                "desired_end": booking.desired_end,
-                "job_description": booking.job_description,
-                "reason": data.reason,
+                DataKey.BOOKING_ID: booking.booking_id,
+                DataKey.USER_EMAIL: booking.user_email,
+                DataKey.HANDYMAN_EMAIL: booking.handyman_email,
+                DataKey.DESIRED_START: booking.desired_start,
+                DataKey.DESIRED_END: booking.desired_end,
+                DataKey.JOB_DESCRIPTION: booking.job_description,
+                DataKey.REASON: data.reason,
             },
         )
 
@@ -174,7 +194,13 @@ class BookingCommandService:
         return {"counts": counts}
     
     async def admin_update_booking(self, booking_id: str, data: UpdateBookingAdmin) -> BookingResponse:
-        booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
+        booking = await fetch_or_404(
+            self.db,
+            Booking,
+            filter_column=Booking.booking_id,
+            filter_value=booking_id,
+            detail=ErrorMessage.BOOKING_NOT_FOUND,
+        )
 
         if data.status is not None:
             if data.status not in VALID_BOOKING_STATUSES:
@@ -195,8 +221,14 @@ class BookingCommandService:
         return to_response(booking)
 
     async def admin_delete_booking(self, booking_id: str) -> DeleteBookingResponse:
-        booking = await fetch_or_404(self.db, Booking, filter_column=Booking.booking_id, filter_value=booking_id, detail="Booking not found")
+        booking = await fetch_or_404(
+            self.db,
+            Booking,
+            filter_column=Booking.booking_id,
+            filter_value=booking_id,
+            detail=ErrorMessage.BOOKING_NOT_FOUND,
+        )
 
         await self.db.delete(booking)
         await self.db.commit()
-        return {"message": "deleted", "booking_id": booking_id}
+        return {"message": ResponseMessage.DELETED, "booking_id": booking_id}

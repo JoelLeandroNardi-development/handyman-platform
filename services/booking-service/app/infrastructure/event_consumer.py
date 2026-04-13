@@ -3,29 +3,22 @@ from __future__ import annotations
 from sqlalchemy import select
 import aio_pika
 
+from ..domain.constants import BookingStatus, CancellationReason, DataKey, EventKey, FailureReason, SlotEventType
+from .config import (
+    DEFAULT_MAX_RETRIES, DEFAULT_PREFETCH, DEFAULT_RETRY_DELAY_MS, DLQ_QUEUE,
+    QUEUE_NAME, RETRY_QUEUE, ROUTING_KEYS, SERVICE_LOG_PREFIX, SERVICE_NAME,
+)
 from .db import SessionLocal
 from .messaging import EXCHANGE_NAME, RABBIT_URL, publisher
 from ..domain.models import Booking
 from shared.core.messaging.consumer import run_consumer_with_retry_dlq
 
-QUEUE_NAME = "booking_service_domain_events"
-RETRY_QUEUE = "booking_service_domain_events_retry"
-DLQ_QUEUE = "booking_service_domain_events_dlq"
-
-ROUTING_KEYS = [
-    "slot.reserved",
-    "slot.rejected",
-    "slot.confirmed",
-    "slot.expired",
-    "slot.released",
-]
-
 async def process_event(payload: dict):
-    event_type = payload.get("event_type")
-    data = payload.get("data") or {}
-    booking_id = data.get("booking_id")
+    event_type = payload.get(EventKey.EVENT_TYPE)
+    data = payload.get(EventKey.DATA) or {}
+    booking_id = data.get(DataKey.BOOKING_ID)
 
-    if event_type not in set(ROUTING_KEYS) or not booking_id:
+    if event_type not in ROUTING_KEYS or not booking_id:
         return
 
     async with SessionLocal() as db:
@@ -34,27 +27,27 @@ async def process_event(payload: dict):
         if not booking:
             return
 
-        if event_type == "slot.reserved":
-            if booking.status == "PENDING":
-                booking.status = "RESERVED"
+        if event_type == SlotEventType.RESERVED:
+            if booking.status == BookingStatus.PENDING:
+                booking.status = BookingStatus.RESERVED
 
-        elif event_type == "slot.rejected":
-            if booking.status in ("PENDING", "RESERVED"):
-                booking.status = "FAILED"
-                booking.failure_reason = data.get("reason") or "slot_rejected"
+        elif event_type == SlotEventType.REJECTED:
+            if booking.status in (BookingStatus.PENDING, BookingStatus.RESERVED):
+                booking.status = BookingStatus.FAILED
+                booking.failure_reason = data.get(DataKey.REASON) or FailureReason.SLOT_REJECTED
 
-        elif event_type == "slot.confirmed":
-            if booking.status == "RESERVED":
-                booking.status = "CONFIRMED"
+        elif event_type == SlotEventType.CONFIRMED:
+            if booking.status == BookingStatus.RESERVED:
+                booking.status = BookingStatus.CONFIRMED
 
-        elif event_type == "slot.expired":
-            if booking.status in ("PENDING", "RESERVED"):
-                booking.status = "EXPIRED"
+        elif event_type == SlotEventType.EXPIRED:
+            if booking.status in (BookingStatus.PENDING, BookingStatus.RESERVED):
+                booking.status = BookingStatus.EXPIRED
 
-        elif event_type == "slot.released":
-            if booking.status not in ("CANCELED", "REJECTED"):
-                booking.status = "CANCELED"
-                booking.cancellation_reason = booking.cancellation_reason or "released"
+        elif event_type == SlotEventType.RELEASED:
+            if booking.status not in (BookingStatus.CANCELED, BookingStatus.REJECTED):
+                booking.status = BookingStatus.CANCELED
+                booking.cancellation_reason = booking.cancellation_reason or CancellationReason.RELEASED
 
         await db.commit()
 
@@ -75,11 +68,11 @@ async def start_consumer():
         dlq_queue=DLQ_QUEUE,
         routing_keys=ROUTING_KEYS,
         handler=process_event,
-        retry_delay_ms=5000,
-        max_retries=3,
-        prefetch=50,
-        service_label="booking-service",
+        retry_delay_ms=DEFAULT_RETRY_DELAY_MS,
+        max_retries=DEFAULT_MAX_RETRIES,
+        prefetch=DEFAULT_PREFETCH,
+        service_label=SERVICE_NAME,
     )
 
-    print("[booking-service] consumer started with DLQ + retry")
+    print(f"{SERVICE_LOG_PREFIX} consumer started with DLQ + retry")
     return conn

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .api.routes import router
+from .infrastructure.config import SERVICE_LOG_PREFIX, SERVICE_NAME
 from .infrastructure.outbox_worker import run_outbox_forever, outbox_stats
 from .infrastructure.messaging import publisher, RABBIT_URL, EXCHANGE_NAME
 from .infrastructure.skill_seeder import seed_default_catalog_if_empty
@@ -17,21 +18,21 @@ _last_catalog_seed_status: dict | None = None
 async def lifespan(app: FastAPI):
     global _outbox_task, _last_catalog_seed_status
 
-    print("[handyman-service] starting up...")
+    print(f"{SERVICE_LOG_PREFIX} starting up...")
 
     _last_catalog_seed_status = await seed_default_catalog_if_empty()
-    print(f"[handyman-service] skills catalog seed status: {_last_catalog_seed_status}")
+    print(f"{SERVICE_LOG_PREFIX} skills catalog seed status: {_last_catalog_seed_status}")
 
     try:
         await publisher.start()
     except Exception as e:
-        print(f"[handyman-service] publisher start failed (ok): {type(e).__name__}: {e}")
+        print(f"{SERVICE_LOG_PREFIX} publisher start failed (ok): {type(e).__name__}: {e}")
 
     _outbox_task = asyncio.create_task(run_outbox_forever(_stop))
 
     yield
 
-    print("[handyman-service] shutting down...")
+    print(f"{SERVICE_LOG_PREFIX} shutting down...")
     _stop.set()
 
     if _outbox_task:
@@ -49,7 +50,7 @@ app.include_router(router)
 async def health():
     return {
         "status": "ok",
-        "service": "handyman-service",
+        "service": SERVICE_NAME,
         "events_enabled": publisher.enabled,
         "exchange_name": EXCHANGE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
@@ -60,7 +61,7 @@ async def health():
 @app.get("/debug/rabbit", response_model=dict[str, object])
 async def debug_rabbit():
     return {
-        "service": "handyman-service",
+        "service": SERVICE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
         "exchange_name": EXCHANGE_NAME,
         "publisher": {"enabled": publisher.enabled},

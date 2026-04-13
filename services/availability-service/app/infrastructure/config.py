@@ -1,0 +1,35 @@
+from __future__ import annotations
+import os
+
+from ..domain.constants import BookingEventType
+
+SERVICE_NAME = "availability-service"
+SERVICE_VERSION = "0.1.0"
+
+REDIS_URL_ENV = "REDIS_URL"
+REDIS_URL = os.getenv(REDIS_URL_ENV)
+REDIS_URL_MISSING_ERROR = f"{REDIS_URL_ENV} environment variable is not set"
+
+QUEUE_NAME = "availability_service_booking_events"
+RETRY_QUEUE_SUFFIX = "_retry"
+DLQ_QUEUE_SUFFIX = "_dlq"
+RETRY_QUEUE = f"{QUEUE_NAME}{RETRY_QUEUE_SUFFIX}"
+DLQ_QUEUE = f"{QUEUE_NAME}{DLQ_QUEUE_SUFFIX}"
+
+ROUTING_KEYS = (
+    BookingEventType.REQUESTED,
+    BookingEventType.CONFIRM_REQUESTED,
+    BookingEventType.CANCEL_REQUESTED,
+)
+
+RESERVATION_TTL_SECONDS = 300
+DEFAULT_RETRY_DELAY_MS = 5000
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_PREFETCH = 50
+CONSUMER_RECONNECT_WAIT_SECONDS = 5
+IDEMPOTENCY_TTL_SECONDS = 3600
+EXPIRY_BATCH_SIZE = 50
+EXPIRY_POLL_INTERVAL_SECONDS = 2.0
+
+RABBIT_URL_MISSING_ERROR = "RABBIT_URL is not set"
+SERVICE_LOG_PREFIX = f"[{SERVICE_NAME}]"

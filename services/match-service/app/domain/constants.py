@@ -1,4 +1,29 @@
-import os
+from __future__ import annotations
+from enum import StrEnum
+
+class MatchEventType(StrEnum):
+    AVAILABILITY_UPDATED = "availability.updated"
+    HANDYMAN_CREATED = "handyman.created"
+    HANDYMAN_LOCATION_UPDATED = "handyman.location_updated"
+    HANDYMAN_UPDATED = "handyman.updated"
+    HANDYMAN_DELETED = "handyman.deleted"
+
+class CacheMode(StrEnum):
+    STRICT = "strict"
+    DEGRADED = "degraded"
+
+class ProjectionSource(StrEnum):
+    PROJECTION = "projection"
+    LIVE = "live"
+    MISSING = "missing"
+    EMPTY_SKILL = "empty-skill"
+
+class SeedReason(StrEnum):
+    ALREADY_PRESENT = "already_present"
+    BOOTSTRAPPED = "bootstrapped"
+
+class TableName(StrEnum):
+    MATCH_LOGS = "match_logs"
 
 RANKING_WEIGHTS = {
     "distance": 0.42,
@@ -15,6 +40,3 @@ RANKING_CAPS = {
     "completed_jobs_count": 100,
     "years_experience": 30,
 }
-
-GRID_DEG = float(os.getenv("MATCH_GRID_DEG") or "0.05")
-TIME_BUCKET_SECONDS = int(os.getenv("MATCH_TIME_BUCKET_SECONDS") or "900")

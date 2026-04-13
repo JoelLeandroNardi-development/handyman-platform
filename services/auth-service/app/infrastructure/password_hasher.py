@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
-
 import bcrypt
+
+from .config import BCRYPT_ROUNDS
 
 class PasswordHasher:
     def __init__(self) -> None:
-        self._rounds = int(os.getenv("BCRYPT_ROUNDS", "12"))
+        self._rounds = BCRYPT_ROUNDS
 
     def hash(self, raw_password: str) -> str:
         salt = bcrypt.gensalt(rounds=self._rounds)

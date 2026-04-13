@@ -3,12 +3,20 @@ from __future__ import annotations
 import httpx
 
 from .availability_projection import clean_slots
-from .config import HANDYMAN_SERVICE_URL, AVAILABILITY_SERVICE_URL, BOOKING_SERVICE_URL, HTTP_TIMEOUT
+from .config import (
+    AVAILABILITY_ENDPOINT_PREFIX,
+    AVAILABILITY_SERVICE_URL,
+    BOOKING_COMPLETED_COUNTS_ENDPOINT,
+    BOOKING_SERVICE_URL,
+    HANDYMEN_ENDPOINT,
+    HANDYMAN_SERVICE_URL,
+    HTTP_TIMEOUT,
+)
 from ..application.normalizers import normalize_handyman
 
 async def fetch_handymen_http() -> list[dict]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-        r = await client.get(f"{HANDYMAN_SERVICE_URL}/handymen")
+        r = await client.get(f"{HANDYMAN_SERVICE_URL}{HANDYMEN_ENDPOINT}")
         r.raise_for_status()
         data = r.json()
 
@@ -27,7 +35,7 @@ async def fetch_availability_http(email: str) -> list[dict] | None:
 
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            r = await client.get(f"{AVAILABILITY_SERVICE_URL}/availability/{email}")
+            r = await client.get(f"{AVAILABILITY_SERVICE_URL}{AVAILABILITY_ENDPOINT_PREFIX}/{email}")
             r.raise_for_status()
             data = r.json()
     except Exception:
@@ -44,7 +52,7 @@ async def fetch_completed_jobs_counts_batch(emails: list[str]) -> dict[str, int]
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             r = await client.post(
-                f"{BOOKING_SERVICE_URL}/bookings/completed-counts",
+                f"{BOOKING_SERVICE_URL}{BOOKING_COMPLETED_COUNTS_ENDPOINT}",
                 json=unique_emails,
             )
             r.raise_for_status()

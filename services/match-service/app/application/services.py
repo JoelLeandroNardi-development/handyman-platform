@@ -4,6 +4,7 @@ import httpx
 import json
 
 from ..application.normalizers import normalize_handyman
+from ..domain.constants import ProjectionSource, SeedReason
 from ..infrastructure.availability_projection import clean_slots, get_availability_slots, delete_availability_projection, availability_projection_count
 from ..infrastructure.clients import fetch_handymen_http, fetch_completed_jobs_counts_batch, fetch_availability_http
 from ..infrastructure.projections import get_handyman_projection, handyman_projection_count, list_projected_handymen_by_skill, redis_client
@@ -98,19 +99,19 @@ async def projections_have_any_availability() -> bool:
 async def get_effective_availability_slots(email: str) -> tuple[list[dict] | None, str]:
     projected = await get_availability_slots(email)
     if projected is not None:
-        return projected, "projection"
+        return projected, ProjectionSource.PROJECTION
 
     live = await fetch_availability_http(email)
     if live is None:
-        return None, "missing"
+        return None, ProjectionSource.MISSING
 
     await upsert_availability_projection(email=email, slots=live)
-    return live, "live"
+    return live, ProjectionSource.LIVE
 
 async def seed_handyman_projection_if_empty() -> dict:
     existing = await handyman_projection_count()
     if existing > 0:
-        return {"seeded": False, "reason": "already_present", "count": existing}
+        return {"seeded": False, "reason": SeedReason.ALREADY_PRESENT, "count": existing}
 
     try:
         handymen = await fetch_handymen_http()
@@ -125,7 +126,7 @@ async def seed_handyman_projection_if_empty() -> dict:
         except Exception:
             continue
 
-    return {"seeded": True, "reason": "bootstrapped", "count": ok}
+    return {"seeded": True, "reason": SeedReason.BOOTSTRAPPED, "count": ok}
 
 async def get_live_handymen_for_skill(skill: str) -> list[dict]:
     skill = norm(skill)
@@ -149,11 +150,11 @@ async def get_live_handymen_for_skill(skill: str) -> list[dict]:
 async def get_effective_handymen_for_skill(skill: str) -> tuple[list[dict], str]:
     skill = norm(skill)
     if not skill:
-        return [], "empty-skill"
+        return [], ProjectionSource.EMPTY_SKILL
 
     projected = await list_projected_handymen_by_skill(skill)
     if projected:
-        return projected, "projection"
+        return projected, ProjectionSource.PROJECTION
 
     live = await get_live_handymen_for_skill(skill)
-    return live, "live"
+    return live, ProjectionSource.LIVE

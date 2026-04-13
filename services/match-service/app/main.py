@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from .api.routes import router
 from .application.services import seed_handyman_projection_if_empty
 from .infrastructure.availability_projection import availability_projection_count
-from .infrastructure.config import QUEUE_NAME, ROUTING_KEYS
+from .infrastructure.config import QUEUE_NAME, ROUTING_KEYS, SERVICE_NAME, SERVICE_LOG_PREFIX
 from .infrastructure.event_consumer import start_consumer_with_retry
 from .infrastructure.messaging import RABBIT_URL, EXCHANGE_NAME
 from .infrastructure.outbox_worker import worker
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     await worker.start()
 
     _last_seed_status = await seed_handyman_projection_if_empty()
-    print(f"[match-service] seed status: {_last_seed_status}")
+    print(f"{SERVICE_LOG_PREFIX} seed status: {_last_seed_status}")
 
     consumer_task = asyncio.create_task(run_consumer())
 
@@ -65,7 +65,7 @@ async def health():
     a_count = await availability_projection_count()
     return {
         "status": "ok",
-        "service": "match-service",
+        "service": SERVICE_NAME,
         "events_enabled": bool(RABBIT_URL),
         "exchange_name": EXCHANGE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
@@ -79,7 +79,7 @@ async def health():
 @app.get("/debug/rabbit")
 async def debug_rabbit():
     return {
-        "service": "match-service",
+        "service": SERVICE_NAME,
         "rabbit_url_set": bool(RABBIT_URL),
         "exchange_name": EXCHANGE_NAME,
         "consumer": {

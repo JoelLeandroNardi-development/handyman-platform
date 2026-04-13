@@ -3,13 +3,14 @@ from __future__ import annotations
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..domain.constants import BookingStatus
 from ..domain.models import Booking
 
 async def get_completed_jobs_count(db: AsyncSession, handyman_email: str) -> int:
     res = await db.execute(
         select(func.count(Booking.id)).where(
             Booking.handyman_email == handyman_email,
-            Booking.status == "COMPLETED",
+            Booking.status == BookingStatus.COMPLETED,
         )
     )
     return res.scalar_one()
@@ -27,7 +28,7 @@ async def get_completed_jobs_counts(db: AsyncSession, handyman_emails: list[str]
         )
         .where(
             Booking.handyman_email.in_(unique_emails),
-            Booking.status == "COMPLETED",
+            Booking.status == BookingStatus.COMPLETED,
         )
         .group_by(Booking.handyman_email)
     )

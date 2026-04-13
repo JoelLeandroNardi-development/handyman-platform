@@ -88,7 +88,7 @@ def match_services_module(monkeypatch):
         fetch_completed_jobs_counts_batch,
     )
     from match_service_test_app.domain.scoring import rank_match_candidates, compute_match_score
-    from match_service_test_app.domain.constants import TIME_BUCKET_SECONDS
+    from match_service_test_app.infrastructure.config import TIME_BUCKET_SECONDS
 
     attrs = {
         "normalize_handyman": normalize_handyman,

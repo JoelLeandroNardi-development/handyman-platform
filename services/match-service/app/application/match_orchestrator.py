@@ -10,7 +10,9 @@ from .services import (
     projections_have_any_availability,
 )
 from ..domain.geo import haversine, bucket_id
+from ..domain.constants import CacheMode
 from ..domain.scoring import rank_match_candidates
+from ..infrastructure.config import CACHE_TTL_DEGRADED_SECONDS, CACHE_TTL_STRICT_SECONDS
 from ..infrastructure.availability_projection import projected_has_overlap
 from ..infrastructure.cache_keys import cache_key
 from ..infrastructure.projections import get_cached_result, set_cache_with_index
@@ -97,8 +99,8 @@ async def run_match_query(
 
     results = rank_match_candidates(results)
 
-    mode = "degraded" if degraded else "strict"
-    ttl = 15 if degraded else 60
+    mode = CacheMode.DEGRADED if degraded else CacheMode.STRICT
+    ttl = CACHE_TTL_DEGRADED_SECONDS if degraded else CACHE_TTL_STRICT_SECONDS
     b_lat, b_lon = bucket_id(latitude, longitude)
 
     if results:

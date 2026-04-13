@@ -3,8 +3,8 @@ from __future__ import annotations
 import math
 from datetime import datetime
 
-from .constants import GRID_DEG, TIME_BUCKET_SECONDS
 from ..application.mappers import as_utc
+from ..infrastructure.config import GRID_DEG, TIME_BUCKET_SECONDS
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     r = 6371.0

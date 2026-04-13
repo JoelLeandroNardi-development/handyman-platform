@@ -1,8 +1,10 @@
 from sqlalchemy import Column, Integer, Float, String
+
+from .constants import TableName
 from ..infrastructure.db import Base
 
 class MatchLog(Base):
-    __tablename__ = "match_logs"
+    __tablename__ = TableName.MATCH_LOGS
 
     id = Column(Integer, primary_key=True)
     user_latitude = Column(Float, nullable=False)
