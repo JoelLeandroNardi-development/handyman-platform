@@ -16,10 +16,7 @@ class EventType(StrEnum):
     SLOT_CONFIRMED = "slot.confirmed"
     SLOT_EXPIRED = "slot.expired"
     SLOT_RELEASED = "slot.released"
-
-class NotificationType(StrEnum):
     NOTIFICATION_CREATED = "notification.created"
-    BOOKING_COMPLETED = "booking.completed"
     JOB_COMPLETED = "job.completed"
     BOOKING_REJECTED_BY_HANDYMAN = "booking.rejected_by_handyman"
 
