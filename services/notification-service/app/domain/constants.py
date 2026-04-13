@@ -131,9 +131,8 @@ class PreferenceCategory(StrEnum):
     BOOKING = NotificationCategory.BOOKING
     CHAT = NotificationCategory.CHAT
 
-class SseSetting(StrEnum):
-    MEDIA_TYPE = "text/event-stream"
-    HEARTBEAT_INTERVAL_SECONDS = 15
+SSE_MEDIA_TYPE = "text/event-stream"
+SSE_HEARTBEAT_INTERVAL_SECONDS = 15
 
 INDEX_UQ_NOTIFICATIONS_RECIPIENT_EVENT_TYPE_ENTITY = "uq_notifications_recipient_event_type_entity"
 
