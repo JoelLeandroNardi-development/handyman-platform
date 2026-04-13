@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..domain.constants import NotificationCategory
 from ..domain.notification_types import NotificationIntent
 
 def booking_intent(
@@ -20,11 +21,11 @@ def booking_intent(
         user_email=user_email,
         event_id=event_id,
         type=type,
-        category="booking",
+        category=NotificationCategory.BOOKING,
         priority=priority,
         title=title,
         body=body,
-        entity_type="booking",
+        entity_type=NotificationCategory.BOOKING,
         entity_id=booking_id,
         action_url=f"/{action_prefix}/{booking_id}" if booking_id else None,
         payload=payload,

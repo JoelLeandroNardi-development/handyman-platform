@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.sse import hub
+from ...domain.constants import HttpHeader, PayloadKey, SseEvent, SSE_HEARTBEAT_INTERVAL_SECONDS, SSE_MEDIA_TYPE
 from ...domain.schemas import NotificationListResponse, NotificationPreferencesResponse, UnreadCountResponse
 from ...infrastructure.repository import (
     get_preferences,
@@ -50,22 +51,22 @@ class NotificationQueryService:
         async def event_generator():
             queue = await hub.subscribe(email)
             try:
-                yield f"event: ready\ndata: {json.dumps({'ok': True})}\n\n"
+                yield f"event: {SseEvent.READY}\ndata: {json.dumps({PayloadKey.OK: True})}\n\n"
                 while True:
                     try:
-                        payload = await asyncio.wait_for(queue.get(), timeout=15)
-                        yield f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+                        payload = await asyncio.wait_for(queue.get(), timeout=SSE_HEARTBEAT_INTERVAL_SECONDS)
+                        yield f"event: {payload[PayloadKey.TYPE]}\ndata: {json.dumps(payload)}\n\n"
                     except asyncio.TimeoutError:
-                        yield f"event: ping\ndata: {json.dumps({'ok': True})}\n\n"
+                        yield f"event: {SseEvent.PING}\ndata: {json.dumps({PayloadKey.OK: True})}\n\n"
             finally:
                 await hub.unsubscribe(email, queue)
 
         return StreamingResponse(
             event_generator(),
-            media_type="text/event-stream",
+            media_type=SSE_MEDIA_TYPE,
             headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
+                HttpHeader.CACHE_CONTROL: HttpHeader.CACHE_CONTROL_VALUE,
+                HttpHeader.CONNECTION: HttpHeader.CONNECTION_VALUE,
+                HttpHeader.X_ACCEL_BUFFERING: HttpHeader.X_ACCEL_BUFFERING_VALUE,
             },
         )

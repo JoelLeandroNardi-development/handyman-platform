@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-import os
 import types
 import sys
 
 import pytest
 
+from tests.constants import (
+    EmailConstants,
+    EventType,
+    NOTIF_BUILDERS_TEST_PACKAGE,
+    NOTIFICATION_SERVICE_DIR,
+)
 from tests.service_loader import load_service_app_module
 
-_PKG = "notif_builders_test_app"
+_PKG = NOTIF_BUILDERS_TEST_PACKAGE
 
 @pytest.fixture(scope="module")
 def _bootstrap():
     load_service_app_module(
-        "notification-service",
+        NOTIFICATION_SERVICE_DIR,
         "domain/notification_types",
         package_name=_PKG,
         reload_modules=True,
@@ -37,7 +42,7 @@ def _bootstrap():
 @pytest.fixture(scope="module")
 def builders_module(_bootstrap):
     return load_service_app_module(
-        "notification-service",
+        NOTIFICATION_SERVICE_DIR,
         "application/notification_builders",
         package_name=_PKG,
     )
@@ -45,7 +50,7 @@ def builders_module(_bootstrap):
 @pytest.fixture(scope="module")
 def event_mappers_module(_bootstrap):
     return load_service_app_module(
-        "notification-service",
+        NOTIFICATION_SERVICE_DIR,
         "application/notification_event_mappers",
         package_name=_PKG,
     )
@@ -53,7 +58,7 @@ def event_mappers_module(_bootstrap):
 @pytest.fixture(scope="module")
 def preferences_module(_bootstrap):
     return load_service_app_module(
-        "notification-service",
+        NOTIFICATION_SERVICE_DIR,
         "application/preferences",
         package_name=_PKG,
     )
@@ -63,7 +68,7 @@ class TestBookingIntent:
     def test_returns_notification_intent(self, builders_module):
         intent = builders_module.booking_intent(
             event_id="evt-1",
-            user_email="user@example.com",
+            user_email=EmailConstants.USER,
             type="job.requested",
             priority="normal",
             title="New request",
@@ -72,14 +77,14 @@ class TestBookingIntent:
             action_prefix="jobs",
             payload={"key": "val"},
         )
-        assert intent["user_email"] == "user@example.com"
+        assert intent["user_email"] == EmailConstants.USER
         assert intent["category"] == "booking"
         assert intent["action_url"] == "/jobs/booking-1"
 
     def test_no_booking_id_means_no_action_url(self, builders_module):
         intent = builders_module.booking_intent(
             event_id="evt-2",
-            user_email="user@example.com",
+            user_email=EmailConstants.USER,
             type="test",
             priority="low",
             title="T",
@@ -167,8 +172,8 @@ class TestPickPayload:
 
 _SAMPLE_DATA = {
     "booking_id": "booking-42",
-    "user_email": "user@example.com",
-    "handyman_email": "pro@example.com",
+    "user_email": EmailConstants.USER,
+    "handyman_email": EmailConstants.HANDYMAN,
     "desired_start": "2026-04-01T10:00:00Z",
     "desired_end": "2026-04-01T12:00:00Z",
     "reason": "schedule conflict",
@@ -202,16 +207,22 @@ class TestEventMappers:
         intents = fn("evt-2", _SAMPLE_DATA)
         assert len(intents) == 2
         recipients = {i["user_email"] for i in intents}
-        assert recipients == {"user@example.com", "pro@example.com"}
+        assert recipients == {EmailConstants.USER, EmailConstants.HANDYMAN}
 
     def test_event_mappers_dict_covers_all_events(self, event_mappers_module):
         mappers = event_mappers_module.EVENT_MAPPERS
         expected_events = {
-            "booking.requested", "slot.reserved", "slot.confirmed",
-            "slot.rejected", "slot.expired", "slot.released",
-            "booking.cancel_requested", "booking.completed",
-            "booking.rejected", "booking.completed_by_user",
-            "booking.completed_by_handyman",
+            EventType.BOOKING_REQUESTED,
+            EventType.SLOT_RESERVED,
+            EventType.SLOT_CONFIRMED,
+            EventType.SLOT_REJECTED,
+            EventType.SLOT_EXPIRED,
+            EventType.SLOT_RELEASED,
+            EventType.BOOKING_CANCEL_REQUESTED,
+            EventType.BOOKING_COMPLETED,
+            EventType.BOOKING_REJECTED,
+            EventType.BOOKING_COMPLETED_BY_USER,
+            EventType.BOOKING_COMPLETED_BY_HANDYMAN,
         }
         assert set(mappers.keys()) == expected_events
 

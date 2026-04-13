@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from .api.routes import router
 from .infrastructure.consumer import consume_forever
+from .infrastructure.config import EVENT_STARTUP_COMPLETE, SERVICE_NAME, SERVICE_VERSION
 from .infrastructure.db import Base, engine
 
 @asynccontextmanager
@@ -18,7 +19,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
 
     consumer_task = asyncio.create_task(consume_forever(stop_event))
-    print(json.dumps({"service": "notification-service", "event": "startup_complete"}))
+    print(json.dumps({"service": SERVICE_NAME, "event": EVENT_STARTUP_COMPLETE}))
 
     try:
         yield
@@ -32,5 +33,5 @@ async def lifespan(app: FastAPI):
             pass
         await engine.dispose()
 
-app = FastAPI(title="notification-service", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title=SERVICE_NAME, version=SERVICE_VERSION, lifespan=lifespan)
 app.include_router(router)

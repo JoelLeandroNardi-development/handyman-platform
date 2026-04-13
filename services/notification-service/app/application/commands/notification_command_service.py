@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...domain.constants import ErrorMessage, PayloadKey
 from ...domain.schemas import (
     MarkAllReadResponse, 
     NotificationPreferencesResponse, 
@@ -30,8 +31,8 @@ class NotificationCommandService:
     ) -> dict:
         ok = await mark_read(self.db, user_email=email, notification_id=notification_id)
         if not ok:
-            raise HTTPException(status_code=404, detail="Notification not found")
-        return {"ok": True}
+            raise HTTPException(status_code=404, detail=ErrorMessage.NOTIFICATION_NOT_FOUND)
+        return {PayloadKey.OK: True}
 
     async def mark_my_notifications_read(
         self,
@@ -47,8 +48,8 @@ class NotificationCommandService:
     ) -> dict:
         ok = await archive_notification(self.db, user_email=email, notification_id=notification_id)
         if not ok:
-            raise HTTPException(status_code=404, detail="Notification not found")
-        return {"ok": True}
+            raise HTTPException(status_code=404, detail=ErrorMessage.NOTIFICATION_NOT_FOUND)
+        return {PayloadKey.OK: True}
 
     async def update_my_preferences(
         self,
@@ -80,5 +81,5 @@ class NotificationCommandService:
     ) -> dict:
         ok = await deactivate_push_device(self.db, user_email=email, device_id=device_id)
         if not ok:
-            raise HTTPException(status_code=404, detail="Device not found")
-        return {"ok": True}
+            raise HTTPException(status_code=404, detail=ErrorMessage.DEVICE_NOT_FOUND)
+        return {PayloadKey.OK: True}

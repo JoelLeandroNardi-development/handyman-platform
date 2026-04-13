@@ -9,18 +9,20 @@ from ..domain.schemas import (
     MarkAllReadResponse, NotificationListResponse, NotificationPreferencesResponse, 
     UnreadCountResponse, PushDeviceResponse, RegisterPushDeviceRequest, UpdateNotificationPreferencesRequest
 )
+from ..domain.constants import QUERY_STATUS_ALIAS
 from ..infrastructure.auth import get_current_email
+from ..infrastructure.config import HEALTH_OK_KEY, HEALTH_SERVICE_KEY, SERVICE_NAME
 from ..infrastructure.db import get_db
 
 router = APIRouter()
 
 @router.get("/health")
 async def health() -> dict:
-    return {"ok": True, "service": "notification-service"}
+    return {HEALTH_OK_KEY: True, HEALTH_SERVICE_KEY: SERVICE_NAME}
 
 @router.get("/me/notifications", response_model=NotificationListResponse)
 async def get_my_notifications(
-    status_filter: str | None = Query(default=None, alias="status"),
+    status_filter: str | None = Query(default=None, alias=QUERY_STATUS_ALIAS),
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
     email: str = Depends(get_current_email),

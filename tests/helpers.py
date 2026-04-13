@@ -4,6 +4,16 @@ import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
+from tests.constants import (
+    EmailConstants,
+    EventType,
+    BOOKING_ID,
+    CONTENT_TYPE_JSON,
+    ENCODING_UTF8,
+    HEADER_RETRY_COUNT,
+    JOB_DESCRIPTION_FIX_LEAKY_FAUCET,
+)
+
 def make_fake_redis(**overrides) -> MagicMock:
     mock = MagicMock()
     mock.get = AsyncMock(return_value=None)
@@ -50,10 +60,10 @@ class MockAsyncClient:
 
 class MockMessage:
     def __init__(self, body: dict, headers: dict | None = None, retry_count: int = 0):
-        self.body = json.dumps(body).encode("utf-8")
+        self.body = json.dumps(body).encode(ENCODING_UTF8)
         self.headers = headers or {}
-        self.headers["x-retry-count"] = retry_count
-        self.content_type = "application/json"
+        self.headers[HEADER_RETRY_COUNT] = retry_count
+        self.content_type = CONTENT_TYPE_JSON
         self.ack_called = False
         self.reject_called = False
         self.reject_requeue = False
@@ -73,26 +83,26 @@ SAMPLE_DT = datetime(2026, 3, 17, 10, 0, 0, tzinfo=timezone.utc)
 
 def make_booking_data(**overrides) -> dict:
     base = {
-        "user_email": "user@example.com",
-        "handyman_email": "handyman@example.com",
+        "user_email": EmailConstants.USER,
+        "handyman_email": EmailConstants.HANDYMAN,
         "desired_start": SAMPLE_DT,
         "desired_end": SAMPLE_DT + timedelta(hours=2),
-        "job_description": "Fix leaky faucet",
+        "job_description": JOB_DESCRIPTION_FIX_LEAKY_FAUCET,
     }
     base.update(overrides)
     return base
 
 def make_event(**overrides) -> dict:
     base = {
-        "event_type": "booking.requested",
-        "aggregate_id": "booking-123",
+        "event_type": EventType.BOOKING_REQUESTED,
+        "aggregate_id": BOOKING_ID,
         "data": {
-            "booking_id": "booking-123",
-            "user_email": "user@example.com",
-            "handyman_email": "handyman@example.com",
+            "booking_id": BOOKING_ID,
+            "user_email": EmailConstants.USER,
+            "handyman_email": EmailConstants.HANDYMAN,
             "desired_start": "2026-03-17T10:00:00+00:00",
             "desired_end": "2026-03-17T12:00:00+00:00",
-            "job_description": "Fix leaky faucet",
+            "job_description": JOB_DESCRIPTION_FIX_LEAKY_FAUCET,
         },
         "timestamp": "2026-03-17T10:00:00+00:00",
     }
@@ -101,7 +111,7 @@ def make_event(**overrides) -> dict:
 
 def make_handyman(**overrides) -> dict:
     base = {
-        "email": "pro@example.com",
+        "email": EmailConstants.PRO,
         "skills": ["plumbing"],
         "years_experience": 5,
         "service_radius_km": 20,

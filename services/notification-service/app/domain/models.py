@@ -6,20 +6,33 @@ import uuid
 from sqlalchemy import Boolean, DateTime, Index, Integer, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from .constants import (
+    NotificationCategory,
+    NotificationPriority,
+    NotificationStatus,
+    COLUMN_ENTITY_ID,
+    COLUMN_EVENT_ID,
+    COLUMN_TYPE,
+    COLUMN_USER_EMAIL,
+    INDEX_UQ_NOTIFICATIONS_RECIPIENT_EVENT_TYPE_ENTITY,
+    TABLE_NOTIFICATIONS,
+    TABLE_NOTIFICATION_PREFERENCES,
+    TABLE_PUSH_DEVICES,
+)
 from ..infrastructure.db import Base
 
 class Notification(Base):
-    __tablename__ = "notifications"
+    __tablename__ = TABLE_NOTIFICATIONS
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
     event_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    category: Mapped[str] = mapped_column(String(50), nullable=False, default="system")
-    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="normal")
+    category: Mapped[str] = mapped_column(String(50), nullable=False, default=NotificationCategory.SYSTEM)
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default=NotificationPriority.NORMAL)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="unread", index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=NotificationStatus.UNREAD, index=True)
     entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     entity_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     action_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -30,17 +43,17 @@ class Notification(Base):
 
     __table_args__ = (
         Index(
-            "uq_notifications_recipient_event_type_entity",
-            "user_email",
-            "event_id",
-            "type",
-            "entity_id",
+            INDEX_UQ_NOTIFICATIONS_RECIPIENT_EVENT_TYPE_ENTITY,
+            COLUMN_USER_EMAIL,
+            COLUMN_EVENT_ID,
+            COLUMN_TYPE,
+            COLUMN_ENTITY_ID,
             unique=True,
         ),
     )
 
 class NotificationPreference(Base):
-    __tablename__ = "notification_preferences"
+    __tablename__ = TABLE_NOTIFICATION_PREFERENCES
 
     user_email: Mapped[str] = mapped_column(String(320), primary_key=True)
     booking_in_app_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -58,7 +71,7 @@ class NotificationPreference(Base):
     locale: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 class PushDevice(Base):
-    __tablename__ = "push_devices"
+    __tablename__ = TABLE_PUSH_DEVICES
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)

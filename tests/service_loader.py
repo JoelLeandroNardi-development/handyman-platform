@@ -5,6 +5,8 @@ import sys
 import types
 from pathlib import Path
 
+from tests.constants import APP_DIRNAME, GATEWAY_SERVICE_DIR, PACKAGE_SUFFIX_APP, SERVICE_DIRNAME
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def load_service_app_module(
@@ -14,14 +16,14 @@ def load_service_app_module(
     package_name: str | None = None,
     reload_modules: bool = False,
 ):
-    app_dir = REPO_ROOT / "services" / service_dir / "app"
+    app_dir = REPO_ROOT / SERVICE_DIRNAME / service_dir / APP_DIRNAME
 
-    if service_dir == "gateway-service":
+    if service_dir == GATEWAY_SERVICE_DIR:
         parent_dir = str(app_dir.parent)
         if parent_dir not in sys.path:
             sys.path.insert(0, parent_dir)
 
-    resolved_package = package_name or f"{service_dir.replace('-', '_')}_app"
+    resolved_package = package_name or f"{service_dir.replace('-', '_')}{PACKAGE_SUFFIX_APP}"
 
     app_dir_str = str(app_dir)
     if app_dir_str not in sys.path:

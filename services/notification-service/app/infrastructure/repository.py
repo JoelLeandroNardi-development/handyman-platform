@@ -7,6 +7,13 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..domain.constants import (
+    NotificationStatus,
+    COLUMN_ENTITY_ID,
+    COLUMN_EVENT_ID,
+    COLUMN_TYPE,
+    COLUMN_USER_EMAIL,
+)
 from ..domain.models import Notification, NotificationPreference, PushDevice
 
 async def create_notification_if_absent(
@@ -38,10 +45,10 @@ async def create_notification_if_absent(
             entity_id=entity_id,
             action_url=action_url,
             payload=payload,
-            status="unread",
+            status=NotificationStatus.UNREAD,
         )
         .on_conflict_do_nothing(
-            index_elements=["user_email", "event_id", "type", "entity_id"]
+            index_elements=[COLUMN_USER_EMAIL, COLUMN_EVENT_ID, COLUMN_TYPE, COLUMN_ENTITY_ID]
         )
         .returning(Notification)
     )
@@ -63,14 +70,14 @@ async def list_notifications(
 ) -> tuple[Sequence[Notification], str | None]:
     stmt = select(Notification).where(Notification.user_email == user_email)
 
-    if status == "unread":
-        stmt = stmt.where(Notification.status == "unread")
-    elif status == "read":
-        stmt = stmt.where(Notification.status == "read")
-    elif status == "archived":
-        stmt = stmt.where(Notification.status == "archived")
+    if status == NotificationStatus.UNREAD:
+        stmt = stmt.where(Notification.status == NotificationStatus.UNREAD)
+    elif status == NotificationStatus.READ:
+        stmt = stmt.where(Notification.status == NotificationStatus.READ)
+    elif status == NotificationStatus.ARCHIVED:
+        stmt = stmt.where(Notification.status == NotificationStatus.ARCHIVED)
     else:
-        stmt = stmt.where(Notification.status != "archived")
+        stmt = stmt.where(Notification.status != NotificationStatus.ARCHIVED)
 
     if cursor:
         stmt = stmt.where(Notification.created_at < datetime.fromisoformat(cursor))
@@ -88,7 +95,7 @@ async def list_notifications(
 async def unread_count(db: AsyncSession, *, user_email: str) -> int:
     stmt = select(func.count()).select_from(Notification).where(
         Notification.user_email == user_email,
-        Notification.status == "unread",
+        Notification.status == NotificationStatus.UNREAD,
     )
     return int((await db.execute(stmt)).scalar_one())
 
@@ -96,7 +103,7 @@ async def mark_read(db: AsyncSession, *, user_email: str, notification_id: str) 
     stmt = (
         update(Notification)
         .where(Notification.id == notification_id, Notification.user_email == user_email)
-        .values(status="read", read_at=datetime.now(timezone.utc))
+        .values(status=NotificationStatus.READ, read_at=datetime.now(timezone.utc))
     )
     result = await db.execute(stmt)
     await db.commit()
@@ -105,8 +112,8 @@ async def mark_read(db: AsyncSession, *, user_email: str, notification_id: str) 
 async def mark_all_read(db: AsyncSession, *, user_email: str) -> int:
     stmt = (
         update(Notification)
-        .where(Notification.user_email == user_email, Notification.status == "unread")
-        .values(status="read", read_at=datetime.now(timezone.utc))
+        .where(Notification.user_email == user_email, Notification.status == NotificationStatus.UNREAD)
+        .values(status=NotificationStatus.READ, read_at=datetime.now(timezone.utc))
     )
     result = await db.execute(stmt)
     await db.commit()
@@ -116,7 +123,7 @@ async def archive_notification(db: AsyncSession, *, user_email: str, notificatio
     stmt = (
         update(Notification)
         .where(Notification.id == notification_id, Notification.user_email == user_email)
-        .values(status="archived", archived_at=datetime.now(timezone.utc))
+        .values(status=NotificationStatus.ARCHIVED, archived_at=datetime.now(timezone.utc))
     )
     result = await db.execute(stmt)
     await db.commit()

@@ -4,16 +4,22 @@ import os
 
 import pytest
 
+from tests.constants import (
+    ENV_NOTIFICATION_DB,
+    IN_MEMORY_SQLITE_URL,
+    NOTIFICATION_SERVICE_DIR,
+    NOTIFICATION_SERVICE_PACKAGE,
+)
 from tests.service_loader import load_service_app_module
 
-os.environ.setdefault("NOTIFICATION_DB", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault(ENV_NOTIFICATION_DB, IN_MEMORY_SQLITE_URL)
 
 @pytest.fixture(scope="module")
 def mapper_module():
     return load_service_app_module(
-        "notification-service",
+        NOTIFICATION_SERVICE_DIR,
         "application/mappers",
-        package_name="notification_service_app",
+        package_name=NOTIFICATION_SERVICE_PACKAGE,
         reload_modules=True,
     )
 
@@ -21,7 +27,7 @@ def mapper_module():
 @pytest.fixture(scope="module")
 def consumer_module(mapper_module):
     return load_service_app_module(
-        "notification-service",
+        NOTIFICATION_SERVICE_DIR,
         "infrastructure/consumer",
-        package_name="notification_service_app",
+        package_name=NOTIFICATION_SERVICE_PACKAGE,
     )
