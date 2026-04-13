@@ -6,7 +6,6 @@ down_revision = "0002"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "auth_sessions",
@@ -21,7 +20,6 @@ def upgrade():
         sa.Column("user_agent", sa.String(length=512), nullable=True),
     )
     op.create_index("ix_auth_sessions_user_id", "auth_sessions", ["user_id"], unique=False)
-
 
 def downgrade():
     op.drop_index("ix_auth_sessions_user_id", table_name="auth_sessions")

@@ -9,8 +9,8 @@ from alembic import context
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.db import Base
-from app import models
+from app.infrastructure.db import Base
+from app.domain import models
 
 config = context.config
 

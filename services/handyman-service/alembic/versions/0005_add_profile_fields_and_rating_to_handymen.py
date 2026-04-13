@@ -13,7 +13,6 @@ down_revision = "0004"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.add_column("handymen", sa.Column("phone", sa.String(), nullable=True))
     op.add_column("handymen", sa.Column("first_name", sa.String(), nullable=True))
@@ -25,7 +24,6 @@ def upgrade():
     op.add_column("handymen", sa.Column("country", sa.String(), nullable=True))
     op.add_column("handymen", sa.Column("avg_rating", sa.Float(), nullable=False, server_default="0"))
     op.add_column("handymen", sa.Column("rating_count", sa.Integer(), nullable=False, server_default="0"))
-
 
 def downgrade():
     op.drop_column("handymen", "rating_count")

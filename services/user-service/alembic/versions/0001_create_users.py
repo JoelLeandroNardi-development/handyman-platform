@@ -6,7 +6,6 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "users",
@@ -16,7 +15,6 @@ def upgrade():
         sa.Column("latitude", sa.Float(), nullable=True),
         sa.Column("longitude", sa.Float(), nullable=True),
     )
-
 
 def downgrade():
     op.drop_table("users")

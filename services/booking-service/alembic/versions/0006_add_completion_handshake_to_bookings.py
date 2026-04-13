@@ -13,7 +13,6 @@ down_revision = "0005"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.add_column(
         "bookings",
@@ -35,7 +34,6 @@ def upgrade():
         "bookings",
         sa.Column("completion_rejection_reason", sa.String(), nullable=True),
     )
-
 
 def downgrade():
     op.drop_column("bookings", "completion_rejection_reason")

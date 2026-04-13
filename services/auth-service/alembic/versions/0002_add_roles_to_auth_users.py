@@ -6,7 +6,6 @@ down_revision = "0001"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     # Add roles column (nullable first for existing rows)
     op.add_column("auth_users", sa.Column("roles", sa.JSON(), nullable=True))
@@ -16,7 +15,6 @@ def upgrade():
 
     # Enforce NOT NULL
     op.alter_column("auth_users", "roles", nullable=False)
-
 
 def downgrade():
     op.drop_column("auth_users", "roles")

@@ -5,8 +5,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
-from app.db import Base
-from app.models import User
+from app.infrastructure.db import Base
+from app.domain.models import User
 
 config = context.config
 fileConfig(config.config_file_name)

@@ -12,7 +12,6 @@ down_revision = "0006"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.alter_column(
         "bookings",
@@ -24,7 +23,6 @@ def upgrade():
         "completion_rejection_reason",
         new_column_name="rejection_reason",
     )
-
 
 def downgrade():
     op.alter_column(

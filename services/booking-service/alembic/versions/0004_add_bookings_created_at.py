@@ -13,7 +13,6 @@ down_revision = "0003"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.add_column(
         "bookings",
@@ -24,7 +23,6 @@ def upgrade():
             nullable=False,
         ),
     )
-
 
 def downgrade():
     op.drop_column("bookings", "created_at")

@@ -13,7 +13,6 @@ down_revision = "0002"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "outbox_events",

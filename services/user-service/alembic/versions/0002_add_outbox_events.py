@@ -13,7 +13,6 @@ down_revision = "0001"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "outbox_events",
@@ -32,7 +31,6 @@ def upgrade():
     op.create_index("ix_outbox_events_event_type", "outbox_events", ["event_type"])
     op.create_index("ix_outbox_events_routing_key", "outbox_events", ["routing_key"])
     op.create_index("ix_outbox_events_status", "outbox_events", ["status"])
-
 
 def downgrade():
     op.drop_index("ix_outbox_events_status", table_name="outbox_events")

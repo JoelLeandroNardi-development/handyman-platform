@@ -13,7 +13,6 @@ down_revision = "0002"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.add_column(
         "users",
@@ -26,7 +25,6 @@ def upgrade():
     )
     # Optional: if you frequently sort/filter by created_at
     # op.create_index("ix_users_created_at", "users", ["created_at"])
-
 
 def downgrade():
     # Optional: if you created it above

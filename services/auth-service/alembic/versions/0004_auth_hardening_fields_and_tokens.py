@@ -6,7 +6,6 @@ down_revision = "0003"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.add_column(
         "auth_users",
@@ -43,7 +42,6 @@ def upgrade():
     )
     op.create_index("ix_email_verification_tokens_user_id", "email_verification_tokens", ["user_id"], unique=False)
     op.create_unique_constraint("uq_email_verification_tokens_token_hash", "email_verification_tokens", ["token_hash"])
-
 
 def downgrade():
     op.drop_constraint("uq_email_verification_tokens_token_hash", "email_verification_tokens", type_="unique")

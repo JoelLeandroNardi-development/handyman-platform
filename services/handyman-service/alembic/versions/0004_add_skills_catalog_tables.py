@@ -13,7 +13,6 @@ down_revision = "0003"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "skills_categories",
@@ -41,7 +40,6 @@ def upgrade():
     )
     op.create_index("ix_skills_catalog_items_category_key", "skills_catalog_items", ["category_key"], unique=False)
     op.create_index("ix_skills_catalog_items_skill_key", "skills_catalog_items", ["skill_key"], unique=False)
-
 
 def downgrade():
     op.drop_index("ix_skills_catalog_items_skill_key", table_name="skills_catalog_items")

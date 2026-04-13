@@ -13,7 +13,6 @@ down_revision = "0005"
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "handyman_reviews",
@@ -29,7 +28,6 @@ def upgrade():
     op.create_index("ix_handyman_reviews_booking_id", "handyman_reviews", ["booking_id"], unique=True)
     op.create_index("ix_handyman_reviews_handyman_email", "handyman_reviews", ["handyman_email"])
     op.create_index("ix_handyman_reviews_user_email", "handyman_reviews", ["user_email"])
-
 
 def downgrade():
     op.drop_index("ix_handyman_reviews_user_email", table_name="handyman_reviews")

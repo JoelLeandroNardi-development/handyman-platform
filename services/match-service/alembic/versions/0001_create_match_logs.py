@@ -6,7 +6,6 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
     op.create_table(
         "match_logs",
@@ -15,7 +14,6 @@ def upgrade():
         sa.Column("user_longitude", sa.Float(), nullable=False),
         sa.Column("skill", sa.String(), nullable=False),
     )
-
 
 def downgrade():
     op.drop_table("match_logs")
