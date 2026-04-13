@@ -54,7 +54,7 @@ class NotificationQueryService:
                 yield f"event: {SseEvent.READY}\ndata: {json.dumps({PayloadKey.OK: True})}\n\n"
                 while True:
                     try:
-                        payload = await asyncio.wait_for(queue.get(), timeout=SseSetting.HEARTBEAT_INTERVAL_SECONDS)
+                        payload = await asyncio.wait_for(queue.get(), timeout=int(SseSetting.HEARTBEAT_INTERVAL_SECONDS))
                         yield f"event: {payload[PayloadKey.TYPE]}\ndata: {json.dumps(payload)}\n\n"
                     except asyncio.TimeoutError:
                         yield f"event: {SseEvent.PING}\ndata: {json.dumps({PayloadKey.OK: True})}\n\n"
