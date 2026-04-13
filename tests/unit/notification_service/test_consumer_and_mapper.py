@@ -7,6 +7,7 @@ import pytest
 from tests.constants import (
     EmailConstants,
     EventType,
+    NotificationType,
     EVENT_ID_KEY,
     EVENT_TYPE_KEY,
 )
@@ -130,7 +131,7 @@ class TestNotificationMapper:
         intents = mapper_module.map_event_to_notifications(
             {
                 EVENT_ID_KEY: "evt-cbu-1",
-                EVENT_TYPE_KEY: EventType.BOOKING_COMPLETED_BY_USER,
+                EVENT_TYPE_KEY: NotificationType.BOOKING_COMPLETED_BY_USER,
                 "data": {
                     "booking_id": "b-cbu-1",
                     "user_email": EmailConstants.USER,
@@ -140,7 +141,7 @@ class TestNotificationMapper:
         )
         assert len(intents) == 1
         assert intents[0]["user_email"] == EmailConstants.HANDYMAN
-        assert intents[0]["type"] == EventType.BOOKING_COMPLETED_BY_USER
+        assert intents[0]["type"] == NotificationType.BOOKING_COMPLETED_BY_USER
         assert intents[0]["priority"] == "high"
         assert intents[0]["payload"]["user_email"] == EmailConstants.USER
         assert intents[0]["entity_id"] == "b-cbu-1"
@@ -149,7 +150,7 @@ class TestNotificationMapper:
         intents = mapper_module.map_event_to_notifications(
             {
                 EVENT_ID_KEY: "evt-cbu-2",
-                EVENT_TYPE_KEY: EventType.BOOKING_COMPLETED_BY_USER,
+                EVENT_TYPE_KEY: NotificationType.BOOKING_COMPLETED_BY_USER,
                 "data": {"booking_id": "b-cbu-2", "user_email": EmailConstants.USER},
             }
         )
@@ -159,7 +160,7 @@ class TestNotificationMapper:
         intents = mapper_module.map_event_to_notifications(
             {
                 EVENT_ID_KEY: "evt-cbh-1",
-                EVENT_TYPE_KEY: EventType.BOOKING_COMPLETED_BY_HANDYMAN,
+                EVENT_TYPE_KEY: NotificationType.BOOKING_COMPLETED_BY_HANDYMAN,
                 "data": {
                     "booking_id": "b-cbh-1",
                     "user_email": EmailConstants.USER,
@@ -169,7 +170,7 @@ class TestNotificationMapper:
         )
         assert len(intents) == 1
         assert intents[0]["user_email"] == EmailConstants.USER
-        assert intents[0]["type"] == EventType.BOOKING_COMPLETED_BY_HANDYMAN
+        assert intents[0]["type"] == NotificationType.BOOKING_COMPLETED_BY_HANDYMAN
         assert intents[0]["priority"] == "high"
         assert intents[0]["payload"]["handyman_email"] == EmailConstants.HANDYMAN
         assert intents[0]["entity_id"] == "b-cbh-1"
@@ -178,7 +179,7 @@ class TestNotificationMapper:
         intents = mapper_module.map_event_to_notifications(
             {
                 EVENT_ID_KEY: "evt-cbh-2",
-                EVENT_TYPE_KEY: EventType.BOOKING_COMPLETED_BY_HANDYMAN,
+                EVENT_TYPE_KEY: NotificationType.BOOKING_COMPLETED_BY_HANDYMAN,
                 "data": {"booking_id": "b-cbh-2", "handyman_email": EmailConstants.HANDYMAN},
             }
         )

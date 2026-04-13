@@ -2,11 +2,8 @@ from __future__ import annotations
 from enum import StrEnum
 
 class EventType(StrEnum):
-    BOOKING_CREATED = "booking.created"
     BOOKING_REQUESTED = "booking.requested"
     BOOKING_CANCEL_REQUESTED = "booking.cancel_requested"
-    BOOKING_CONFIRMED = "booking.confirmed"
-    BOOKING_CANCELLED = "booking.cancelled"
     BOOKING_COMPLETED = "booking.completed"
     BOOKING_REJECTED = "booking.rejected"
     BOOKING_COMPLETED_BY_USER = "booking.completed_by_user"
@@ -16,9 +13,22 @@ class EventType(StrEnum):
     SLOT_CONFIRMED = "slot.confirmed"
     SLOT_EXPIRED = "slot.expired"
     SLOT_RELEASED = "slot.released"
-    NOTIFICATION_CREATED = "notification.created"
+
+class NotificationType(StrEnum):
+    JOB_REQUESTED = "job.requested"
+    BOOKING_RESERVED = "booking.reserved"
+    BOOKING_CONFIRMED = "booking.confirmed"
+    JOB_CONFIRMED = "job.confirmed"
+    BOOKING_REJECTED = "booking.rejected"
+    BOOKING_EXPIRED = "booking.expired"
+    BOOKING_CANCELLED = "booking.cancelled"
+    JOB_RELEASED = "job.released"
+    BOOKING_COMPLETED = "booking.completed"
     JOB_COMPLETED = "job.completed"
     BOOKING_REJECTED_BY_HANDYMAN = "booking.rejected_by_handyman"
+    JOB_COMPLETION_REQUESTED = "job.completion_requested"
+    BOOKING_COMPLETION_REQUESTED = "booking.completion_requested"
+    NOTIFICATION_CREATED = "notification.created"
 
 class EmailConstants(StrEnum):
     USER = "user@example.com"
