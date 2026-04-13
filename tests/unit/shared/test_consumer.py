@@ -28,7 +28,7 @@ from shared.core.messaging.consumer import (
 @pytest.mark.rabbit
 class TestSafeDecodeJson:
     @pytest.mark.parametrize("raw, expected", [
-        (json.dumps({"event": EventType.BOOKING_CREATED}).encode(), {"event": EventType.BOOKING_CREATED}),
+        (json.dumps({"event": EventType.BOOKING_REQUESTED}).encode(), {"event": EventType.BOOKING_REQUESTED}),
         (b"not valid json {{", {}),
         (b"", {}),
         (None, {}),
@@ -40,7 +40,7 @@ class TestSafeDecodeJson:
 
     def test_complex_payload(self, rabbit_message_mock):
         payload = {
-            "event": EventType.BOOKING_CONFIRMED,
+            "event": EventType.SLOT_CONFIRMED,
             "data": {"booking_id": "b-123", "items": [1, 2, 3]},
         }
         rabbit_message_mock.body = json.dumps(payload).encode()
@@ -77,7 +77,7 @@ class TestSetupConsumerTopology:
         rabbit_channel_mock.declare_exchange = AsyncMock(return_value=MagicMock())
         rabbit_channel_mock.declare_queue = AsyncMock(return_value=queue)
 
-        rks = [EventType.BOOKING_REQUESTED, EventType.BOOKING_CONFIRMED, EventType.BOOKING_CANCELLED]
+        rks = [EventType.BOOKING_REQUESTED, EventType.SLOT_CONFIRMED, EventType.BOOKING_CANCEL_REQUESTED]
         await setup_consumer_topology(
             channel=rabbit_channel_mock,
             exchange_name=EXCHANGE_DOMAIN_EVENTS,
