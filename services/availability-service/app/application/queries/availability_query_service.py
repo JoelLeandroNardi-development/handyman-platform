@@ -7,7 +7,7 @@ from ...infrastructure.cache import redis_client
 from ...infrastructure.repository import get_reservation
 
 class AvailabilityQueryService:
-    async def get_availability(email: str) -> dict:
+    async def get_availability(self, email: str) -> dict:
         key = avail_key(email)
         slots = await redis_client.lrange(key, 0, -1)
 
@@ -22,6 +22,7 @@ class AvailabilityQueryService:
         return {"email": email, "slots": parsed}
 
     async def list_all_availability(
+        self,
         limit: int = Query(200, ge=1, le=1000),
         cursor: int = Query(0, ge=0),
     ) -> dict:
@@ -45,6 +46,6 @@ class AvailabilityQueryService:
 
         return {"cursor": int(next_cursor or 0), "items": items}
 
-    async def get_reservation(booking_id: str) -> dict:
+    async def get_reservation(self, booking_id: str) -> dict:
         res = await get_reservation(booking_id)
         return {"booking_id": booking_id, "reservation": res}

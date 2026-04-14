@@ -20,7 +20,7 @@ class HandymanCommandService:
 
     async def create_handyman(self, data: CreateHandyman) -> HandymanResponse:
         normalized_skills = normalize_skills_input(data.skills)
-        invalid_skills = await find_invalid_skills(normalized_skills)
+        invalid_skills = await find_invalid_skills(self.db, normalized_skills)
         if invalid_skills:
             raise HTTPException(
                 status_code=422,

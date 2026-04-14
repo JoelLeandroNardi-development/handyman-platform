@@ -50,7 +50,7 @@ async def create_handyman_endpoint(data: CreateHandyman, request: Request, user=
 
 @router.get("/handymen/{email}", response_model=HandymanResponse, tags=["Handymen"])
 async def get_handyman_endpoint(email: str, request: Request, user=Depends(get_current_user)):
-    require_role(user, ["admin"])
+    require_role(user, ["user", "handyman", "admin"])
     return await get_handyman(email, request_id=request.state.request_id, user_payload=user)
 
 @router.put("/handymen/{email}/location", response_model=HandymanResponse, tags=["Handymen"])
