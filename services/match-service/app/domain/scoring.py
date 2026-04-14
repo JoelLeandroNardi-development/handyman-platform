@@ -4,7 +4,7 @@ import math
 from typing import Any
 
 from .constants import RANKING_WEIGHTS, RANKING_CAPS
-from ..application.mappers import clamp01, safe_float, safe_int
+from shared.core.utils.normalize import clamp01, safe_float, safe_int
 
 def _distance_score(distance_km: Any) -> float:
     km = max(0.0, safe_float(distance_km, default=1_000_000.0))
